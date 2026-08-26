@@ -9,3 +9,7 @@ expo-env.d.ts
 
 # codegen: se regenera, no se versiona
 packages/api/src/generated/
+
+# prebuild: los proyectos nativos se regeneran, no se versionan
+apps/mobile/ios/
+apps/mobile/android/

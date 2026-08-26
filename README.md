@@ -17,9 +17,42 @@ O todo junto en un contenedor:
 
     docker compose up            # http://localhost:3000
 
-Para la app mobile hace falta Expo Go o un simulador:
+La app mobile se corre con un *development build*, no con Expo Go: Expo Go se
+quedó en el SDK 54 y el proyecto usa el 57. Con el backend levantado aparte:
 
-    bun run --filter mobile dev
+**iOS** — requiere Xcode y CocoaPods.
+
+    brew install cocoapods
+    cd apps/mobile
+    bunx expo install expo-dev-client
+    bunx expo run:ios
+
+**Android** — requiere Android Studio con un emulador creado.
+
+    cd apps/mobile
+    bunx expo install expo-dev-client
+    bunx expo run:android
+
+La primera vez, `run:*` genera el proyecto nativo con `expo prebuild`, lo
+compila y lo deja corriendo contra Metro. Después reusa `apps/mobile/ios/` y
+`apps/mobile/android/`, que no se versionan porque son artefactos de build.
+
+Cambiar sólo TypeScript o JavaScript **no** necesita recompilar: alcanza con
+levantar Metro.
+
+    cd apps/mobile && bunx expo start
+
+Va directo y no por `bun run --filter mobile dev` porque el filtro se come el
+TTY y Metro pierde el menú interactivo.
+
+Hay que volver a correr `run:*` sólo en tres casos: instalar o actualizar una
+librería con código nativo, cambiar `app.json`, o subir de versión el SDK de
+Expo.
+
+En un dispositivo físico `localhost` es el dispositivo, no la máquina: hay que
+apuntar la API a la IP de la red local.
+
+    EXPO_PUBLIC_API_URL=http://192.168.1.81:3000/graphql bunx expo run:ios --device
 
 ## Verificar
 
