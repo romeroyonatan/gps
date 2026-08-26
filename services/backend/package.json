@@ -1,0 +1,23 @@
+{
+  "name": "backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "schema": "bun scripts/generar-schema.ts && bunx biome format --write ../../schema.gql",
+    "compile": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gps/core": "workspace:*",
+    "@gps/sistema": "workspace:*",
+    "graphql": "^16.9.0",
+    "graphql-yoga": "^5.22.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "bun-plugin-tailwind": "^0.1.2",
+    "typescript": "^5.7.0"
+  }
+}

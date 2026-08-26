@@ -1,0 +1,24 @@
+{
+  "name": "gps",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "check": "bun run lint && bun run compile && bun test",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "compile": "bun run --filter './packages/*' --filter './services/*' --filter './apps/*' compile",
+    "schema": "bun run --filter backend schema",
+    "dev": "bun run --filter backend dev"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.10",
+    "bun-plugin-tailwind": "^0.1.2",
+    "typescript": "^5.7.0"
+  }
+}

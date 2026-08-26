@@ -1,0 +1,8 @@
+# packages/api/src/queries/version.graphql
+query Version {
+  version {
+    numero
+    entorno
+    modulos
+  }
+}

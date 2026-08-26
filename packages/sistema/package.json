@@ -1,0 +1,20 @@
+{
+  "name": "@gps/sistema",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./dominio": "./src/dominio/index.ts",
+    "./servidor": "./src/servidor/index.ts"
+  },
+  "scripts": {
+    "compile": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gps/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.0"
+  }
+}

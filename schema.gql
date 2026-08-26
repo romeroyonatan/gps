@@ -1,0 +1,15 @@
+type Query {
+  """
+  Devuelve la version de esta instancia.
+  """
+  version: Version!
+}
+
+"""
+Version del sistema y modulos registrados.
+"""
+type Version {
+  entorno: String!
+  modulos: [String!]!
+  numero: String!
+}

@@ -1,0 +1,12 @@
+services:
+  gps:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      ENTORNO: produccion
+    healthcheck:
+      test: ["CMD", "bun", "-e", "await fetch('http://localhost:3000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Instalar dependencias
+        run: bun install --frozen-lockfile
+
+      - name: Lint y formato
+        run: bunx biome check .
+
+      - name: Generar tipos del cliente
+        run: bun run --filter @gps/api codegen
+
+      - name: Chequeo de tipos
+        run: bun run compile
+
+      - name: Tests
+        run: bun test
+
+      - name: Verificar que schema.gql esta al dia
+        run: |
+          bun run schema
+          if ! git diff --exit-code schema.gql; then
+            echo "::error::schema.gql quedo desactualizado. Corre 'bun run schema' y commitea el resultado."
+            exit 1
+          fi
+
+      - name: Verificar que el servidor arranca y sirve la aplicación
+        run: |
+          ENTORNO=produccion PUERTO=3000 bun services/backend/src/index.ts &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000/health > /dev/null && break
+            sleep 1
+          done
+          curl -sf http://localhost:3000/health
+          curl -sf http://localhost:3000/graphql -H 'content-type: application/json' \
+            -d '{"query":"{ version { numero modulos } }"}'
+          curl -sf http://localhost:3000/ | grep -q '<div id="raiz">'
+
+      - name: Construir la imagen Docker
+        run: docker build -t gps:ci .

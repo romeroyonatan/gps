@@ -1,0 +1,9 @@
+# services/backend/bunfig.toml
+# Bun lee bunfig.toml solo desde el cwd del proceso: no busca hacia arriba ni
+# fusiona con otros bunfig.toml. Este archivo cubre "bun run dev" (cwd =
+# services/backend, por el filtro de workspace); el bunfig.toml de la raíz
+# del repo cubre la invocación directa "bun services/backend/src/index.ts"
+# (cwd = raíz). Si editás el bloque [serve.static] acá, editá también el
+# otro archivo.
+[serve.static]
+plugins = ["bun-plugin-tailwind"]

@@ -1,0 +1,31 @@
+# bunfig.toml
+[install]
+linker = "isolated"
+# babel-preset-expo (y las presets/plugins que devuelve como strings) se
+# resuelven en el directorio del archivo que declara el preset (apps/mobile),
+# no en el propio node_modules de babel-preset-expo. Con linker aislado esos
+# paquetes no quedan alcanzables por la subida jerárquica de Node desde
+# apps/mobile. Se publican al node_modules raíz para que la resolución de
+# Babel (no la de Metro, que ya cubre metro.config.js) los encuentre.
+#
+# El patrón tiene que quedar ancho ("*babel*"), no achicarse a "@babel/*":
+# babel-preset-expo también depende de plugins sin scope que pisan el mismo
+# problema de resolución (babel-plugin-react-compiler,
+# babel-plugin-react-native-web, babel-plugin-syntax-hermes-parser,
+# babel-plugin-transform-flow-enums). Un "@babel/*" los deja afuera y rompe
+# el build de mobile en silencio. De paso también matchea
+# metro-babel-transformer, que no tiene este problema (Metro lo resuelve
+# solo, ver metro.config.js) pero hoistearlo no hace daño. Este patrón no
+# toca los otros dos límites que este repo hace cumplir: @gps/*/servidor
+# desde apps/** y bun:*/node:* desde packages/*/src/servidor/** (ver
+# biome.json).
+publicHoistPattern = ["*babel*"]
+
+# Bun lee bunfig.toml solo desde el cwd del proceso: no busca hacia arriba ni
+# fusiona con otros bunfig.toml. Este archivo cubre la invocación directa
+# "bun services/backend/src/index.ts" desde la raíz del repo (cwd = raíz);
+# services/backend/bunfig.toml cubre "bun run dev" (cwd = services/backend,
+# por el filtro de workspace). Si editás el bloque [serve.static] acá, editá
+# también el otro archivo.
+[serve.static]
+plugins = ["bun-plugin-tailwind"]

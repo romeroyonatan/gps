@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.expo/
+expo-env.d.ts
+*.tsbuildinfo
+.DS_Store
+.env
+.env.local
+
+# codegen: se regenera, no se versiona
+packages/api/src/generated/
