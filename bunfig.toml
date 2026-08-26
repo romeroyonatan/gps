@@ -29,3 +29,9 @@ publicHoistPattern = ["*babel*"]
 # también el otro archivo.
 [serve.static]
 plugins = ["bun-plugin-tailwind"]
+
+[test]
+# Los Pods de apps/mobile/ios son decenas de miles de archivos y recorrerlos
+# agota los descriptores (macOS corta en kern.maxfilesperproc=10240, muy por
+# debajo del ulimit). Son artefactos de prebuild: no hay tests ahi.
+pathIgnorePatterns = ["**/apps/mobile/ios/**"]
