@@ -48,6 +48,12 @@ jobs:
           curl -sf http://localhost:3000/health
           curl -sf http://localhost:3000/graphql -H 'content-type: application/json' \
             -d '{"query":"{ version { numero modulos } }"}'
+          # Es el unico lugar que ejercita una base en archivo con las
+          # migraciones aplicadas al arrancar: si no se consulta una tabla, un
+          # esquema roto pasa igual. El grep atrapa el {"errors":[...]}.
+          curl -sf http://localhost:3000/graphql -H 'content-type: application/json' \
+            -d '{"query":"{ distritos { numero zona grupos { numero ramas } } }"}' \
+            | grep -q '"distritos"'
           curl -sf http://localhost:3000/ | grep -q '<div id="raiz">'
 
       - name: Construir la imagen Docker

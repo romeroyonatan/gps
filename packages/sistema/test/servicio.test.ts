@@ -1,12 +1,18 @@
 import { describe, expect, test } from 'bun:test'
-import type { Core } from '@gps/core'
+import type { Bd, Core } from '@gps/core'
 import { crearServicioDeSistema } from '../src/servidor/servicio'
 
 function coreFalso(parcial: Partial<Core> = {}): Core {
   return {
     config: { version: '9.9.9', entorno: 'prueba', puerto: 0 },
     logger: { info: () => {}, error: () => {} },
-    reloj: { ahora: () => new Date('2026-01-01T00:00:00Z') },
+    reloj: { ahora: () => new Date('1970-01-01T00:00:00Z') },
+    // sistema no consulta la base ni genera ids: el fake no los provee, y si
+    // algun dia los usara este test explotaria, que es lo que queremos.
+    bd: null as unknown as Bd,
+    nuevoId: () => {
+      throw new Error('sistema no deberia generar ids')
+    },
     modulos: ['sistema'],
     ...parcial,
   }

@@ -4,9 +4,15 @@ services:
     ports:
       - "3000:3000"
     environment:
-      ENTORNO: desarrollo
+      ENTORNO: ${ENTORNO:-desarrollo}
+      BD: /datos/gps.db
+    volumes:
+      - gps-datos:/datos
     healthcheck:
       test: ["CMD", "bun", "-e", "await fetch('http://localhost:3000/health')"]
       interval: 30s
       timeout: 5s
       retries: 3
+
+volumes:
+  gps-datos:

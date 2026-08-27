@@ -1,0 +1,14 @@
+# packages/api/src/queries/distritos.graphql
+query Distritos {
+  distritos {
+    id
+    numero
+    zona
+    grupos {
+      id
+      numero
+      nombre
+      ramas
+    }
+  }
+}

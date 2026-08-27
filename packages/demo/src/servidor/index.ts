@@ -1,0 +1,1 @@
+export { sembrarEscenario } from './escenario'

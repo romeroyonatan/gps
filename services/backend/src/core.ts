@@ -1,10 +1,12 @@
-import type { Config, Core } from '@gps/core'
+import type { Bd, Config, Core } from '@gps/core'
 
-export function crearCore(config: Config, modulos: readonly string[]): Core {
+export function crearCore(config: Config, modulos: readonly string[], bd: Bd): Core {
   return {
     config,
     modulos,
+    bd,
     reloj: { ahora: () => new Date() },
+    nuevoId: (prefijo) => `${prefijo}_${Bun.randomUUIDv7()}`,
     logger: {
       info: (mensaje, datos) => console.log(JSON.stringify({ nivel: 'info', mensaje, ...datos })),
       error: (mensaje, datos) =>

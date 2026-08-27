@@ -1,14 +1,12 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1-labs
 
 FROM oven/bun:1 AS dependencias
 WORKDIR /app
 COPY package.json bun.lock bunfig.toml ./
-COPY packages/core/package.json packages/core/
-COPY packages/sistema/package.json packages/sistema/
-COPY packages/api/package.json packages/api/
-COPY services/backend/package.json services/backend/
-COPY apps/web/package.json apps/web/
-COPY apps/mobile/package.json apps/mobile/
+# --parents copia cada package.json conservando su ruta, y por eso esta linea
+# no hay que tocarla al agregar un paquete: la lista explicita se olvidaba y el
+# install fallaba recien en el CI. Necesita el frontend 1-labs de Dockerfile.
+COPY --parents packages/*/package.json services/*/package.json apps/*/package.json ./
 RUN bun install --frozen-lockfile
 
 FROM dependencias AS construccion

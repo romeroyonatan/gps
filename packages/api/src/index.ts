@@ -1,4 +1,5 @@
-export type { VersionQuery } from './generated/graphql'
+export { useDistritos } from './estructura'
+export type { DistritosQuery, VersionQuery } from './generated/graphql'
 export { crearQueryClient, ProveedorDeApi, useTransporte } from './proveedor'
 export type { Transporte } from './transporte'
 export { ErrorDeApi, transporteHttp } from './transporte'

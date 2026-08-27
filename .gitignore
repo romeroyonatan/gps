@@ -13,3 +13,6 @@ packages/api/src/generated/
 # prebuild: los proyectos nativos se regeneran, no se versionan
 apps/mobile/ios/
 apps/mobile/android/
+
+# la base de desarrollo se crea sola, no se versiona
+*.db

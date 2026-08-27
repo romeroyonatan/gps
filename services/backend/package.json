@@ -5,13 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "bun --watch src/index.ts",
+    "demo": "ENTORNO=demo bun --watch src/index.ts",
     "start": "bun src/index.ts",
     "schema": "bun scripts/generar-schema.ts && bunx biome format --write ../../schema.gql",
     "compile": "tsc --noEmit"
   },
   "dependencies": {
     "@gps/core": "workspace:*",
+    "@gps/demo": "workspace:*",
+    "@gps/estructura": "workspace:*",
     "@gps/sistema": "workspace:*",
+    "drizzle-orm": "^0.45.2",
     "graphql": "^16.9.0",
     "graphql-yoga": "^5.22.0"
   },

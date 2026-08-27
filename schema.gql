@@ -1,8 +1,49 @@
+"""
+Un distrito de la diocesis, con sus grupos.
+"""
+type Distrito {
+  grupos: [Grupo!]!
+  id: ID!
+  numero: Int!
+  zona: String!
+}
+
+"""
+Un grupo scout y las ramas que tiene abiertas.
+"""
+type Grupo {
+  id: ID!
+  nombre: String!
+  numero: Int!
+
+  """
+  De menor a mayor edad. Vacia si el grupo no abrio ninguna.
+  """
+  ramas: [Rama!]!
+}
+
 type Query {
+  """
+  El arbol de la diocesis: distritos, sus grupos y sus ramas.
+  """
+  distritos: [Distrito!]!
+
   """
   Devuelve la version de esta instancia.
   """
   version: Version!
+}
+
+"""
+Ramas en que la asociacion divide a sus miembros por edad.
+"""
+enum Rama {
+  adultos
+  castores
+  lobatos
+  raiders
+  rovers
+  scouts
 }
 
 """

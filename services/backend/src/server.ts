@@ -1,11 +1,11 @@
-import type { Config } from '@gps/core'
+import type { Bd, Config } from '@gps/core'
 import { createYoga } from 'graphql-yoga'
 import inicio from '../../../apps/web/index.html'
 import { componer } from './composicion'
 import { crearContexto } from './context'
 
-export function crearServidor(config: Config) {
-  const { esquema, contexto } = componer(config)
+export async function crearServidor(config: Config, bd: Bd) {
+  const { esquema, contexto } = await componer(config, bd)
 
   const yoga = createYoga({
     schema: esquema,

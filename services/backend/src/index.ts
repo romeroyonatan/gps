@@ -1,10 +1,19 @@
 import type { Config, Entorno } from '@gps/core'
 import paquete from '../../../package.json'
+import { crearBd } from './bd'
 import { crearServidor } from './server'
 
 function leerEntorno(valor: string | undefined): Entorno {
-  if (valor === 'produccion' || valor === 'prueba') return valor
+  if (valor === 'produccion' || valor === 'prueba' || valor === 'demo') return valor
   return 'desarrollo'
+}
+
+/** La ruta de la base es del backend, no de los modulos: no entra en Config.
+ *  En demo es siempre memoria y no se puede configurar, para que un build de
+ *  demostracion no pueda apuntar a datos reales. */
+export function leerRutaDeBd(entorno: Entorno, valor: string | undefined): string {
+  if (entorno === 'demo') return ':memory:'
+  return valor ?? './gps.db'
 }
 
 export function leerPuerto(valor: string | undefined): number {
@@ -27,7 +36,8 @@ export function leerConfig(): Config {
 
 if (import.meta.main) {
   const config = leerConfig()
-  const servidor = crearServidor(config)
+  const bd = crearBd(leerRutaDeBd(config.entorno, process.env.BD))
+  const servidor = await crearServidor(config, bd)
   // Bun corre como PID 1 en el contenedor y el kernel ignora SIGTERM sin handler:
   // sin esto, `docker compose down` espera 10s y mata con SIGKILL (exit 137).
   process.on('SIGTERM', () => process.exit(0))

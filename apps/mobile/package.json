@@ -5,6 +5,7 @@
   "dependencies": {
     "@expo/metro-runtime": "~57.0.13",
     "@gps/api": "workspace:*",
+    "@gps/estructura": "workspace:*",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@tanstack/query-async-storage-persister": "^5.102.4",
     "expo": "~57.0.16",

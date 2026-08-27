@@ -1,0 +1,26 @@
+language js
+
+// Regla de portabilidad: el codigo bajo packages/*/src/servidor/** no toca la
+// plataforma, todo pasa por Core. Los imports los ataja noRestrictedImports en
+// biome.json; esto ataja lo que no es un import y por eso se le escapaba: un
+// `new Date()` suelto pasa cualquier regla de imports.
+//
+// Solo se prohibe lo que tiene reemplazo en Core, que es lo que hace de esto una
+// regla y no un capricho: el reloj es core.reloj.ahora() y los ids son
+// core.nuevoId(prefijo). Math.random() queda afuera a proposito, porque Core no
+// ofrece nada en su lugar.
+//
+// Se usa un plugin y no la regla noRestrictedGlobals porque esa prohibe el
+// identificador `Date`, y eso marca tambien las posiciones de tipo -`ahora(): Date`,
+// `const x: Date`-, que son legitimas. Un plugin matchea la expresion, no el nombre.
+or {
+  `new Date($...)` as $reloj where {
+    register_diagnostic(span=$reloj, message="Portabilidad: la hora sale de core.reloj.ahora(), no del sistema.", severity="error")
+  },
+  `Date.now()` as $ahora where {
+    register_diagnostic(span=$ahora, message="Portabilidad: la hora sale de core.reloj.ahora(), no del sistema.", severity="error")
+  },
+  `crypto.randomUUID()` as $id where {
+    register_diagnostic(span=$id, message="Portabilidad: los ids salen de core.nuevoId(prefijo).", severity="error")
+  }
+}

@@ -38,7 +38,7 @@ Las piezas marcadas con `(futuro)` están diseñadas pero no implementadas.
                                         |
                           +-------------v--------------+
                           |    packages/<modulo>       |
-                          |    sistema, personas, ...  |
+                          |    sistema, estructura, ...|
                           +-------------+--------------+
                                         |
                           +-------------v--------------+
@@ -80,13 +80,16 @@ Un contenedor, un proceso, un puerto. En desarrollo y en producción es el mismo
        |
        | 1. lee y valida la configuracion del entorno
        v
-    core.ts ------------- construye ------------> Core { config, logger, reloj }
+    core.ts ------------- construye ------------> Core { config, logger, reloj, bd }
        |
        | 2. toma la lista de modulos
        v
-    modules.ts  ->  [ sistema, personas, estructura, ... ]
+    modules.ts  ->  [ sistema, estructura, personas, ... ]
        |
        | 3. ordena por dependencies y detecta ciclos
+       v
+    aplicarMigraciones(core, modulos)   corre las migraciones pendientes de cada uno
+       |
        v
     para cada modulo, en orden:
        |
@@ -94,8 +97,6 @@ Un contenedor, un proceso, un puerto. En desarrollo y en producción es el mismo
        |         y se monta en el contexto bajo modulo.name
        |
        +--> modulo.registerSchema(builder)
-       |
-       +--> (futuro) corre sus migraciones pendientes
        |
        v
     esquema compuesto  --genera-->  schema.gql   (versionado, CI lo verifica)
@@ -119,20 +120,24 @@ impuesto por el linter, no por convención.
       |                 apps/web      apps/mobile    services/backend
       |
       +-- /servidor    esquema, resolvers, repositorios, migraciones
-      |                    ^                        ^
-      |                    |                        |
-      |             services/backend         packages/local
-      |                                        (y NADIE mas)
+      |                    ^              ^              ^
+      |                    |              |              |
+      |             services/backend  packages/local  packages/demo
+      |                                                (y NADIE mas)
       |
       +-- /ui          componentes compartibles (opcional)
                            ^          ^
                            |          |
                         apps/web  apps/mobile
 
-Prohibido y verificado en CI:
+Prohibido y verificado en CI, por `noRestrictedImports` en `biome.json`:
 
     apps/**  ---X--->  packages/*/servidor
-    packages/<a>  ---X--->  packages/<b>       (los modulos no se importan entre si)
+    packages/<a>/src  ---X--->  @gps/<b>       (los modulos no se importan entre si)
+
+Dos excepciones, las dos en la segunda regla. `@gps/core` sí se puede importar: es la
+plomería, no un módulo. Y `packages/demo` está exceptuado del todo, porque sembrar los
+módulos a través de sus servicios públicos exige conocerlos — es su razón de ser.
 
 Los módulos se comunican **sólo por el contexto**: `ctx.personas`, `ctx.estructura`.
 
@@ -170,7 +175,7 @@ Los módulos se comunican **sólo por el contexto**: `ctx.personas`, `ctx.estruc
     servicio del modulo
        |
        v
-    repositorio  ->  base        (futuro; el modulo `sistema` no llega hasta aca)
+    repositorio  ->  base        (estructura llega hasta aca; sistema no tiene tablas)
        |
        v
     respuesta
@@ -221,21 +226,28 @@ aunque sus repositorios reciban un `Alcance`.
        |
     tesoreria
 
-Orden de construcción que se desprende: `sistema` (hecho), luego `personas`, luego
-`estructura`, y a partir de ahí el resto. Es tentativo: cada spec de módulo puede
+El `estructura` de la spec depende de `personas` porque modela cargos y autoridades
+(jefe de grupo, comisionado de distrito, auxiliares, Edifor): todos apuntan a una
+persona. El `estructura` que existe hoy todavía no llega ahí — sólo modela distritos,
+grupos y las ramas que cada grupo tiene abiertas — así que hoy no depende de ningún
+otro módulo (`dependencies: []`). La dependencia con `personas` llega junto con los
+cargos, no antes.
+
+Orden de construcción que se desprende: `sistema` y `estructura` (hechos), luego
+`personas`, y a partir de ahí el resto. Es tentativo: cada spec de módulo puede
 ajustarlo.
 
-## 8. Modo demo y offline (futuro)
+## 8. Modo demo y offline
 
 Los mismos módulos, otro `Core`.
 
     +---------------------------+        +---------------------------+
-    |  services/backend         |        |  apps/mobile              |
+    |  services/backend         |        |  apps/mobile   (futuro)   |
     |                           |        |                           |
     |  Core {                   |        |  Core {                   |
     |    bd: bun:sqlite         |        |    bd: expo-sqlite        |
-    |    notificador: ExpoPush  |        |    notificador: ninguno   |
-    |    almacenamiento: S3     |        |    almacenamiento: local  |
+    |    notificador (futuro)   |        |    notificador: ninguno   |
+    |    almacenamiento (futuro)|        |    almacenamiento: local  |
     |  }                        |        |  }                        |
     +------------+--------------+        +------------+--------------+
                  |                                    |
@@ -246,9 +258,29 @@ Los mismos módulos, otro `Core`.
                        |  identico en los dos     |
                        +--------------------------+
 
+La mitad izquierda ya existe, salvo lo marcado `(futuro)`: `services/backend/src/bd.ts`
+abre SQLite real por Drizzle, y `bun run demo` (`ENTORNO=demo`) levanta esa misma base
+en memoria, sembrada por `packages/demo` a través de los servicios públicos de cada
+módulo — la siembra no conoce repositorios ni tablas, sólo llama a lo que cualquier
+resolver llamaría.
+
+La mitad derecha sigue siendo futuro completo: no hay `packages/local` ni base en el
+dispositivo. Cuando exista, va a componer los mismos módulos con un `Core` que abra
+`expo-sqlite` en vez de `bun:sqlite` — `bd.ts` es hoy el único archivo que conoce el
+driver, así que cambiarlo ahí es todo lo que hace falta del lado del servidor.
+
 Esto sólo funciona si se respeta la regla: **el código de servidor de un módulo nunca
 toca una API de plataforma directamente.** Ni `bun:sqlite`, ni `fs`, ni `fetch`, ni la
 hora del sistema. Todo pasa por `Core`.
+
+Con una deuda conocida, que conviene tener escrita y no escondida. El runner
+`aplicarMigraciones` sí es portable: recibe `sql: string` y habla por `core.bd`, sin
+tocar el sistema de archivos ni el driver. Lo que **no** es portable es cómo cada
+módulo consigue ese texto, que es un detalle de plataforma: hoy `estructura` lo importa
+con `with { type: 'text' }`, una extensión de Bun que Metro no soporta (del atributo de
+import sólo `json` es estándar). El día que exista `packages/local` va a haber que
+resolverlo ahí — un transformer de Metro, o pasarle las migraciones al módulo de otra
+forma —, pero es un cambio en los módulos, no en el runner.
 
 ## 9. Eventos entre módulos (futuro)
 

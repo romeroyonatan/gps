@@ -1,4 +1,6 @@
-export type Entorno = 'desarrollo' | 'produccion' | 'prueba'
+import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
+
+export type Entorno = 'desarrollo' | 'produccion' | 'prueba' | 'demo'
 
 export interface Config {
   readonly version: string
@@ -15,12 +17,25 @@ export interface Reloj {
   ahora(): Date
 }
 
+/** La base, sin atarse al driver: bun:sqlite en el servidor, expo-sqlite en el
+ *  telefono. Quien la abre es la raiz de composicion; un modulo la recibe ya
+ *  abierta y no sabe cual es. */
+export type Bd = BaseSQLiteDatabase<'sync', unknown>
+
 /** Lo que el core le provee a todo modulo. Es la unica via de un modulo
  *  hacia la plataforma: ver la regla de portabilidad en AGENT.md. */
 export interface Core {
   readonly config: Config
   readonly logger: Logger
   readonly reloj: Reloj
+  readonly bd: Bd
   /** Nombres de los modulos registrados, en orden de dependencias. */
   readonly modulos: readonly string[]
+  /** Identificador nuevo para una entidad, con su prefijo:
+   *      grupo_01a04035-7e28-7428-afbd-021d928ae01c
+   *  El prefijo se guarda en la base, no se codifica: un id en un log dice de
+   *  que entidad es sin ir a buscarlo. Es del dominio, asi que va en espanol y
+   *  en singular. Va en Core por la misma razon que reloj.ahora(): generar un
+   *  UUID es tocar la plataforma. */
+  nuevoId(prefijo: string): string
 }

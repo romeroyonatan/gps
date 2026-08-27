@@ -6,7 +6,7 @@ const config: CodegenConfig = {
   generates: {
     './src/generated/graphql.ts': {
       plugins: ['typescript', 'typescript-operations', 'typed-document-node'],
-      config: { useTypeImports: true },
+      config: { useTypeImports: true, enumsAsTypes: true },
     },
   },
 }

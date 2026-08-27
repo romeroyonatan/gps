@@ -6,7 +6,7 @@ Mapa de piezas en `docs/arquitectura.md`. Tutorial en prosa en `docs/crear-un-mo
 
 ## Vocabulario: módulo ≠ plugin
 
-- **Módulo**: una unidad de negocio nuestra (Personas, Afiliación, `sistema`).
+- **Módulo**: una unidad de negocio nuestra (`sistema`, `estructura`).
   Interfaz `Module`, registrados en `services/backend/src/modules.ts`.
 - **Plugin**: reservado para los interceptores del pipeline de GraphQL de envelop.
   Todavía no hay ninguno.
@@ -16,6 +16,7 @@ Mapa de piezas en `docs/arquitectura.md`. Tutorial en prosa en `docs/crear-un-mo
     bun install                 instalar
     bun run dev                 la app entera en :3000 — web y API en un solo
                                 proceso, con recarga en caliente
+    bun run demo                la app con datos de ejemplo, base en memoria
     bun run --filter mobile dev Expo
     bun run check               lint + tipos + tests
     bun run schema               regenerar schema.gql
@@ -29,10 +30,17 @@ Mapa de piezas en `docs/arquitectura.md`. Tutorial en prosa en `docs/crear-un-mo
 3. Escribir el dominio en `src/dominio/`: modelos, validaciones, reglas puras.
 4. Escribir el servicio, el esquema y el módulo en `src/servidor/`.
 5. Declarar las dependencias en `dependencies` del objeto `Module`.
-6. Agregarlo a la lista de `services/backend/src/modules.ts`.
-7. `bun run schema` y commitear el `schema.gql` resultante.
+6. Si el módulo tiene tablas: declararlas en `src/servidor/tablas.ts`, generar la
+   migración con `bunx drizzle-kit generate --name <nombre>` parado en el paquete, y
+   sumarla a `src/servidor/migraciones.ts`.
+7. Agregarlo a la lista de `services/backend/src/modules.ts`.
+8. `bun run schema` y commitear el `schema.gql` resultante.
 
-No hay ningún otro archivo central que tocar.
+`modules.ts` es el único archivo central que hay que tocar. El `Dockerfile` no:
+copia los `package.json` con `COPY --parents packages/*/package.json` (necesita el
+frontend `1-labs`), justamente para que un paquete nuevo no lo obligue a nadie a
+acordarse. Si alguna vez se vuelve a una lista explícita de `COPY`, este paso vuelve a
+la receta.
 
 ## Reglas obligatorias
 
@@ -43,14 +51,25 @@ industria (`module`, `core`, `index`, `server`, `context`, `config`, `logger`,
 `schema`, `repository`, `cache`, `query`) y para los archivos canónicos
 (`README.md`, `schema.gql`, `package.json`, `Dockerfile`).
 
-**Portabilidad.** El código bajo `src/servidor/` de un módulo nunca importa `bun:*`
-ni `node:*`, ni lee archivos, ni consulta la hora del sistema. Todo pasa por `Core`.
-Lo impone Biome. Si la regla molesta, la solución es pasar el dato por `Core`, nunca
-desactivarla. Es lo que va a permitir correr los módulos dentro del teléfono.
+**Portabilidad.** El código bajo `src/` de un módulo (no sólo `src/servidor/`: también
+`/dominio`, que se importa desde el navegador) nunca importa `bun:*` ni `node:*`, ni lee
+archivos. El código bajo `src/servidor/` además nunca consulta la hora del sistema ni
+genera ids al azar. Todo pasa por `Core`. Lo impone Biome por dos vías:
+`noRestrictedImports` para los imports, con alcance a todo `src/`, y el plugin
+`biome-plugins/portabilidad.grit`, acotado a `src/servidor/`, para lo que no es un
+import (`new Date()`, `Date.now()`, `crypto.randomUUID()`) — un `new Date()` suelto pasa
+cualquier regla de imports. El plugin sólo prohíbe lo que tiene reemplazo en `Core`: el
+reloj es `core.reloj.ahora()` y los ids son `core.nuevoId(prefijo)`. En los tests, los
+relojes falsos se fijan en epoch 1970 para que cualquier hora del sistema colada se
+distinga de un vistazo en vez de parecer plausible. Si la regla de portabilidad molesta,
+la solución es pasar el dato por `Core`, nunca desactivarla. Es lo que va a permitir
+correr los módulos dentro del teléfono.
 
 **Fronteras de imports.** `apps/**` no puede importar `*/servidor`. Los módulos no se
 importan entre sí: se comunican por el contexto (`ctx.sistema`, `ctx.personas`). Lo
-impone Biome.
+impone Biome, con dos aclaraciones: `@gps/core` sí se puede importar —es la plomería,
+no un módulo— y `packages/demo` está exceptuado, porque conocer a los otros módulos
+para sembrarlos es literalmente su razón de ser.
 
 **Mobile-first.** Todo se diseña primero a 375px. `sm:` y `md:` sólo agregan en
 pantallas grandes, nunca arreglan lo que se rompió en chicas.
@@ -64,6 +83,10 @@ convenciones están documentadas pero no implementadas todavía: no hay `auth`, 
 
 ## Qué NO existe todavía
 
-Base de datos, migraciones, auth, rate limiting, bus de eventos, auditoría, archivos,
-modo demo. Cada uno tiene su diseño en la spec y llega con su primer consumidor real.
-No agregarlos por adelantado.
+Auth, `Alcance` real, `politicas.ts`, rate limiting, bus de eventos, auditoría,
+archivos, `packages/local`, base en el dispositivo. Cada uno tiene su diseño en la
+spec y llega con su primer consumidor real. No agregarlos por adelantado.
+
+La base es SQLite por Drizzle y llega a los módulos por `Core.bd`; las migraciones las
+declara cada módulo y las aplica `aplicarMigraciones` al arrancar. Sigue sin haber
+Postgres, ni pool, ni réplicas.

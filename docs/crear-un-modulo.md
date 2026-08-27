@@ -169,6 +169,47 @@ hay un import directo de un módulo a otro en ningún punto: `dependencies` sól
 el arranque, el contexto es el único canal de comunicación entre módulos en tiempo de
 ejecución.
 
+## Las tablas y las migraciones
+
+`sistema` no tiene tablas — por eso sirve de plantilla para todo lo anterior, pero no
+para esto. Para ver el resto del patrón hay que mirar `packages/estructura`.
+
+Las tablas se declaran con Drizzle en `src/servidor/tablas.ts`, no en `/dominio`: son
+detalle de cómo se guardan los datos, no forma que las apps necesiten conocer. Al lado,
+`drizzle.config.ts` apunta `schema` a ese archivo y `out` a `./migraciones`, una
+carpeta dentro del propio paquete. No hay un `drizzle.config.ts` ni un directorio de
+migraciones centrales para todo el proyecto: cada módulo genera las suyas paradas en su
+propio directorio (`bunx drizzle-kit generate --name <nombre>`), por la misma razón por
+la que no hay un `schema.ts` central para el GraphQL — un archivo compartido es un
+archivo que dos módulos que no se conocen entre sí terminan pisándose al tocar.
+
+`drizzle-kit generate` escribe el `.sql` nuevo en `migraciones/`; sumarlo a la lista es
+un paso aparte, a mano, en `src/servidor/migraciones.ts`:
+
+    import inicial from '../../migraciones/0000_inicial.sql' with { type: 'text' }
+
+    export const migraciones: readonly Migracion[] = [{ nombre: '0000_inicial', sql: inicial }]
+
+El `import ... with { type: 'text' }` trae el SQL como string en vez de ejecutarlo:
+`aplicarMigraciones`, en `packages/core`, es quien lo corre, sentencia por sentencia,
+dentro de una transacción, contra `core.bd` — nunca el módulo. Por eso el archivo lleva
+`migraciones` como campo del objeto `Module` (`migraciones: readonly Migracion[]`) y no
+como código que se ejecuta solo al importar el paquete: el orden en que se aplican las
+migraciones de todos los módulos lo decide la raíz de composición, no cada paquete por
+separado. `aplicarMigraciones` corre antes de `createServices` de cualquier módulo —
+ninguno debería poder consultar una tabla que todavía no existe — y sabe qué ya aplicó
+por una tabla propia (`migraciones`, con `modulo` y `nombre` como clave), así que
+correrla de nuevo con la misma base no repite nada.
+
+Una advertencia sobre esa línea, para que la copies sabiendo lo que copiás: el atributo
+`with { type: 'text' }` **es una extensión de Bun** — del estándar sólo `json` lo es — y
+Metro no lo soporta. Es decir que el runner es portable al teléfono pero *esta forma de
+cargarle el texto no*. Es deuda conocida y aceptada: el día que exista `packages/local`
+va a haber que resolverla, con un transformer de Metro o pasándole las migraciones al
+módulo de otra manera, y ese día hay que tocar todos los módulos que hayan copiado esta
+línea. Copiala igual —hoy no hay alternativa mejor y el costo se paga una sola vez—,
+pero no la tomes como una decisión cerrada.
+
 ## Registrarlo
 
     import { sistema } from '@gps/sistema/servidor'
