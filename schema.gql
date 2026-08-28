@@ -1,4 +1,15 @@
 """
+Los datos que necesita el alta de una persona.
+"""
+input DatosDePersona {
+  apellidos: String!
+  fechaDeNacimiento: String!
+  nombres: String!
+  numeroDeDocumento: String!
+  tipoDeDocumento: TipoDeDocumento!
+}
+
+"""
 Un distrito de la diocesis, con sus grupos.
 """
 type Distrito {
@@ -22,11 +33,39 @@ type Grupo {
   ramas: [Rama!]!
 }
 
+type Mutation {
+  """
+  Da de alta una persona.
+  """
+  crearPersona(datos: DatosDePersona!): Persona!
+}
+
+"""
+Los datos personales de un miembro de la asociacion.
+"""
+type Persona {
+  apellidos: String!
+
+  """
+  Fecha de calendario en formato aaaa-mm-dd, sin hora ni zona horaria.
+  """
+  fechaDeNacimiento: String!
+  id: ID!
+  nombres: String!
+  numeroDeDocumento: String!
+  tipoDeDocumento: TipoDeDocumento!
+}
+
 type Query {
   """
   El arbol de la diocesis: distritos, sus grupos y sus ramas.
   """
   distritos: [Distrito!]!
+
+  """
+  Todas las personas, ordenadas por apellido.
+  """
+  personas: [Persona!]!
 
   """
   Devuelve la version de esta instancia.
@@ -44,6 +83,14 @@ enum Rama {
   raiders
   rovers
   scouts
+}
+
+"""
+Tipos de documento que la asociacion acepta.
+"""
+enum TipoDeDocumento {
+  dni
+  pasaporte
 }
 
 """

@@ -1,11 +1,5 @@
+import type { Marcas } from '@gps/core'
 import type { Rama } from './ramas'
-
-/** Cuando se creo y cuando se toco por ultima vez. Las escribe el servicio
- *  con core.reloj.ahora(), nunca la base: ver la regla de portabilidad. */
-export interface Marcas {
-  readonly creadoEn: Date
-  readonly actualizadoEn: Date
-}
 
 /** Los distritos en que se divide la diocesis. La diocesis en si no es una
  *  entidad: hay una sola por instancia.

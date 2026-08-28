@@ -1,5 +1,6 @@
 import { useDistritos, useVersion } from '@gps/api'
 import { etiquetaDeEdades, RAMAS, type Rama } from '@gps/estructura/dominio'
+import { Link } from 'expo-router'
 import { SafeAreaView, ScrollView, Text, View } from 'react-native'
 
 const RAMA_POR_ID = new Map(RAMAS.map((rama) => [rama.id, rama]))
@@ -45,6 +46,9 @@ export default function Pantalla() {
       <ScrollView contentContainerClassName="px-4 py-10">
         <Text className="text-2xl font-semibold text-slate-900">GPS</Text>
         <Text className="mt-1 text-sm text-slate-500">Gestión para Scouts</Text>
+        <Link href="/personas" className="mt-4 text-sm font-medium text-slate-900 underline">
+          Ver personas
+        </Link>
 
         {isPending && (
           <Text className="mt-8 text-sm text-slate-500">Consultando la estructura…</Text>

@@ -1,0 +1,6 @@
+export type { TipoDeDocumento } from './documentos'
+export { nombreDelTipo, normalizarNumero, TIPOS_DE_DOCUMENTO } from './documentos'
+export type { DatosDePersona, Persona } from './modelos'
+export { calcularEdad, nombreCompleto } from './modelos'
+export type { Problema } from './validaciones'
+export { validarPersona } from './validaciones'

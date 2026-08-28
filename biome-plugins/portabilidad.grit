@@ -10,11 +10,17 @@ language js
 // core.nuevoId(prefijo). Math.random() queda afuera a proposito, porque Core no
 // ofrece nada en su lugar.
 //
+// Por la misma razon el patron es `new Date()` sin argumentos y no `new Date($...)`:
+// lo que consulta el reloj es la forma vacia. `new Date('2010-05-01')` o
+// `new Date(Date.UTC(...))` construyen una fecha a partir de valores explicitos,
+// son deterministas, y Core no ofrece nada en su lugar. Prohibirlas obligaria a
+// desactivar la regla para parsear una fecha, que es como mueren las reglas.
+//
 // Se usa un plugin y no la regla noRestrictedGlobals porque esa prohibe el
 // identificador `Date`, y eso marca tambien las posiciones de tipo -`ahora(): Date`,
 // `const x: Date`-, que son legitimas. Un plugin matchea la expresion, no el nombre.
 or {
-  `new Date($...)` as $reloj where {
+  `new Date()` as $reloj where {
     register_diagnostic(span=$reloj, message="Portabilidad: la hora sale de core.reloj.ahora(), no del sistema.", severity="error")
   },
   `Date.now()` as $ahora where {

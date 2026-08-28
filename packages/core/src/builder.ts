@@ -15,6 +15,14 @@ export function crearBuilder() {
     DefaultFieldNullability: false
   }>({ defaultFieldNullability: false })
   builder.queryType({})
+  // Mutation se declara aca por la misma razon que Query: para que cada modulo
+  // le agregue campos con builder.mutationField(...) sin competir por declarar
+  // el tipo, y el orden de registro no importe.
+  //
+  // Ojo: GraphQL exige que un tipo tenga al menos un campo, asi que el esquema
+  // no compone si ningun modulo registrado aporta una mutation. Hoy la aporta
+  // personas.
+  builder.mutationType({})
   return builder
 }
 

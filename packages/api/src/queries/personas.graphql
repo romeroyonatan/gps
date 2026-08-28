@@ -1,0 +1,11 @@
+# packages/api/src/queries/personas.graphql
+query Personas {
+  personas {
+    id
+    tipoDeDocumento
+    numeroDeDocumento
+    nombres
+    apellidos
+    fechaDeNacimiento
+  }
+}

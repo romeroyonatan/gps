@@ -14,6 +14,7 @@
     "@gps/core": "workspace:*",
     "@gps/demo": "workspace:*",
     "@gps/estructura": "workspace:*",
+    "@gps/personas": "workspace:*",
     "@gps/sistema": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "graphql": "^16.9.0",

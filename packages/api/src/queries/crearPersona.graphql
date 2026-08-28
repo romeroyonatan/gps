@@ -1,0 +1,6 @@
+# packages/api/src/queries/crearPersona.graphql
+mutation CrearPersona($datos: DatosDePersona!) {
+  crearPersona(datos: $datos) {
+    id
+  }
+}

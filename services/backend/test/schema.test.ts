@@ -26,7 +26,9 @@ describe('esquema compuesto', () => {
 
   test('lista los modulos efectivamente registrados', async () => {
     const resultado = await consultar('{ version { modulos } }')
-    expect(resultado.data).toEqual({ version: { modulos: ['sistema', 'estructura'] } })
+    expect(resultado.data).toEqual({
+      version: { modulos: ['sistema', 'estructura', 'personas'] },
+    })
   })
 
   test('el contexto expone actor en null: auth todavia no existe', async () => {

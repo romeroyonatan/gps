@@ -1,9 +1,10 @@
 {
-  "name": "@gps/demo",
+  "name": "@gps/personas",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "exports": {
+    "./dominio": "./src/dominio/index.ts",
     "./servidor": "./src/servidor/index.ts"
   },
   "scripts": {
@@ -11,12 +12,12 @@
   },
   "dependencies": {
     "@gps/core": "workspace:*",
-    "@gps/estructura": "workspace:*",
-    "@gps/personas": "workspace:*"
+    "drizzle-orm": "^0.45.2",
+    "graphql": "^16.9.0"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "drizzle-orm": "^0.45.2",
+    "drizzle-kit": "^0.31.10",
     "typescript": "^5.7.0"
   }
 }

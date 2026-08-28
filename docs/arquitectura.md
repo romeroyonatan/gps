@@ -36,10 +36,10 @@ Las piezas marcadas con `(futuro)` están diseñadas pero no implementadas.
                     |                                        |
                     +-------------------+--------------------+
                                         |
-                          +-------------v--------------+
-                          |    packages/<modulo>       |
-                          |    sistema, estructura, ...|
-                          +-------------+--------------+
+                          +-------------v----------------------+
+                          |    packages/<modulo>               |
+                          |  sistema, estructura, personas, ...|
+                          +-------------+----------------------+
                                         |
                           +-------------v--------------+
                           |      packages/core         |
