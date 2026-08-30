@@ -1,9 +1,11 @@
 import type { Core } from '@gps/core'
-import { and, eq } from 'drizzle-orm'
+import type { Estructura } from '@gps/estructura/dominio'
+import { and, eq, isNull } from 'drizzle-orm'
 import { nombreDelTipo, normalizarNumero, type TipoDeDocumento } from '../dominio/documentos'
-import type { DatosDePersona, Persona } from '../dominio/modelos'
-import { type Problema, validarPersona } from '../dominio/validaciones'
-import { personas } from './tablas'
+import type { DatosDePersona } from '../dominio/modelos'
+import { type Problema, validarIngreso, validarPersona } from '../dominio/validaciones'
+import type { Cargo, DatosDeIngreso, PersonaConVinculos, Pertenencia } from '../dominio/vinculos'
+import { personas, pertenencias, cargos as tablaDeCargos } from './tablas'
 
 /** Los datos del alta no pasan las reglas de /dominio. Lleva los problemas
  *  adentro para que el resolver los pueda publicar campo por campo. */
@@ -25,9 +27,20 @@ export class DocumentoDuplicado extends Error {
   }
 }
 
+/** El grupo del ingreso no existe, o esta cerrado. */
+export class GrupoInexistente extends Error {
+  constructor(grupoId: string) {
+    super('El grupo al que se quiere inscribir no existe o está cerrado.')
+    this.name = 'GrupoInexistente'
+    this.grupoId = grupoId
+  }
+  readonly grupoId: string
+}
+
 export interface ServicioDePersonas {
-  crearPersona(datos: DatosDePersona): Promise<Persona>
-  listarPersonas(): Promise<readonly Persona[]>
+  crearPersona(datos: DatosDePersona, ingreso: DatosDeIngreso): Promise<PersonaConVinculos>
+  /** Las personas con pertenencia vigente en ese grupo, ordenadas por apellido. */
+  listarPersonas(grupoId: string): Promise<readonly PersonaConVinculos[]>
 }
 
 /** El orden alfabetico lo hace Intl y no un ORDER BY: SQLite compara bytes, asi
@@ -41,11 +54,26 @@ const alfabeto = new Intl.Collator('es')
 
 /** Los metodos devuelven Promise aunque el driver de SQLite sea sincrono: es la
  *  costura que deja pasar a Postgres o a un driver asincrono en el telefono sin
- *  tocar a ningun consumidor. */
-export function crearServicioDePersonas(core: Core): ServicioDePersonas {
+ *  tocar a ningun consumidor.
+ *
+ *  `estructura` entra por el constructor y no por el contexto: es una
+ *  dependencia declarada del modulo, que la raiz de composicion le pasa ya
+ *  construida (ver Module<S, D> en core). Asi el servicio la puede usar sin
+ *  saber si hay un request encima, que es lo que le permite correr dentro del
+ *  telefono. */
+export function crearServicioDePersonas(core: Core, estructura: Estructura): ServicioDePersonas {
   return {
-    async crearPersona(datos) {
-      const problemas = validarPersona(datos, core.reloj.ahora())
+    async crearPersona(datos, ingreso) {
+      // Primero el grupo: sin el no se pueden validar ni la rama ni la
+      // existencia del destino, y no tiene sentido validar lo demas.
+      const grupo = await estructura.obtenerGrupo(ingreso.grupoId)
+      if (!grupo) throw new GrupoInexistente(ingreso.grupoId)
+
+      const hoy = core.reloj.ahora()
+      const problemas: readonly Problema[] = [
+        ...validarPersona(datos, hoy),
+        ...validarIngreso(ingreso, grupo.ramas, hoy),
+      ]
       if (problemas.length > 0) throw new DatosInvalidos(problemas)
 
       const numeroDeDocumento = normalizarNumero(datos.numeroDeDocumento)
@@ -77,15 +105,73 @@ export function crearServicioDePersonas(core: Core): ServicioDePersonas {
         creadoEn: ahora,
         actualizadoEn: ahora,
       }
-      core.bd.insert(personas).values(persona).run()
-      return persona
+      const pertenencia: Pertenencia = {
+        id: core.nuevoId('pertenencia'),
+        personaId: persona.id,
+        grupoId: ingreso.grupoId,
+        categoria: ingreso.categoria,
+        rama: ingreso.rama,
+        desde: ingreso.desde,
+        hasta: null,
+        creadoEn: ahora,
+        actualizadoEn: ahora,
+      }
+      const cargosDeLaPersona: Cargo[] = ingreso.cargos.map((datosDelCargo) => ({
+        id: core.nuevoId('cargo'),
+        personaId: persona.id,
+        grupoId: ingreso.grupoId,
+        cargo: datosDelCargo.cargo,
+        // El desde del cargo es el de la pertenencia: sin edicion todavia, y
+        // pedir la misma fecha una vez por cargo no le sirve a nadie.
+        desde: ingreso.desde,
+        hasta: datosDelCargo.hasta,
+        creadoEn: ahora,
+        actualizadoEn: ahora,
+      }))
+
+      // Las tres escrituras en una transaccion: una persona sin pertenencia no
+      // aparece en ninguna pantalla, porque la unica query filtra por grupo.
+      core.bd.transaction((tx) => {
+        tx.insert(personas).values(persona).run()
+        tx.insert(pertenencias).values(pertenencia).run()
+        if (cargosDeLaPersona.length > 0) {
+          tx.insert(tablaDeCargos).values(cargosDeLaPersona).run()
+        }
+      })
+
+      return { ...persona, pertenencia, cargos: cargosDeLaPersona }
     },
 
-    async listarPersonas() {
-      return core.bd
+    async listarPersonas(grupoId) {
+      // Dos consultas y el armado en memoria, el mismo criterio que
+      // listarDistritos: con la cantidad de personas de un grupo alcanza de
+      // sobra, y si algun dia deja de alcanzar se arregla en un solo lugar.
+      const filas = core.bd
         .select()
-        .from(personas)
+        .from(pertenencias)
+        .innerJoin(personas, eq(personas.id, pertenencias.personaId))
+        .where(and(eq(pertenencias.grupoId, grupoId), isNull(pertenencias.hasta)))
         .all()
+
+      const filasDeCargos = core.bd
+        .select()
+        .from(tablaDeCargos)
+        .where(eq(tablaDeCargos.grupoId, grupoId))
+        .all()
+
+      const cargosPorPersona = new Map<string, Cargo[]>()
+      for (const cargo of filasDeCargos) {
+        const suyos = cargosPorPersona.get(cargo.personaId) ?? []
+        suyos.push(cargo)
+        cargosPorPersona.set(cargo.personaId, suyos)
+      }
+
+      return filas
+        .map((fila) => ({
+          ...fila.personas,
+          pertenencia: fila.pertenencias,
+          cargos: cargosPorPersona.get(fila.personas.id) ?? [],
+        }))
         .sort(
           (una, otra) =>
             alfabeto.compare(una.apellidos, otra.apellidos) ||

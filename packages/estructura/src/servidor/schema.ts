@@ -1,16 +1,19 @@
-import type { Builder } from '@gps/core'
+import { type Builder, enumCompartido } from '@gps/core'
 import type { DistritoConGrupos, GrupoConRamas } from '../dominio/modelos'
-import { RAMAS, type Rama } from '../dominio/ramas'
+import { RAMAS } from '../dominio/ramas'
 
 export function registrarSchema(builder: Builder): void {
-  const RamaRef = builder.enumType('Rama', {
-    description: 'Ramas en que la asociacion divide a sus miembros por edad.',
-    // Los valores son los ids del dominio, en minuscula y no gritados como
-    // manda la convencion de GraphQL. Es a proposito: asi lo que viaja por la
-    // red es el id, y la pantalla saca nombre y rango etario de RAMAS sin una
-    // tabla de traduccion en el medio.
-    values: RAMAS.map((rama) => rama.id) as unknown as readonly Rama[],
-  })
+  // enumCompartido y no builder.enumType porque personas declara el mismo enum
+  // para la rama de la pertenencia, y Pothos aborta si un nombre se registra dos
+  // veces. Los valores son los ids del dominio, en minuscula y no gritados como
+  // manda la convencion de GraphQL: asi lo que viaja por la red es el id, y la
+  // pantalla saca nombre y rango etario de RAMAS sin tabla de traduccion.
+  const RamaRef = enumCompartido(
+    builder,
+    'Rama',
+    RAMAS.map((rama) => rama.id),
+    'Ramas en que la asociacion divide a sus miembros por edad.',
+  )
 
   const GrupoRef = builder.objectRef<GrupoConRamas>('Grupo').implement({
     description: 'Un grupo scout y las ramas que tiene abiertas.',

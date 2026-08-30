@@ -30,3 +30,13 @@ export type Rama = (typeof RAMAS)[number]['id']
 export function etiquetaDeEdades(rama: (typeof RAMAS)[number]): string {
   return rama.hasta === null ? `${rama.desde}+` : `${rama.desde}–${rama.hasta}`
 }
+
+const RAMA_POR_ID = new Map(RAMAS.map((rama) => [rama.id, rama]))
+
+/** Busca la entrada del catalogo por id. Vive en el dominio y no en cada
+ *  pantalla por la misma razon que etiquetaDeEdades: es presentacion del
+ *  dominio, y dos copias divergen sin que nadie se entere -que es justo lo que
+ *  paso: cuatro pantallas hacian este mismo lookup, cada una a su manera. */
+export function ramaDelCatalogo(id: Rama): (typeof RAMAS)[number] | undefined {
+  return RAMA_POR_ID.get(id)
+}

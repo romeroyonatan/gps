@@ -1,4 +1,8 @@
-import { integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core'
+import type { Rama } from '@gps/estructura/dominio'
+import { sql } from 'drizzle-orm'
+import { integer, sqliteTable, text, unique, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import type { TipoDeCargo } from '../dominio/cargos'
+import type { Categoria } from '../dominio/categorias'
 import type { TipoDeDocumento } from '../dominio/documentos'
 
 // Se esparce en cada tabla en vez de abstraerse en core: Drizzle necesita las
@@ -36,4 +40,58 @@ export const personas = sqliteTable(
     ...marcas,
   },
   (tabla) => [unique().on(tabla.tipoDeDocumento, tabla.numeroDeDocumento)],
+)
+
+/** La pertenencia de una persona a un grupo, con su periodo.
+ *
+ *  `grupo_id` va sin foreign key: la tabla `grupos` es de estructura y
+ *  declararla exigiria importar su tablas.ts, que es privado. La integridad la
+ *  da obtenerGrupo en el alta. Es una perdida real y consciente; ver §7.4 de la
+ *  spec. Contra `personas`, en cambio, la foreign key va: es del mismo modulo.
+ *
+ *  El indice parcial es "una persona pertenece a un solo grupo" puesto en la
+ *  base. Funciona porque una pertenencia no tiene mandato: su `hasta` se
+ *  escribe el dia de la baja y nunca esta en el futuro, asi que `hasta IS NULL`
+ *  y "vigente" son lo mismo. Y sigue permitiendo todas las pertenencias
+ *  cerradas que haga falta, que es el historial. */
+export const pertenencias = sqliteTable(
+  'pertenencias',
+  {
+    id: text('id').primaryKey(),
+    personaId: text('persona_id')
+      .notNull()
+      .references(() => personas.id),
+    grupoId: text('grupo_id').notNull(),
+    categoria: text('categoria').$type<Categoria>().notNull(),
+    rama: text('rama').$type<Rama>(),
+    desde: text('desde').notNull(),
+    hasta: text('hasta'),
+    ...marcas,
+  },
+  (tabla) => [
+    uniqueIndex('pertenencia_vigente_por_persona').on(tabla.personaId).where(sql`hasta is null`),
+  ],
+)
+
+/** Los cargos de una persona en un grupo, con su periodo.
+ *
+ *  A diferencia de `pertenencias`, el UNIQUE es completo y no parcial: un cargo
+ *  puede nacer con su `hasta` puesto cuatro anios adelante -un mandato-, asi
+ *  que `WHERE hasta IS NULL` no seleccionaria los vigentes y un indice parcial
+ *  no impediria nada. Lo que este ataja es el duplicado exacto, que es el
+ *  error que de verdad ocurre: el doble click en Guardar. */
+export const cargos = sqliteTable(
+  'cargos',
+  {
+    id: text('id').primaryKey(),
+    personaId: text('persona_id')
+      .notNull()
+      .references(() => personas.id),
+    grupoId: text('grupo_id').notNull(),
+    cargo: text('cargo').$type<TipoDeCargo>().notNull(),
+    desde: text('desde').notNull(),
+    hasta: text('hasta'),
+    ...marcas,
+  },
+  (tabla) => [unique().on(tabla.personaId, tabla.grupoId, tabla.cargo, tabla.desde)],
 )

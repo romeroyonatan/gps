@@ -1,12 +1,10 @@
 import { useDistritos, useVersion } from '@gps/api'
-import { etiquetaDeEdades, RAMAS, type Rama } from '@gps/estructura/dominio'
+import { etiquetaDeEdades, type Rama, ramaDelCatalogo } from '@gps/estructura/dominio'
 import { Link } from 'expo-router'
-import { SafeAreaView, ScrollView, Text, View } from 'react-native'
-
-const RAMA_POR_ID = new Map(RAMAS.map((rama) => [rama.id, rama]))
+import { Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native'
 
 function EtiquetaDeRama(props: { rama: Rama }) {
-  const rama = RAMA_POR_ID.get(props.rama)
+  const rama = ramaDelCatalogo(props.rama)
   if (!rama) return null
   const edades = etiquetaDeEdades(rama)
   return (
@@ -18,22 +16,24 @@ function EtiquetaDeRama(props: { rama: Rama }) {
   )
 }
 
-function Grupo(props: { numero: number; nombre: string; ramas: readonly Rama[] }) {
+function Grupo(props: { id: string; numero: number; nombre: string; ramas: readonly Rama[] }) {
   return (
-    <View className="border-b border-slate-200 px-4 py-3">
-      <Text className="text-sm font-medium text-slate-900">
-        <Text className="text-slate-400">Grupo Scout Nº{props.numero} -</Text> {props.nombre}
-      </Text>
-      {props.ramas.length === 0 ? (
-        <Text className="mt-1.5 text-xs text-slate-400">Todavía no abrió ninguna rama</Text>
-      ) : (
-        <View className="mt-1.5 flex-row flex-wrap gap-1.5">
-          {props.ramas.map((rama) => (
-            <EtiquetaDeRama key={rama} rama={rama} />
-          ))}
-        </View>
-      )}
-    </View>
+    <Link href={`/grupos/${props.id}`} asChild>
+      <Pressable className="border-b border-slate-200 px-4 py-3">
+        <Text className="text-sm font-medium text-slate-900">
+          <Text className="text-slate-400">Grupo Scout Nº{props.numero} -</Text> {props.nombre}
+        </Text>
+        {props.ramas.length === 0 ? (
+          <Text className="mt-1.5 text-xs text-slate-400">Todavía no abrió ninguna rama</Text>
+        ) : (
+          <View className="mt-1.5 flex-row flex-wrap gap-1.5">
+            {props.ramas.map((rama) => (
+              <EtiquetaDeRama key={rama} rama={rama} />
+            ))}
+          </View>
+        )}
+      </Pressable>
+    </Link>
   )
 }
 
@@ -46,9 +46,6 @@ export default function Pantalla() {
       <ScrollView contentContainerClassName="px-4 py-10">
         <Text className="text-2xl font-semibold text-slate-900">GPS</Text>
         <Text className="mt-1 text-sm text-slate-500">Gestión para Scouts</Text>
-        <Link href="/personas" className="mt-4 text-sm font-medium text-slate-900 underline">
-          Ver personas
-        </Link>
 
         {isPending && (
           <Text className="mt-8 text-sm text-slate-500">Consultando la estructura…</Text>
@@ -76,6 +73,7 @@ export default function Pantalla() {
               {distrito.grupos.map((grupo) => (
                 <Grupo
                   key={grupo.id}
+                  id={grupo.id}
                   numero={grupo.numero}
                   nombre={grupo.nombre}
                   ramas={grupo.ramas}

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@gps/core": "workspace:*",
+    "@gps/estructura": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "graphql": "^16.9.0"
   },

@@ -1,11 +1,21 @@
 # packages/api/src/queries/personas.graphql
-query Personas {
-  personas {
+query Personas($grupoId: ID!) {
+  personas(grupoId: $grupoId) {
     id
     tipoDeDocumento
     numeroDeDocumento
     nombres
     apellidos
     fechaDeNacimiento
+    pertenencia {
+      categoria
+      rama
+      desde
+    }
+    cargos {
+      cargo
+      desde
+      hasta
+    }
   }
 }

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import type { DatosDePersona } from '../src/dominio/modelos'
-import { validarPersona } from '../src/dominio/validaciones'
+import { validarIngreso, validarPersona } from '../src/dominio/validaciones'
+import type { DatosDeIngreso } from '../src/dominio/vinculos'
 
 const HOY = new Date(2026, 7, 27)
 
@@ -95,5 +96,96 @@ describe('validarPersona', () => {
   test('no se aceptan mas de 120 anios, que es el tope contra el dedazo', () => {
     expect(validarPersona({ ...valida, fechaDeNacimiento: '1906-08-27' }, HOY)).toEqual([])
     expect(campos({ ...valida, fechaDeNacimiento: '1025-08-27' })).toEqual(['fechaDeNacimiento'])
+  })
+})
+
+// El reloj de los tests esta en 1970, asi que un ingreso valido tiene que ser
+// anterior. Es incomodo y es a proposito: obliga a que se note si alguien se
+// cuelga la hora real.
+const HOY_INGRESO = new Date(1970, 0, 1, 12)
+
+const ingreso: DatosDeIngreso = {
+  grupoId: 'grupo_1',
+  categoria: 'beneficiario',
+  rama: 'lobatos',
+  desde: '1969-03-01',
+  cargos: [],
+}
+
+const ABIERTAS = ['lobatos', 'scouts'] as const
+
+const camposDeIngreso = (problemas: readonly { campo: string }[]) => problemas.map((p) => p.campo)
+
+describe('validarIngreso', () => {
+  test('un ingreso completo no tiene problemas', () => {
+    expect(validarIngreso(ingreso, ABIERTAS, HOY_INGRESO)).toEqual([])
+  })
+
+  test('un beneficiario sin rama es un dato incompleto', () => {
+    expect(
+      camposDeIngreso(validarIngreso({ ...ingreso, rama: null }, ABIERTAS, HOY_INGRESO)),
+    ).toEqual(['rama'])
+  })
+
+  test('un activo sin rama tambien: hasta el jefe de grupo da en alguna', () => {
+    const activo = { ...ingreso, categoria: 'activo' as const, rama: null }
+    expect(camposDeIngreso(validarIngreso(activo, ABIERTAS, HOY_INGRESO))).toEqual(['rama'])
+  })
+
+  test('un adherente con rama es una contradiccion', () => {
+    const adherente = { ...ingreso, categoria: 'adherente' as const }
+    expect(camposDeIngreso(validarIngreso(adherente, ABIERTAS, HOY_INGRESO))).toEqual(['rama'])
+  })
+
+  test('un adherente sin rama esta bien', () => {
+    const adherente = { ...ingreso, categoria: 'adherente' as const, rama: null }
+    expect(validarIngreso(adherente, ABIERTAS, HOY_INGRESO)).toEqual([])
+  })
+
+  test('la rama tiene que estar abierta en ese grupo', () => {
+    // Es la regla que el servidor no podia verificar antes de que un modulo
+    // pudiera alcanzar al otro.
+    expect(
+      camposDeIngreso(validarIngreso({ ...ingreso, rama: 'castores' }, ABIERTAS, HOY_INGRESO)),
+    ).toEqual(['rama'])
+  })
+
+  test('la fecha de ingreso tiene que ser del almanaque', () => {
+    expect(
+      camposDeIngreso(validarIngreso({ ...ingreso, desde: '1969-02-30' }, ABIERTAS, HOY_INGRESO)),
+    ).toEqual(['desde'])
+  })
+
+  test('la fecha de ingreso no puede ser futura', () => {
+    expect(
+      camposDeIngreso(validarIngreso({ ...ingreso, desde: '1971-01-01' }, ABIERTAS, HOY_INGRESO)),
+    ).toEqual(['desde'])
+  })
+
+  test('el mismo cargo no puede ir dos veces', () => {
+    const cargos = [
+      { cargo: 'jefeDeRama' as const, hasta: null },
+      { cargo: 'jefeDeRama' as const, hasta: null },
+    ]
+    expect(camposDeIngreso(validarIngreso({ ...ingreso, cargos }, ABIERTAS, HOY_INGRESO))).toEqual([
+      'cargos',
+    ])
+  })
+
+  test('un cargo puede terminar en el futuro: un mandato dura cuatro anios', () => {
+    const cargos = [{ cargo: 'jefeDeGrupo' as const, hasta: '1973-03-01' }]
+    expect(validarIngreso({ ...ingreso, cargos }, ABIERTAS, HOY_INGRESO)).toEqual([])
+  })
+
+  test('un cargo no puede terminar antes de empezar', () => {
+    const cargos = [{ cargo: 'jefeDeGrupo' as const, hasta: '1968-01-01' }]
+    expect(camposDeIngreso(validarIngreso({ ...ingreso, cargos }, ABIERTAS, HOY_INGRESO))).toEqual([
+      'cargos',
+    ])
+  })
+
+  test('acumula: no corta en el primer problema', () => {
+    const roto = { ...ingreso, rama: 'castores' as const, desde: '1971-01-01' }
+    expect(camposDeIngreso(validarIngreso(roto, ABIERTAS, HOY_INGRESO))).toEqual(['rama', 'desde'])
   })
 })

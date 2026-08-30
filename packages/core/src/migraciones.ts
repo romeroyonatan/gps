@@ -24,7 +24,8 @@ const SEPARADOR = '--> statement-breakpoint'
  *  El dia que exista `packages/local` va a haber que resolverlo ahi -un
  *  transformer de Metro, o pasar las migraciones de otra forma-, pero es un
  *  cambio en los modulos, no en esta funcion. */
-export function aplicarMigraciones(core: Core, modulos: readonly Module<unknown>[]): void {
+// biome-ignore lint/suspicious/noExplicitAny: el runner es agnostico del tipo de servicios
+export function aplicarMigraciones(core: Core, modulos: readonly Module<any, any>[]): void {
   core.bd.run(
     sql.raw(`CREATE TABLE IF NOT EXISTS migraciones (
       modulo TEXT NOT NULL,

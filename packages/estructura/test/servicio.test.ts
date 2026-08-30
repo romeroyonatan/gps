@@ -162,6 +162,58 @@ describe('listarDistritos', () => {
   })
 })
 
+describe('obtenerGrupo', () => {
+  test('devuelve el grupo con sus ramas abiertas, ordenadas por catalogo', async () => {
+    const { servicio } = montarConBd()
+    const distrito = await servicio.crearDistrito({ numero: 1, zona: 'San Isidro' })
+    const grupo = await servicio.crearGrupo({
+      numero: 42,
+      nombre: 'Ceferino Namuncurá',
+      distritoId: distrito.id,
+    })
+    // Se abren desordenadas a proposito: el orden de salida tiene que ser el
+    // del catalogo, no el de insercion.
+    await servicio.abrirRama(grupo.id, 'scouts')
+    await servicio.abrirRama(grupo.id, 'castores')
+
+    expect(await servicio.obtenerGrupo(grupo.id)).toEqual({
+      ...grupo,
+      ramas: ['castores', 'scouts'],
+    })
+  })
+
+  test('devuelve null si el grupo no existe', async () => {
+    expect(await montarConBd().servicio.obtenerGrupo('grupo_inexistente')).toBeNull()
+  })
+
+  test('devuelve null si el grupo esta cerrado', async () => {
+    // Para los otros modulos un grupo cerrado no existe, igual que no aparece
+    // en listarDistritos. Asi "no se puede inscribir a nadie en un grupo
+    // cerrado" no necesita una regla aparte.
+    const { servicio } = montarConBd()
+    const distrito = await servicio.crearDistrito({ numero: 1, zona: 'Quilmes' })
+    const grupo = await servicio.crearGrupo({
+      numero: 19,
+      nombre: 'San Miguel Arcángel',
+      distritoId: distrito.id,
+    })
+    await servicio.cerrarGrupo(grupo.id)
+
+    expect(await servicio.obtenerGrupo(grupo.id)).toBeNull()
+  })
+
+  test('un grupo sin ramas abiertas devuelve la lista vacia', async () => {
+    const { servicio } = montarConBd()
+    const distrito = await servicio.crearDistrito({ numero: 4, zona: 'Morón' })
+    const grupo = await servicio.crearGrupo({
+      numero: 88,
+      nombre: 'Padre Mario Pantaleo',
+      distritoId: distrito.id,
+    })
+    expect((await servicio.obtenerGrupo(grupo.id))?.ramas).toEqual([])
+  })
+})
+
 describe('abrirRama', () => {
   test('abrir dos veces la misma rama falla', async () => {
     const servicio = montar()

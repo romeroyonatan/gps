@@ -4,6 +4,7 @@ import {
   type Config,
   type Context,
   crearBuilder,
+  crearServicios,
   ordenarModulos,
 } from '@gps/core'
 import type { GraphQLSchema } from 'graphql'
@@ -28,11 +29,8 @@ export async function componer(
   // que todavia no existe.
   aplicarMigraciones(core, ordenados)
 
-  const servicios: Record<string, unknown> = {}
-  for (const modulo of ordenados) {
-    servicios[modulo.name] = modulo.createServices(core)
-    modulo.registerSchema(builder)
-  }
+  const servicios = crearServicios(core, ordenados)
+  for (const modulo of ordenados) modulo.registerSchema(builder)
 
   const contexto = { actor: null, ...servicios } as Context
 

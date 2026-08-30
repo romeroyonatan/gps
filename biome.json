@@ -63,8 +63,8 @@
                     "message": "Regla de portabilidad: el codigo de modulo no toca la plataforma, todo pasa por Core."
                   },
                   {
-                    "group": ["@gps/**", "!@gps/core"],
-                    "message": "Los modulos no se importan entre si: se comunican por el contexto (ctx.<modulo>). @gps/core si se puede: es la plomeria, no un modulo."
+                    "group": ["@gps/*/servidor"],
+                    "message": "El servidor de un modulo es privado: tiene estado y es la implementacion. Se llega por el contexto (ctx.<modulo>) o por las dependencias de createServices. El /dominio si se puede importar: es la interfaz publica del modulo."
                   }
                 ]
               }

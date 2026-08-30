@@ -1,14 +1,24 @@
+import type { Rama } from '@gps/estructura/dominio'
+import { nombreDelCargo, type TipoDeCargo } from './cargos'
 import { normalizarNumero } from './documentos'
 import { calcularEdad, type DatosDePersona } from './modelos'
+import { aFechaDeCalendario, type DatosDeIngreso } from './vinculos'
 
 /** Un problema de validacion, atado a su campo. Por campo y no una lista de
  *  strings sueltos porque el formulario tiene que marcar el input que falla: un
- *  cartel generico arriba obliga a leer y adivinar cual de los cuatro era.
+ *  cartel generico arriba obliga a leer y adivinar cual era.
  *
- *  tipoDeDocumento no esta en la union porque no puede fallar: lo garantizan el
- *  tipo TipoDeDocumento del lado de TypeScript y el enum del lado de GraphQL. */
+ *  Ni tipoDeDocumento ni categoria estan en la union: no pueden fallar, lo
+ *  garantizan sus tipos del lado de TypeScript y sus enums del lado de GraphQL. */
 export interface Problema {
-  readonly campo: 'numeroDeDocumento' | 'nombres' | 'apellidos' | 'fechaDeNacimiento'
+  readonly campo:
+    | 'numeroDeDocumento'
+    | 'nombres'
+    | 'apellidos'
+    | 'fechaDeNacimiento'
+    | 'rama'
+    | 'desde'
+    | 'cargos'
   readonly mensaje: string
 }
 
@@ -88,6 +98,66 @@ export function validarPersona(datos: DatosDePersona, hoy: Date): readonly Probl
         campo: 'fechaDeNacimiento',
         mensaje: `La fecha de nacimiento es de hace más de ${MAXIMA_EDAD} años.`,
       })
+    }
+  }
+
+  return problemas
+}
+
+/** Las reglas que tiene que cumplir el ingreso de una persona a un grupo.
+ *  Devuelve la lista de problemas, vacia si esta todo bien. Acumula: no corta
+ *  en el primero.
+ *
+ *  `ramasAbiertas` entra por parametro y no se consulta: del lado del servidor
+ *  sale de estructura.obtenerGrupo(grupoId), y del lado del formulario del
+ *  arbol que la pantalla ya tiene. Es lo que hace que la regla corra en los dos
+ *  lados con una sola implementacion, igual que validarPersona. */
+export function validarIngreso(
+  ingreso: DatosDeIngreso,
+  ramasAbiertas: readonly Rama[],
+  hoy: Date,
+): readonly Problema[] {
+  const problemas: Problema[] = []
+  const esAdherente = ingreso.categoria === 'adherente'
+
+  if (esAdherente && ingreso.rama !== null) {
+    problemas.push({
+      campo: 'rama',
+      mensaje: 'Un adherente no pertenece a ninguna rama.',
+    })
+  } else if (!esAdherente && ingreso.rama === null) {
+    problemas.push({ campo: 'rama', mensaje: 'Elegí la rama a la que pertenece.' })
+  } else if (ingreso.rama !== null && !ramasAbiertas.includes(ingreso.rama)) {
+    problemas.push({ campo: 'rama', mensaje: 'El grupo no tiene abierta esa rama.' })
+  }
+
+  if (!esFechaDeCalendario(ingreso.desde)) {
+    problemas.push({
+      campo: 'desde',
+      mensaje: 'La fecha de ingreso tiene que ser una fecha real, con formato aaaa-mm-dd.',
+    })
+  } else if (ingreso.desde > aFechaDeCalendario(hoy)) {
+    problemas.push({ campo: 'desde', mensaje: 'La fecha de ingreso no puede ser futura.' })
+  }
+
+  const vistos = new Set<TipoDeCargo>()
+  for (const cargo of ingreso.cargos) {
+    const nombre = nombreDelCargo(cargo.cargo)
+    if (vistos.has(cargo.cargo)) {
+      problemas.push({ campo: 'cargos', mensaje: `${nombre} está cargado dos veces.` })
+    }
+    vistos.add(cargo.cargo)
+
+    if (cargo.hasta === null) continue
+    if (!esFechaDeCalendario(cargo.hasta)) {
+      problemas.push({
+        campo: 'cargos',
+        mensaje: `La fecha de fin de ${nombre} tiene que ser una fecha real, con formato aaaa-mm-dd.`,
+      })
+    } else if (cargo.hasta <= ingreso.desde) {
+      // No se exige que este en el futuro: cargar un mandato ya vencido es
+      // valido, es historial.
+      problemas.push({ campo: 'cargos', mensaje: `${nombre} no puede terminar antes de empezar.` })
     }
   }
 

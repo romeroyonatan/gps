@@ -1,8 +1,20 @@
 import { describe, expect, test } from 'bun:test'
+import type { Core } from '../src/core'
 import type { Module } from '../src/module'
-import { CicloDeDependencias, DependenciaFaltante, ordenarModulos } from '../src/registry'
+import {
+  CicloDeDependencias,
+  crearServicios,
+  DependenciaFaltante,
+  ordenarModulos,
+} from '../src/registry'
 
-function moduloFalso(name: string, dependencies: string[] = []): Module<object> {
+// D es Record<string, unknown>, no el default: estos modulos falsos declaran
+// dependencias por nombre suelto para probar el orden, sin servicios reales
+// detras.
+function moduloFalso(
+  name: string,
+  dependencies: string[] = [],
+): Module<object, Record<string, unknown>> {
   return {
     name,
     dependencies,
@@ -67,5 +79,40 @@ describe('ordenarModulos', () => {
     }
     expect(mensaje).toContain('personas')
     expect(mensaje).toContain('estructura')
+  })
+})
+
+describe('crearServicios', () => {
+  // crearServicios no toca el Core, solo lo pasa: un objeto vacio alcanza y
+  // evita levantar una base para probar el cableado.
+  const core = {} as Core
+
+  test('le pasa a cada modulo los servicios de sus dependencias, ya construidos', () => {
+    const estructura: Module<{ ramas: string[] }> = {
+      name: 'estructura',
+      dependencies: [],
+      createServices: () => ({ ramas: ['lobatos'] }),
+      registerSchema: () => {},
+    }
+    const personas: Module<{ vistas: string[] }, { estructura: { ramas: string[] } }> = {
+      name: 'personas',
+      dependencies: ['estructura'],
+      createServices: (_core, deps) => ({ vistas: deps.estructura.ramas }),
+      registerSchema: () => {},
+    }
+
+    const servicios = crearServicios(core, ordenarModulos([personas, estructura]))
+
+    expect(servicios.personas).toEqual({ vistas: ['lobatos'] })
+  })
+
+  test('un modulo sin dependencias recibe un objeto vacio', () => {
+    const solo: Module<{ ok: boolean }> = {
+      name: 'solo',
+      dependencies: [],
+      createServices: (_core, deps) => ({ ok: Object.keys(deps).length === 0 }),
+      registerSchema: () => {},
+    }
+    expect(crearServicios(core, [solo]).solo).toEqual({ ok: true })
   })
 })

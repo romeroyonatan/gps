@@ -27,3 +27,88 @@ export function crearBuilder() {
 }
 
 export type Builder = ReturnType<typeof crearBuilder>
+
+/** Los enums que ya declaro algun modulo, por builder. WeakMap y no una
+ *  constante de modulo porque los tests arman varios builders y no tienen por
+ *  que contaminarse entre si. */
+const compartidos = new WeakMap<
+  Builder,
+  Map<string, { valores: readonly string[]; descripcion: string | undefined; ref: unknown }>
+>()
+
+export class ValoresDistintos extends Error {
+  constructor(nombre: string, unos: readonly string[], otros: readonly string[]) {
+    super(
+      `Dos modulos declaran el enum "${nombre}" con valores distintos: ` +
+        `[${unos.join(', ')}] y [${otros.join(', ')}].`,
+    )
+    this.name = 'ValoresDistintos'
+  }
+}
+
+// Mismo motivo que ValoresDistintos: si dos modulos declaran el mismo enum con
+// descripcion distinta, sin este chequeo gana en silencio el que se registra
+// primero, y eso depende del orden de los modulos.
+export class DescripcionesDistintas extends Error {
+  constructor(nombre: string, una: string | undefined, otra: string | undefined) {
+    super(
+      `Dos modulos declaran el enum "${nombre}" con descripciones distintas: ` +
+        `"${una ?? ''}" y "${otra ?? ''}".`,
+    )
+    this.name = 'DescripcionesDistintas'
+  }
+}
+
+// El cast de `values` es el mismo que hacia estructura antes de este helper:
+// Pothos no infiere el tipo del enum desde un readonly V[] que no sea literal.
+function crearEnum<V extends string>(
+  builder: Builder,
+  nombre: string,
+  valores: readonly V[],
+  descripcion?: string,
+) {
+  return builder.enumType(nombre, {
+    values: valores as unknown as readonly V[],
+    description: descripcion,
+  })
+}
+
+/** Un enum de GraphQL que declara mas de un modulo. El primero que lo pide lo
+ *  crea; los demas reciben el mismo ref.
+ *
+ *  Existe porque Pothos tiene objectRef, inputRef e interfaceRef diferidos
+ *  -se crean en un archivo y se implementan en otro- pero no tiene enumRef: un
+ *  enum solo se crea con enumType, y crearlo dos veces con el mismo nombre
+ *  aborta el esquema. Y `Rama` la necesitan estructura, que la define, y
+ *  personas, que la usa en la pertenencia.
+ *
+ *  El catalogo NO sube a core: sigue viviendo en el /dominio del modulo que lo
+ *  define, y los dos se lo pasan a este helper. Lo que vive aca es la plomeria
+ *  de registrar una sola vez, que es lo que core es. */
+export function enumCompartido<V extends string>(
+  builder: Builder,
+  nombre: string,
+  valores: readonly V[],
+  descripcion?: string,
+): ReturnType<typeof crearEnum<V>> {
+  const delBuilder =
+    compartidos.get(builder) ??
+    new Map<string, { valores: readonly string[]; descripcion: string | undefined; ref: unknown }>()
+  compartidos.set(builder, delBuilder)
+
+  const registrado = delBuilder.get(nombre)
+  if (registrado) {
+    const iguales =
+      registrado.valores.length === valores.length &&
+      registrado.valores.every((valor, indice) => valor === valores[indice])
+    if (!iguales) throw new ValoresDistintos(nombre, registrado.valores, valores)
+    if (registrado.descripcion !== descripcion) {
+      throw new DescripcionesDistintas(nombre, registrado.descripcion, descripcion)
+    }
+    return registrado.ref as ReturnType<typeof crearEnum<V>>
+  }
+
+  const ref = crearEnum(builder, nombre, valores, descripcion)
+  delBuilder.set(nombre, { valores, descripcion, ref })
+  return ref
+}

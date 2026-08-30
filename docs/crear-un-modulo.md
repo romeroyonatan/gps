@@ -160,14 +160,73 @@ técnico de Pothos son la excepción de industria, no la regla.
 
 `declare module '@gps/core'` usa *declaration merging* de TypeScript para agregarle un
 campo a la interfaz `Context` que vive en `packages/core/src/context.ts`, sin tocar ese
-archivo. Es la única vía para que otro módulo llegue al servicio de `sistema`: en
-tiempo de ejecución, `services/backend/src/composicion.ts` mete
+archivo. Es la vía para que un resolver llegue al servicio de `sistema` sin conocer su
+implementación: en tiempo de ejecución, `services/backend/src/composicion.ts` mete
 `crearServicioDeSistema(core)` bajo la clave `sistema` del objeto de contexto; en
 tiempo de compilación, este `declare module` es lo que le permite a un resolver de
-otro módulo escribir `contexto.sistema.obtenerVersion()` y que TypeScript lo acepte. No
-hay un import directo de un módulo a otro en ningún punto: `dependencies` sólo ordena
-el arranque, el contexto es el único canal de comunicación entre módulos en tiempo de
-ejecución.
+otro módulo escribir `contexto.sistema.obtenerVersion()` y que TypeScript lo acepte.
+
+Un módulo nunca importa el `/servidor` de otro —eso lo prohíbe Biome, y sigue
+prohibido—, pero sí puede importar su `/dominio`, y en particular su `publico.ts`, para
+tipar una dependencia declarada (la próxima sección lo recorre con `estructura` y
+`personas`). `ctx.<modulo>` sigue siendo el canal para lo que un resolver necesita en
+tiempo de ejecución; `dependencies` es el canal para lo que un módulo necesita antes, al
+construir sus propios servicios.
+
+## La interfaz pública: cuando otro módulo necesita algo tuyo
+
+`sistema` no depende de nadie, así que no hace falta `publico.ts` para explicarlo. Para
+ver la pieza hay que mirar `packages/estructura` y `packages/personas`, que sí están
+conectados: `personas` necesita saber a qué grupo pertenece cada persona, y eso lo sabe
+`estructura`.
+
+La tentación fácil sería que `personas` importara `ServicioDeEstructura` entero, la
+interfaz que vive en `/servidor` con los seis métodos del servicio. `Estructura` no lo
+permite: Biome rechaza cualquier import de `@gps/estructura/servidor` desde otro módulo,
+porque `/servidor` es privado — tiene estado y es la implementación.
+
+Lo que un módulo le presta a los demás se declara aparte, en `src/dominio/publico.ts`, y
+a propósito es más chico que el servicio completo:
+
+    // packages/estructura/src/dominio/publico.ts
+    export interface Estructura {
+      /** El grupo con sus ramas abiertas, o null si no existe o esta cerrado. */
+      obtenerGrupo(grupoId: string): Promise<GrupoConRamas | null>
+    }
+
+`ServicioDeEstructura`, en `/servidor`, extiende `Estructura` y le agrega cinco métodos
+más (crear distrito, crear grupo, abrir rama, cerrar grupo, listar distritos) que
+`personas` no necesita y no puede ver. Ésa es la mitad que importa de la regla: lo que no
+se publica en `publico.ts` queda privado, aunque viva en el mismo paquete. Es la idea de
+los *package interfaces* de SAP y del modificador `global` de Salesforce — declarar la
+superficie pública aparte de la implementación, para que agrandar el servicio no agrande
+lo que los demás pueden tocar.
+
+Declarar la dependencia es tipar el `Module` contra ella:
+
+    import type { Module } from '@gps/core'
+    import type { Estructura } from '@gps/estructura/dominio'
+
+    export const personas: Module<ServicioDePersonas, { estructura: Estructura }> = {
+      name: 'personas',
+      dependencies: ['estructura'],
+      createServices: (core, dependencias) =>
+        crearServicioDePersonas(core, dependencias.estructura),
+      registerSchema: registrarSchema,
+    }
+
+`Module<S, D>` tipa `dependencies` contra las claves de `D`: escribir `dependencies:
+['sistema']` acá no compilaría, porque `sistema` no está en `{ estructura: Estructura }`.
+El servicio concreto de `estructura` —no sólo su tipo— llega por el segundo parámetro de
+`createServices`, ya construido: `crearServicios` (`packages/core/src/registry.ts`) arma
+ese objeto recorriendo `modulo.dependencies` y leyendo lo que ya construyó para cada
+nombre, así que para cuando corre `personas.createServices`, `dependencias.estructura` ya
+es un `ServicioDeEstructura` real, no una promesa ni una referencia diferida.
+
+Con `publico.ts` conviene ser conservador: agregar un método ahí es agrandar lo que
+cualquier módulo futuro puede llegar a usar, y sacarlo después rompe a quien ya lo usa.
+`Estructura` publica un solo método porque es el único que `personas` necesita hoy — el
+resto se agrega cuando aparezca el consumidor real, no antes.
 
 ## Las tablas y las migraciones
 
@@ -224,8 +283,8 @@ servicios.
 
 `ordenarModulos` (`packages/core/src/registry.ts`), que corre en
 `services/backend/src/composicion.ts` antes de crear ningún servicio, recorre
-`dependencies` de cada módulo y produce un orden topológico estable: si `personas`
-declarara `dependencies: ['sistema']`, `sistema` se construiría primero sin importar en
+`dependencies` de cada módulo y produce un orden topológico estable: `personas` declara
+`dependencies: ['estructura']`, así que `estructura` se construye primero sin importar en
 qué orden aparecen en el arreglo de `modulos`. Si un módulo declara una dependencia que
 no está en la lista, `ordenarModulos` tira `DependenciaFaltante` ("El modulo X depende
 de Y, que no esta registrado"); si dos módulos se necesitan en círculo, tira
@@ -284,10 +343,12 @@ que corre, lo cual es la misma razón por la que `Core.reloj` existe en primer l
   cualquier otro runtime, porque quedó atado a una API que sólo existe en el proceso de
   Bun del backend. Biome lo rechaza al lintear, pero el daño real es de arquitectura, no
   de estilo.
-- **Importar otro módulo directamente** (en vez de comunicarse por `ctx.<modulo>`) hace
-  imposible dar de baja el módulo importado sin romper compilación en todos los que lo
-  importaron directo. El contexto existe para que cada módulo dependa de una interfaz
-  (`Context`), no de la implementación concreta de otro paquete.
+- **Importar el `/servidor` de otro módulo directamente** (en vez de por el contexto o
+  por las `dependencies` de `Module`) hace imposible dar de baja el módulo importado sin
+  romper la compilación de todos los que lo importaron directo. El `/dominio` sí se puede
+  importar —es la interfaz pública, declarada a propósito en `publico.ts`—, pero el
+  `/servidor` es la implementación con estado, y a ésa cada módulo llega siempre detrás
+  de una interfaz (`Context`, o la `D` de `Module<S, D>`), nunca por import directo.
 - **Olvidarse de correr `bun run schema` después de tocar el esquema** hace fallar CI: el
   `schema.gql` versionado queda desactualizado respecto del que el código compone, y esa
   discrepancia es justamente lo que la verificación de CI existe para detectar.

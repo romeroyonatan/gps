@@ -5,7 +5,7 @@ export type {
   PersonasQuery,
   VersionQuery,
 } from './generated/graphql'
-export { useCrearPersona, usePersonas } from './personas'
+export { useCrearPersona, usePersonasDelGrupo } from './personas'
 export { crearQueryClient, ProveedorDeApi, useTransporte } from './proveedor'
 export type { Transporte } from './transporte'
 export { ErrorDeApi, transporteHttp } from './transporte'

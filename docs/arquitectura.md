@@ -93,7 +93,9 @@ Un contenedor, un proceso, un puerto. En desarrollo y en producción es el mismo
        v
     para cada modulo, en orden:
        |
-       +--> servicios = modulo.createServices(core)
+       +--> servicios = modulo.createServices(core, dependencias)
+       |         las dependencias son los servicios de modulo.dependencies,
+       |         ya construidos, tipados contra su /dominio/publico.ts
        |         y se monta en el contexto bajo modulo.name
        |
        +--> modulo.registerSchema(builder)
@@ -114,10 +116,11 @@ impuesto por el linter, no por convención.
 
     packages/personas/
       |
-      +-- /dominio     modelos, validaciones, reglas puras, politicas.ts (futuro)
-      |                    ^              ^                  ^
-      |                    |              |                  |
-      |                 apps/web      apps/mobile    services/backend
+      +-- /dominio     modelos, validaciones, reglas puras, publico.ts,
+      |                politicas.ts (futuro)
+      |                    ^              ^                  ^               ^
+      |                    |              |                  |               |
+      |                 apps/web      apps/mobile    services/backend  otros modulos
       |
       +-- /servidor    esquema, resolvers, repositorios, migraciones
       |                    ^              ^              ^
@@ -132,14 +135,33 @@ impuesto por el linter, no por convención.
 
 Prohibido y verificado en CI, por `noRestrictedImports` en `biome.json`:
 
-    apps/**  ---X--->  packages/*/servidor
-    packages/<a>/src  ---X--->  @gps/<b>       (los modulos no se importan entre si)
+    apps/**            ---X--->  packages/*/servidor
+    packages/<a>/src   ---X--->  @gps/<b>/servidor
+    packages/<a>/src   ------->  @gps/<b>/dominio     (la interfaz publica)
 
-Dos excepciones, las dos en la segunda regla. `@gps/core` sí se puede importar: es la
-plomería, no un módulo. Y `packages/demo` está exceptuado del todo, porque sembrar los
-módulos a través de sus servicios públicos exige conocerlos — es su razón de ser.
+Dos excepciones a la primera regla. `@gps/core` sí se puede importar: es la plomería, no
+un módulo. Y `packages/demo` está exceptuado del todo, porque sembrar los módulos a
+través de sus servicios públicos exige conocerlos — es su razón de ser.
 
-Los módulos se comunican **sólo por el contexto**: `ctx.personas`, `ctx.estructura`.
+`/servidor` es privado — tiene estado y es la implementación — y se llega a él por el
+contexto (`ctx.personas`, `ctx.estructura`) o por las dependencias que `createServices`
+recibe ya construidas. `/dominio`, en cambio, sí se importa entre módulos: es puro,
+isomorfo y sin estado. Lo que un módulo le ofrece a los demás se declara en
+`src/dominio/publico.ts`, deliberadamente más chico que su servicio —
+`packages/estructura/src/dominio/publico.ts` publica `interface Estructura` con un solo
+método, `obtenerGrupo`, mientras `ServicioDeEstructura` (en `/servidor`) tiene cinco más
+que siguen siendo privados.
+
+Compartir un tipo de dominio entre módulos tiene una arista aparte cuando ese tipo es un
+enum de GraphQL: Pothos 4.13 no tiene un `enumRef` diferido, así que un enum sólo se crea
+con `builder.enumType(...)`, y crearlo dos veces con el mismo nombre aborta el esquema al
+componerlo. `Rama` la necesitan tanto `estructura` (que la define, en su `/dominio`) como
+`personas` (que la usa para modelar la pertenencia), y los dos módulos registran su
+esquema por separado. `enumCompartido` (`packages/core/src/builder.ts`) es la plomería
+que resuelve eso: el primer módulo que lo llama con un nombre lo crea, el segundo recibe
+la misma referencia si los valores coinciden, y tira si no. El catálogo de valores de
+`Rama` no subió a `core` —sigue siendo `estructura` quien lo declara en su `/dominio`—,
+sólo el registro que evita crearlo dos veces, que es plomería y por eso vive en `core`.
 
 ## 5. El recorrido de una consulta
 
@@ -205,18 +227,21 @@ obligatorio** de todo repositorio, así que una consulta que se olvide de filtra
 compila. La segunda: las políticas son las **mismas funciones** en el servidor y en la
 pantalla, así que la interfaz no puede ofrecer algo que el servidor vaya a rechazar.
 
+Quien ocupa cada cargo lo dice `personas`, no `estructura` — ver §7. Cuando llegue
+`auth`, la cadena de dependencias va a ser `auth` → `personas` → `estructura`.
+
 ## 7. Dependencias entre módulos
 
-`Actor` y `Alcance` son tipos de `core`; `estructura` aporta la implementación que
-expande los roles en un alcance concreto. Por eso `personas` no depende de `estructura`
-aunque sus repositorios reciban un `Alcance`.
+`Actor` y `Alcance` son tipos de `core`; `estructura` va a aportar, cuando exista `auth`,
+la implementación que expande los roles en un alcance concreto. Eso es ortogonal a la
+dependencia de módulo que ya existe hoy: `personas` depende de `estructura`.
 
     core                        plomeria; todos dependen de el
 
-    personas        archivos    no dependen de ningun otro modulo
+    estructura      archivos    no dependen de ningun otro modulo
        ^                ^
        |                |
-    estructura        permisos  <---+
+    personas           permisos  <---+
        ^  ^                        |
        |  |                        |
        |  +-- salud                |
@@ -226,16 +251,16 @@ aunque sus repositorios reciban un `Alcance`.
        |
     tesoreria
 
-El `estructura` de la spec depende de `personas` porque modela cargos y autoridades
-(jefe de grupo, comisionado de distrito, auxiliares, Edifor): todos apuntan a una
-persona. El `estructura` que existe hoy todavía no llega ahí — sólo modela distritos,
-grupos y las ramas que cada grupo tiene abiertas — así que hoy no depende de ningún
-otro módulo (`dependencies: []`). La dependencia con `personas` llega junto con los
-cargos, no antes.
+La spec base suponía que `estructura` iba a depender de `personas`, porque modela cargos
+y autoridades (jefe de grupo, comisionado de distrito, auxiliares, Edifor): todos apuntan
+a una persona. Al conectar los dos módulos la relación resultó invertida: la pertenencia
+y los cargos viven en `personas`, en dos tablas con historial (`pertenencias` y `cargos`),
+así que es `personas` quien depende de `estructura` (`dependencies: ['estructura']`) —
+para saber a qué grupo pertenece cada quien — y no al revés. `estructura` no depende de
+ningún otro módulo (`dependencies: []`), y quién ocupa cada cargo lo dice `personas`.
 
-Orden de construcción que se desprende: `sistema` y `estructura` (hechos), luego
-`personas`, y a partir de ahí el resto. Es tentativo: cada spec de módulo puede
-ajustarlo.
+Orden de construcción que se desprende: `sistema`, `estructura` y `personas` (hechos), y
+a partir de ahí el resto. Es tentativo: cada spec de módulo puede ajustarlo.
 
 ## 8. Modo demo y offline
 

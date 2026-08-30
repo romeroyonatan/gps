@@ -1,10 +1,9 @@
 import { useDistritos } from '@gps/api'
-import { etiquetaDeEdades, RAMAS, type Rama } from '@gps/estructura/dominio'
-
-const RAMA_POR_ID = new Map(RAMAS.map((rama) => [rama.id, rama]))
+import { etiquetaDeEdades, type Rama, ramaDelCatalogo } from '@gps/estructura/dominio'
+import { Link } from 'wouter'
 
 function EtiquetaDeRama(props: { rama: Rama }) {
-  const rama = RAMA_POR_ID.get(props.rama)
+  const rama = ramaDelCatalogo(props.rama)
   if (!rama) return null
   const edades = etiquetaDeEdades(rama)
   return (
@@ -14,21 +13,26 @@ function EtiquetaDeRama(props: { rama: Rama }) {
   )
 }
 
-function Grupo(props: { numero: number; nombre: string; ramas: readonly Rama[] }) {
+function Grupo(props: { id: string; numero: number; nombre: string; ramas: readonly Rama[] }) {
   return (
-    <li className="px-4 py-3">
-      <p className="text-sm font-medium text-slate-900">
-        <span className="text-slate-400">Grupo Scout Nº{props.numero} -</span> {props.nombre}
-      </p>
-      {props.ramas.length === 0 ? (
-        <p className="mt-1.5 text-xs text-slate-400">Todavía no abrió ninguna rama</p>
-      ) : (
-        <ul className="mt-1.5 flex flex-wrap gap-1.5">
-          {props.ramas.map((rama) => (
-            <EtiquetaDeRama key={rama} rama={rama} />
-          ))}
-        </ul>
-      )}
+    <li>
+      <Link
+        href={`/grupos/${props.id}`}
+        className="block px-4 py-3 hover:bg-slate-50 active:bg-slate-100"
+      >
+        <p className="text-sm font-medium text-slate-900">
+          <span className="text-slate-400">Grupo Scout Nº{props.numero} -</span> {props.nombre}
+        </p>
+        {props.ramas.length === 0 ? (
+          <p className="mt-1.5 text-xs text-slate-400">Todavía no abrió ninguna rama</p>
+        ) : (
+          <ul className="mt-1.5 flex flex-wrap gap-1.5">
+            {props.ramas.map((rama) => (
+              <EtiquetaDeRama key={rama} rama={rama} />
+            ))}
+          </ul>
+        )}
+      </Link>
     </li>
   )
 }
@@ -61,6 +65,7 @@ export function Estructura() {
               {distrito.grupos.map((grupo) => (
                 <Grupo
                   key={grupo.id}
+                  id={grupo.id}
                   numero={grupo.numero}
                   nombre={grupo.nombre}
                   ramas={grupo.ramas}

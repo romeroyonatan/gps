@@ -29,12 +29,17 @@ Mapa de piezas en `docs/arquitectura.md`. Tutorial en prosa en `docs/crear-un-mo
 2. Cambiar `name` en el `package.json` a `@gps/<nombre>`.
 3. Escribir el dominio en `src/dominio/`: modelos, validaciones, reglas puras.
 4. Escribir el servicio, el esquema y el módulo en `src/servidor/`.
-5. Declarar las dependencias en `dependencies` del objeto `Module`.
-6. Si el módulo tiene tablas: declararlas en `src/servidor/tablas.ts`, generar la
+5. Si otro módulo va a necesitar algo de éste, declararlo en `src/dominio/publico.ts` —
+   sólo eso, no la interfaz entera del servicio.
+6. Declarar las dependencias en `dependencies` del objeto `Module`. `Module<S, D>` tipa
+   `dependencies` contra las claves de `D`: un nombre que no esté ahí no compila. Los
+   servicios ya construidos de esas dependencias llegan por el segundo parámetro de
+   `createServices(core, dependencias)`, no por el contexto.
+7. Si el módulo tiene tablas: declararlas en `src/servidor/tablas.ts`, generar la
    migración con `bunx drizzle-kit generate --name <nombre>` parado en el paquete, y
    sumarla a `src/servidor/migraciones.ts`.
-7. Agregarlo a la lista de `services/backend/src/modules.ts`.
-8. `bun run schema` y commitear el `schema.gql` resultante.
+8. Agregarlo a la lista de `services/backend/src/modules.ts`.
+9. `bun run schema` y commitear el `schema.gql` resultante.
 
 `modules.ts` es el único archivo central que hay que tocar. El `Dockerfile` no:
 copia los `package.json` con `COPY --parents packages/*/package.json` (necesita el
@@ -65,11 +70,17 @@ distinga de un vistazo en vez de parecer plausible. Si la regla de portabilidad 
 la solución es pasar el dato por `Core`, nunca desactivarla. Es lo que va a permitir
 correr los módulos dentro del teléfono.
 
-**Fronteras de imports.** `apps/**` no puede importar `*/servidor`. Los módulos no se
-importan entre sí: se comunican por el contexto (`ctx.sistema`, `ctx.personas`). Lo
-impone Biome, con dos aclaraciones: `@gps/core` sí se puede importar —es la plomería,
-no un módulo— y `packages/demo` está exceptuado, porque conocer a los otros módulos
-para sembrarlos es literalmente su razón de ser.
+**Fronteras de imports.** `apps/**` no puede importar `*/servidor`. Los módulos tampoco:
+el `/servidor` de un módulo es privado —tiene estado y es la implementación— y se llega a
+él por el contexto (`ctx.sistema`, `ctx.personas`) o por las dependencias que
+`createServices` recibe ya construidas. El `/dominio`, en cambio, **sí** se puede importar
+entre módulos: es puro, isomorfo y sin estado, y las apps ya lo importan de todos. Lo que
+un módulo le ofrece a los demás se declara en `src/dominio/publico.ts`, y es
+deliberadamente más chico que su servicio: es la idea de los *package interfaces* de SAP y
+del modificador `global` de Salesforce, y la mitad que importa es que el resto queda
+privado. Lo impone Biome, con dos aclaraciones: `@gps/core` es la plomería y no un módulo,
+y `packages/demo` está exceptuado incluso para `/servidor`, porque conocer a los otros
+módulos para sembrarlos es literalmente su razón de ser.
 
 **Mobile-first.** Todo se diseña primero a 375px. `sm:` y `md:` sólo agregan en
 pantallas grandes, nunca arreglan lo que se rompió en chicas.
@@ -86,6 +97,12 @@ convenciones están documentadas pero no implementadas todavía: no hay `auth`, 
 Auth, `Alcance` real, `politicas.ts`, rate limiting, bus de eventos, auditoría,
 archivos, `packages/local`, base en el dispositivo. Cada uno tiene su diseño en la
 spec y llega con su primer consumidor real. No agregarlos por adelantado.
+
+Tampoco hay baja ni edición de personas (las columnas `hasta` existen y el historial se
+puede escribir, pero por ahora sólo se llena con altas), ni cargos fuera del ámbito del
+grupo (los distritales, diocesanos y de equipo llegan con el ámbito que los necesite), ni
+equipos, ni forma de buscar una persona sin saber su grupo (la única consulta es
+`personas(grupoId: ID!)`).
 
 La base es SQLite por Drizzle y llega a los módulos por `Core.bd`; las migraciones las
 declara cada módulo y las aplica `aplicarMigraciones` al arrancar. Sigue sin haber

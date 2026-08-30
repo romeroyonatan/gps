@@ -1,10 +1,14 @@
 import type { Core } from '@gps/core'
-import { eq, isNull } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import type { Distrito, DistritoConGrupos, Grupo, GrupoConRamas } from '../dominio/modelos'
+import type { Estructura } from '../dominio/publico'
 import { RAMAS, type Rama } from '../dominio/ramas'
 import { distritos, grupos, ramasDelGrupo } from './tablas'
 
-export interface ServicioDeEstructura {
+/** Lo que este modulo hace, que es mas que lo que publica: ver Estructura en
+ *  /dominio/publico.ts. `extends` es lo que hace que la implementacion no pueda
+ *  quedar corta sin que TypeScript se entere. */
+export interface ServicioDeEstructura extends Estructura {
   crearDistrito(datos: { numero: number; zona: string }): Promise<Distrito>
   crearGrupo(datos: { numero: number; nombre: string; distritoId: string }): Promise<Grupo>
   abrirRama(grupoId: string, rama: Rama): Promise<void>
@@ -70,6 +74,22 @@ export function crearServicioDeEstructura(core: Core): ServicioDeEstructura {
         .set({ cerradoEn: ahora, actualizadoEn: ahora })
         .where(eq(grupos.id, grupoId))
         .run()
+    },
+
+    async obtenerGrupo(grupoId) {
+      const grupo = core.bd
+        .select()
+        .from(grupos)
+        .where(and(eq(grupos.id, grupoId), isNull(grupos.cerradoEn)))
+        .get()
+      if (!grupo) return null
+
+      const filas = core.bd
+        .select()
+        .from(ramasDelGrupo)
+        .where(eq(ramasDelGrupo.grupoId, grupoId))
+        .all()
+      return { ...grupo, ramas: ordenarPorCatalogo(filas.map((fila) => fila.rama)) }
     },
 
     async listarDistritos() {

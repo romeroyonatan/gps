@@ -1,4 +1,45 @@
 """
+Un cargo de una persona en su grupo, con su periodo.
+"""
+type Cargo {
+  cargo: TipoDeCargo!
+  desde: String!
+
+  """
+  Vacía si no tiene fin previsto. Puede estar en el futuro: un mandato dura cuatro años.
+  """
+  hasta: String
+}
+
+"""
+Como pertenece una persona a su grupo.
+"""
+enum Categoria {
+  activo
+  adherente
+  beneficiario
+}
+
+"""
+Un cargo en el alta. Su `desde` es el de la pertenencia.
+"""
+input DatosDeCargo {
+  cargo: TipoDeCargo!
+  hasta: String
+}
+
+"""
+El grupo al que ingresa la persona, y como.
+"""
+input DatosDeIngreso {
+  cargos: [DatosDeCargo!]!
+  categoria: Categoria!
+  desde: String!
+  grupoId: ID!
+  rama: Rama
+}
+
+"""
 Los datos que necesita el alta de una persona.
 """
 input DatosDePersona {
@@ -35,16 +76,21 @@ type Grupo {
 
 type Mutation {
   """
-  Da de alta una persona.
+  Da de alta una persona y la inscribe en un grupo.
   """
-  crearPersona(datos: DatosDePersona!): Persona!
+  crearPersona(datos: DatosDePersona!, ingreso: DatosDeIngreso!): Persona!
 }
 
 """
-Los datos personales de un miembro de la asociacion.
+Un miembro de la asociacion, con sus vinculos vigentes en su grupo.
 """
 type Persona {
   apellidos: String!
+
+  """
+  Todos, también los vencidos: la vigencia la decide el cliente.
+  """
+  cargos: [Cargo!]!
 
   """
   Fecha de calendario en formato aaaa-mm-dd, sin hora ni zona horaria.
@@ -53,7 +99,25 @@ type Persona {
   id: ID!
   nombres: String!
   numeroDeDocumento: String!
+  pertenencia: Pertenencia!
   tipoDeDocumento: TipoDeDocumento!
+}
+
+"""
+Como y desde cuando una persona pertenece a su grupo.
+"""
+type Pertenencia {
+  categoria: Categoria!
+
+  """
+  Fecha de calendario en formato aaaa-mm-dd, sin hora ni zona horaria.
+  """
+  desde: String!
+
+  """
+  Vacía si y sólo si la categoría es adherente.
+  """
+  rama: Rama
 }
 
 type Query {
@@ -63,9 +127,9 @@ type Query {
   distritos: [Distrito!]!
 
   """
-  Todas las personas, ordenadas por apellido.
+  Las personas de un grupo, ordenadas por apellido.
   """
-  personas: [Persona!]!
+  personas(grupoId: ID!): [Persona!]!
 
   """
   Devuelve la version de esta instancia.
@@ -83,6 +147,17 @@ enum Rama {
   raiders
   rovers
   scouts
+}
+
+"""
+Los cargos de un grupo scout.
+"""
+enum TipoDeCargo {
+  capellan
+  director
+  jefeDeGrupo
+  jefeDeRama
+  subjefeDeGrupo
 }
 
 """

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { etiquetaDeEdades, RAMAS } from '../src/dominio/ramas'
+import { etiquetaDeEdades, RAMAS, ramaDelCatalogo } from '../src/dominio/ramas'
 
 describe('catalogo de RAMAS', () => {
   test('tiene las seis ramas, de menor a mayor edad', () => {
@@ -32,5 +32,25 @@ describe('catalogo de RAMAS', () => {
 describe('etiquetaDeEdades', () => {
   test('un tramo cerrado va con el guion largo entre las dos edades', () => {
     expect(RAMAS.map(etiquetaDeEdades)).toEqual(['5–7', '7–10', '10–14', '14–17', '17–21', '21+'])
+  })
+})
+
+describe('ramaDelCatalogo', () => {
+  test('devuelve la entrada del catalogo, no solo el nombre', () => {
+    // Los consumidores le piden nombre y tambien le pasan la entrada entera a
+    // etiquetaDeEdades, por eso el helper devuelve la entrada y no un string.
+    expect(ramaDelCatalogo('lobatos')).toEqual({
+      id: 'lobatos',
+      nombre: 'Lobatos',
+      desde: 7,
+      hasta: 10,
+    })
+  })
+
+  test('un id que no esta en el catalogo no rompe: devuelve undefined', () => {
+    // Es el caso que el comentario de RAMAS avisa: sacar o renombrar una rama
+    // deja ids viejos dando vueltas en los datos, y el helper tiene que poder
+    // decir "no esta" sin tirar.
+    expect(ramaDelCatalogo('inexistente' as never)).toBeUndefined()
   })
 })
