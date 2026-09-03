@@ -7,7 +7,9 @@
     "compile": "tsc --noEmit"
   },
   "dependencies": {
+    "@gps/afiliacion": "workspace:*",
     "@gps/api": "workspace:*",
+    "@gps/core": "workspace:*",
     "@gps/estructura": "workspace:*",
     "@gps/personas": "workspace:*",
     "@tanstack/query-async-storage-persister": "^5.102.4",

@@ -1,4 +1,4 @@
-import type { Builder } from '@gps/core'
+import type { Builder } from '@gps/core/graphql'
 import type { Version } from '../dominio/index'
 
 export function registrarSchema(builder: Builder): void {

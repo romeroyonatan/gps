@@ -1,9 +1,9 @@
-import { type Builder, enumCompartido } from '@gps/core'
+import { type Builder, enumCompartido } from '@gps/core/graphql'
 import { RAMAS } from '@gps/estructura/dominio'
 import { GraphQLError } from 'graphql'
 import { TIPOS_DE_CARGO, type TipoDeCargo } from '../dominio/cargos'
 import { CATEGORIAS, type Categoria } from '../dominio/categorias'
-import { TIPOS_DE_DOCUMENTO, type TipoDeDocumento } from '../dominio/documentos'
+import { TIPOS_DE_DOCUMENTO } from '../dominio/documentos'
 import type { DatosDePersona } from '../dominio/modelos'
 import type {
   Cargo,
@@ -15,14 +15,21 @@ import type {
 import { DatosInvalidos, DocumentoDuplicado, GrupoInexistente } from './servicio'
 
 export function registrarSchema(builder: Builder): void {
-  const TipoDeDocumentoRef = builder.enumType('TipoDeDocumento', {
-    description: 'Tipos de documento que la asociacion acepta.',
-    // Los valores son los ids del dominio, en minuscula y no gritados como manda
-    // la convencion de GraphQL. Es a proposito, igual que en el enum Rama: asi
-    // lo que viaja por la red es el id, y la pantalla saca la etiqueta de
-    // TIPOS_DE_DOCUMENTO sin una tabla de traduccion en el medio.
-    values: TIPOS_DE_DOCUMENTO.map((tipo) => tipo.id) as unknown as readonly TipoDeDocumento[],
-  })
+  // Los valores son los ids del dominio, en minuscula y no gritados como manda
+  // la convencion de GraphQL. Es a proposito, igual que en el enum Rama: asi
+  // lo que viaja por la red es el id, y la pantalla saca la etiqueta de
+  // TIPOS_DE_DOCUMENTO sin una tabla de traduccion en el medio.
+  //
+  // enumCompartido y no builder.enumType porque afiliacion declara el mismo
+  // enum: dos modulos no pueden declararlo dos veces. Ojo con la descripcion,
+  // que tiene que ser identica en los dos, o enumCompartido tira
+  // DescripcionesDistintas al componer el esquema.
+  const TipoDeDocumentoRef = enumCompartido(
+    builder,
+    'TipoDeDocumento',
+    TIPOS_DE_DOCUMENTO.map((tipo) => tipo.id),
+    'Tipos de documento que la asociacion acepta.',
+  )
 
   const RamaRef = enumCompartido(
     builder,

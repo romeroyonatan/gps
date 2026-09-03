@@ -1,4 +1,5 @@
 import type { Core } from '@gps/core'
+import { aFechaDeCalendario } from '@gps/core/fechas'
 import { and, eq, isNull } from 'drizzle-orm'
 import type { Distrito, DistritoConGrupos, Grupo, GrupoConRamas } from '../dominio/modelos'
 import type { Estructura } from '../dominio/publico'
@@ -128,6 +129,23 @@ export function crearServicioDeEstructura(core: Core): ServicioDeEstructura {
         ...distrito,
         grupos: gruposPorDistrito.get(distrito.id) ?? [],
       }))
+    },
+
+    async gruposAbiertosEn(fecha) {
+      // El filtro va en memoria y no en el WHERE: cerrado_en es un instante en
+      // milisegundos y `fecha` es un dia del almanaque, asi que compararlos
+      // exige convertir el primero -y esa conversion depende de la zona
+      // horaria, que es justo lo que aFechaDeCalendario resuelve. Son unas
+      // decenas de grupos por diocesis; el mismo criterio que listarDistritos.
+      const filas = core.bd
+        .select({ id: grupos.id, cerradoEn: grupos.cerradoEn })
+        .from(grupos)
+        .all()
+      return new Set(
+        filas
+          .filter((fila) => fila.cerradoEn === null || fecha <= aFechaDeCalendario(fila.cerradoEn))
+          .map((fila) => fila.id),
+      )
     },
   }
 }

@@ -11,6 +11,7 @@
     "compile": "tsc --noEmit"
   },
   "dependencies": {
+    "@gps/afiliacion": "workspace:*",
     "@gps/core": "workspace:*",
     "@gps/demo": "workspace:*",
     "@gps/estructura": "workspace:*",

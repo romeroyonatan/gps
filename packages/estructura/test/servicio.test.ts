@@ -290,3 +290,47 @@ describe('cerrarGrupo', () => {
     ).rejects.toThrow()
   })
 })
+
+describe('gruposAbiertosEn', () => {
+  test('un grupo cerrado en octubre sigue estando abierto en mayo', async () => {
+    // Es el caso que hace que la pregunta lleve fecha: si devolviera solo los
+    // abiertos hoy, se perderia la nomina legitima de mayo.
+    const { servicio } = montarConBd({ ahora: () => new Date('1970-10-15T12:00:00Z') })
+    const distrito = await servicio.crearDistrito({ numero: 1, zona: 'San Isidro' })
+    const grupo = await servicio.crearGrupo({
+      numero: 7,
+      nombre: 'San Jorge',
+      distritoId: distrito.id,
+    })
+    await servicio.cerrarGrupo(grupo.id)
+
+    expect(await servicio.gruposAbiertosEn('1970-05-01')).toContain(grupo.id)
+    expect(await servicio.gruposAbiertosEn('1970-11-01')).not.toContain(grupo.id)
+  })
+
+  test('cerrado ese mismo dia todavia cuenta como abierto', async () => {
+    // Las dos puntas inclusivas, igual que estaVigente.
+    const { servicio } = montarConBd({ ahora: () => new Date('1970-10-15T12:00:00Z') })
+    const distrito = await servicio.crearDistrito({ numero: 1, zona: 'San Isidro' })
+    const grupo = await servicio.crearGrupo({
+      numero: 7,
+      nombre: 'San Jorge',
+      distritoId: distrito.id,
+    })
+    await servicio.cerrarGrupo(grupo.id)
+
+    expect(await servicio.gruposAbiertosEn('1970-10-15')).toContain(grupo.id)
+  })
+
+  test('un grupo que nunca cerro esta abierto siempre', async () => {
+    const servicio = montar()
+    const distrito = await servicio.crearDistrito({ numero: 1, zona: 'San Isidro' })
+    const grupo = await servicio.crearGrupo({
+      numero: 7,
+      nombre: 'San Jorge',
+      distritoId: distrito.id,
+    })
+
+    expect(await servicio.gruposAbiertosEn('2999-12-31')).toContain(grupo.id)
+  })
+})

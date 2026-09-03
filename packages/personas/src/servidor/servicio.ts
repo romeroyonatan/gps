@@ -1,8 +1,9 @@
 import type { Core } from '@gps/core'
 import type { Estructura } from '@gps/estructura/dominio'
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, eq, gte, isNull, lte, or } from 'drizzle-orm'
 import { nombreDelTipo, normalizarNumero, type TipoDeDocumento } from '../dominio/documentos'
 import type { DatosDePersona } from '../dominio/modelos'
+import type { Personas } from '../dominio/publico'
 import { type Problema, validarIngreso, validarPersona } from '../dominio/validaciones'
 import type { Cargo, DatosDeIngreso, PersonaConVinculos, Pertenencia } from '../dominio/vinculos'
 import { personas, pertenencias, cargos as tablaDeCargos } from './tablas'
@@ -37,7 +38,10 @@ export class GrupoInexistente extends Error {
   readonly grupoId: string
 }
 
-export interface ServicioDePersonas {
+/** Lo que este modulo hace, que es mas que lo que publica: ver Personas en
+ *  /dominio/publico.ts. `extends` es lo que hace que la implementacion no pueda
+ *  quedar corta sin que TypeScript se entere. */
+export interface ServicioDePersonas extends Personas {
   crearPersona(datos: DatosDePersona, ingreso: DatosDeIngreso): Promise<PersonaConVinculos>
   /** Las personas con pertenencia vigente en ese grupo, ordenadas por apellido. */
   listarPersonas(grupoId: string): Promise<readonly PersonaConVinculos[]>
@@ -177,6 +181,30 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
             alfabeto.compare(una.apellidos, otra.apellidos) ||
             alfabeto.compare(una.nombres, otra.nombres),
         )
+    },
+
+    async miembrosActivos(fecha) {
+      // Las dos puntas inclusivas: la misma regla que estaVigente, pero contra
+      // una fecha cualquiera en vez de contra hoy. Va en el WHERE y no en
+      // memoria porque son fechas de texto contra fechas de texto -aaaa-mm-dd
+      // ordena igual lexicografica que cronologicamente- y esto barre toda la
+      // asociacion, no un grupo.
+      const filas = core.bd
+        .select()
+        .from(pertenencias)
+        .innerJoin(personas, eq(personas.id, pertenencias.personaId))
+        .where(
+          and(
+            lte(pertenencias.desde, fecha),
+            or(isNull(pertenencias.hasta), gte(pertenencias.hasta, fecha)),
+          ),
+        )
+        .all()
+
+      return filas.map((fila) => ({
+        persona: fila.personas,
+        grupoId: fila.pertenencias.grupoId,
+      }))
     },
   }
 }

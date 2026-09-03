@@ -1,6 +1,7 @@
 import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
 import { aplicarMigraciones, type Bd, type Core, type Module, type Reloj } from '@gps/core'
+import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Estructura, GrupoConRamas } from '@gps/estructura/dominio'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import type { DatosDePersona } from '../src/dominio/modelos'
@@ -31,7 +32,20 @@ const GRUPO: GrupoConRamas = {
  *  contexto, asi que el test no necesita levantar el otro modulo. Es lo que
  *  hace testeable la dependencia entre modulos. */
 function estructuraFalsa(grupos: readonly GrupoConRamas[] = [GRUPO]): Estructura {
-  return { obtenerGrupo: async (id) => grupos.find((grupo) => grupo.id === id) ?? null }
+  return {
+    obtenerGrupo: async (id) => grupos.find((grupo) => grupo.id === id) ?? null,
+    // Personas no usa gruposAbiertosEn: se implementa solo para satisfacer la
+    // interfaz. Los GrupoConRamas de este archivo tienen cerradoEn: null.
+    async gruposAbiertosEn(fecha) {
+      return new Set(
+        grupos
+          .filter(
+            (grupo) => grupo.cerradoEn === null || fecha <= aFechaDeCalendario(grupo.cerradoEn),
+          )
+          .map((grupo) => grupo.id),
+      )
+    },
+  }
 }
 
 /** Un servicio con la base migrada y un Core de ids fijos, para poder afirmar
@@ -296,5 +310,38 @@ describe('crearPersona', () => {
     expect(
       montar().crearPersona({ ...valida, fechaDeNacimiento: '2010-05-01' }, ingreso),
     ).rejects.toBeInstanceOf(DatosInvalidos)
+  })
+})
+
+describe('miembrosActivos', () => {
+  test('incluye a quien ya habia entrado y todavia no se fue', async () => {
+    const servicio = montar()
+    await servicio.crearPersona(
+      { ...valida, numeroDeDocumento: '30111222' },
+      { ...ingreso, desde: '1969-03-01' },
+    )
+
+    const activos = await servicio.miembrosActivos('1969-05-01')
+    expect(activos).toHaveLength(1)
+    expect(activos[0]?.grupoId).toBe('grupo_1')
+    expect(activos[0]?.persona.numeroDeDocumento).toBe('30111222')
+  })
+
+  test('no incluye a quien entro despues', async () => {
+    const servicio = montar()
+    await servicio.crearPersona(
+      { ...valida, numeroDeDocumento: '30111222' },
+      { ...ingreso, desde: '1969-07-01' },
+    )
+    expect(await servicio.miembrosActivos('1969-05-01')).toHaveLength(0)
+  })
+
+  test('las dos puntas son inclusivas, igual que estaVigente', async () => {
+    const servicio = montar()
+    await servicio.crearPersona(
+      { ...valida, numeroDeDocumento: '30111222' },
+      { ...ingreso, desde: '1969-05-01' },
+    )
+    expect(await servicio.miembrosActivos('1969-05-01')).toHaveLength(1)
   })
 })

@@ -1,0 +1,29 @@
+# packages/api/src/queries/afiliacion.graphql
+query Declaraciones($grupoId: ID!) {
+  declaraciones(grupoId: $grupoId) {
+    id
+    fecha
+    periodo
+    afiliados {
+      personaId
+      tipoDeDocumento
+      numeroDeDocumento
+      nombres
+      apellidos
+    }
+    aCobrar {
+      personaId
+    }
+  }
+}
+
+query AfiliadosEn($periodo: Int!, $personaIds: [ID!]!) {
+  afiliadosEn(periodo: $periodo, personaIds: $personaIds)
+}
+
+mutation DeclararAfiliacion($grupoId: ID!) {
+  declararAfiliacion(grupoId: $grupoId) {
+    id
+    fecha
+  }
+}

@@ -15,7 +15,9 @@
       "version": "1.0.0",
       "dependencies": {
         "@expo/metro-runtime": "~57.0.13",
+        "@gps/afiliacion": "workspace:*",
         "@gps/api": "workspace:*",
+        "@gps/core": "workspace:*",
         "@gps/estructura": "workspace:*",
         "@gps/personas": "workspace:*",
         "@react-native-async-storage/async-storage": "2.2.0",
@@ -52,7 +54,9 @@
       "name": "web",
       "version": "0.1.0",
       "dependencies": {
+        "@gps/afiliacion": "workspace:*",
         "@gps/api": "workspace:*",
+        "@gps/core": "workspace:*",
         "@gps/estructura": "workspace:*",
         "@gps/personas": "workspace:*",
         "@tanstack/query-async-storage-persister": "^5.102.4",
@@ -67,6 +71,22 @@
         "@types/react-dom": "^19.2.0",
         "bun-plugin-tailwind": "^0.1.2",
         "tailwindcss": "^4.3.3",
+        "typescript": "^5.7.0",
+      },
+    },
+    "packages/afiliacion": {
+      "name": "@gps/afiliacion",
+      "version": "0.1.0",
+      "dependencies": {
+        "@gps/core": "workspace:*",
+        "@gps/estructura": "workspace:*",
+        "@gps/personas": "workspace:*",
+        "drizzle-orm": "^0.45.2",
+        "graphql": "^16.9.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "drizzle-kit": "^0.31.10",
         "typescript": "^5.7.0",
       },
     },
@@ -110,6 +130,7 @@
       "name": "@gps/demo",
       "version": "0.1.0",
       "dependencies": {
+        "@gps/afiliacion": "workspace:*",
         "@gps/core": "workspace:*",
         "@gps/estructura": "workspace:*",
         "@gps/personas": "workspace:*",
@@ -163,6 +184,7 @@
       "name": "backend",
       "version": "0.1.0",
       "dependencies": {
+        "@gps/afiliacion": "workspace:*",
         "@gps/core": "workspace:*",
         "@gps/demo": "workspace:*",
         "@gps/estructura": "workspace:*",
@@ -481,6 +503,8 @@
     "@expo/xcpretty": ["@expo/xcpretty@4.4.4", "", { "dependencies": { "@babel/code-frame": "^7.20.0", "chalk": "^4.1.0", "js-yaml": "^4.1.0" }, "bin": { "excpretty": "build/cli.js" } }, "sha512-4aQzz9vgxcNXFfo/iyNgDDYfsU5XGKKxWxZopw0cVotHiW+U8IJbIxMaxsINs6bHhtkG3StKNPcOrn3eBuxKPw=="],
 
     "@fastify/busboy": ["@fastify/busboy@3.2.2", "", {}, "sha512-yXSS27qPExaXeuLvMRMXOLtpipzfQYNjG3FkunDWKGfMYjKuhFXko9CVzqxm8jcF+lmtS9Fd89QNdh9XDjnbNg=="],
+
+    "@gps/afiliacion": ["@gps/afiliacion@workspace:packages/afiliacion"],
 
     "@gps/api": ["@gps/api@workspace:packages/api"],
 

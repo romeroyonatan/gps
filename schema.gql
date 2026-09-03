@@ -1,4 +1,15 @@
 """
+Una fila de la nómina: cómo estaba esa persona el día de la declaración.
+"""
+type Afiliado {
+  apellidos: String!
+  nombres: String!
+  numeroDeDocumento: String!
+  personaId: ID!
+  tipoDeDocumento: TipoDeDocumento!
+}
+
+"""
 Un cargo de una persona en su grupo, con su periodo.
 """
 type Cargo {
@@ -51,6 +62,32 @@ input DatosDePersona {
 }
 
 """
+La nómina que un grupo presenta en una fecha.
+"""
+type Declaracion {
+  """
+  Los de la nómina que todavía no tenían afiliación ese período.
+  """
+  aCobrar: [Afiliado!]!
+
+  """
+  La nómina completa del grupo ese día.
+  """
+  afiliados: [Afiliado!]!
+
+  """
+  Fecha de calendario en formato aaaa-mm-dd, sin hora ni zona horaria.
+  """
+  fecha: String!
+  id: ID!
+
+  """
+  El año en que arranca el período al que cae esta declaración.
+  """
+  periodo: Int!
+}
+
+"""
 Un distrito de la diocesis, con sus grupos.
 """
 type Distrito {
@@ -79,6 +116,11 @@ type Mutation {
   Da de alta una persona y la inscribe en un grupo.
   """
   crearPersona(datos: DatosDePersona!, ingreso: DatosDeIngreso!): Persona!
+
+  """
+  Declaración extraordinaria: fotografía al grupo con la fecha de hoy.
+  """
+  declararAfiliacion(grupoId: ID!): Declaracion!
 }
 
 """
@@ -121,6 +163,16 @@ type Pertenencia {
 }
 
 type Query {
+  """
+  Los ids, de entre los preguntados, que ya tienen afiliación ese período.
+  """
+  afiliadosEn(periodo: Int!, personaIds: [ID!]!): [ID!]!
+
+  """
+  Las declaraciones de un grupo, de la más reciente a la más vieja.
+  """
+  declaraciones(grupoId: ID!): [Declaracion!]!
+
   """
   El arbol de la diocesis: distritos, sus grupos y sus ramas.
   """

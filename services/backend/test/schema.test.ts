@@ -27,7 +27,7 @@ describe('esquema compuesto', () => {
   test('lista los modulos efectivamente registrados', async () => {
     const resultado = await consultar('{ version { modulos } }')
     expect(resultado.data).toEqual({
-      version: { modulos: ['sistema', 'estructura', 'personas'] },
+      version: { modulos: ['sistema', 'estructura', 'personas', 'afiliacion'] },
     })
   })
 
@@ -47,5 +47,27 @@ describe('esquema compuesto', () => {
     const tipo = resultado.data?.__type as { enumValues: { name: string }[] }
     const valores = tipo.enumValues.map((valor) => valor.name)
     expect(valores).toEqual(['adultos', 'castores', 'lobatos', 'raiders', 'rovers', 'scouts'])
+  })
+})
+
+describe('afiliacion en el esquema compuesto', () => {
+  test('la query declaraciones existe y responde vacia sin datos', async () => {
+    const resultado = await consultar('{ declaraciones(grupoId: "grupo_1") { fecha periodo } }')
+    expect(resultado.errors).toBeUndefined()
+    expect(resultado.data).toEqual({ declaraciones: [] })
+  })
+
+  test('afiliadosEn responde vacio sin declaraciones', async () => {
+    const resultado = await consultar('{ afiliadosEn(periodo: 2026, personaIds: ["persona_1"]) }')
+    expect(resultado.errors).toBeUndefined()
+    expect(resultado.data).toEqual({ afiliadosEn: [] })
+  })
+
+  test('TipoDeDocumento lo declaran dos modulos y el esquema compone igual', async () => {
+    // Si personas y afiliacion lo declararan con builder.enumType, componer
+    // tiraria. enumCompartido es lo que lo permite; este test es el que se
+    // rompe si alguno de los dos se sale del helper o cambia la descripcion.
+    const resultado = await consultar('{ __type(name: "TipoDeDocumento") { name } }')
+    expect(resultado.errors).toBeUndefined()
   })
 })

@@ -1,4 +1,5 @@
 import type { Marcas } from '@gps/core'
+import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Rama } from '@gps/estructura/dominio'
 import type { TipoDeCargo } from './cargos'
 import type { Categoria } from './categorias'
@@ -61,16 +62,6 @@ export type DatosDeCargo = Omit<Cargo, 'id' | 'personaId' | 'grupoId' | 'desde' 
 export interface DatosDeIngreso
   extends Omit<Pertenencia, 'id' | 'personaId' | 'hasta' | keyof Marcas> {
   readonly cargos: readonly DatosDeCargo[]
-}
-
-/** La fecha de calendario de un instante, segun el almanaque de quien lo mira.
- *
- *  Componentes locales y no toISOString por lo mismo que calcularEdad: en UTC-3
- *  el 1 de mayo a las 22:00 seria el 2 de mayo en UTC. */
-export function aFechaDeCalendario(instante: Date): string {
-  const mes = `${instante.getMonth() + 1}`.padStart(2, '0')
-  const dia = `${instante.getDate()}`.padStart(2, '0')
-  return `${instante.getFullYear()}-${mes}-${dia}`
 }
 
 /** Si el vinculo esta vigente el dia `hoy`, con las dos puntas incluidas.

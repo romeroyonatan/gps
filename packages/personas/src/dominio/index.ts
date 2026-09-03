@@ -6,6 +6,7 @@ export type { TipoDeDocumento } from './documentos'
 export { nombreDelTipo, normalizarNumero, TIPOS_DE_DOCUMENTO } from './documentos'
 export type { DatosDePersona, Persona } from './modelos'
 export { calcularEdad, nombreCompleto } from './modelos'
+export type { MiembroActivo, Personas } from './publico'
 export type { Problema } from './validaciones'
 export { validarIngreso, validarPersona } from './validaciones'
 export type {
@@ -15,4 +16,4 @@ export type {
   PersonaConVinculos,
   Pertenencia,
 } from './vinculos'
-export { aFechaDeCalendario, estaVigente } from './vinculos'
+export { estaVigente } from './vinculos'

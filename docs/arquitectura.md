@@ -241,12 +241,12 @@ dependencia de módulo que ya existe hoy: `personas` depende de `estructura`.
     estructura      archivos    no dependen de ningun otro modulo
        ^                ^
        |                |
-    personas           permisos  <---+
-       ^  ^                        |
-       |  |                        |
-       |  +-- salud                |
-       |                           |
-    afiliacion --------------------+
+    personas           permisos
+       ^  ^
+       |  |
+       |  +-- salud
+       |
+    afiliacion      depende tambien de estructura, directo y no solo via personas
        ^
        |
     tesoreria
@@ -258,6 +258,15 @@ y los cargos viven en `personas`, en dos tablas con historial (`pertenencias` y 
 así que es `personas` quien depende de `estructura` (`dependencies: ['estructura']`) —
 para saber a qué grupo pertenece cada quien — y no al revés. `estructura` no depende de
 ningún otro módulo (`dependencies: []`), y quién ocupa cada cargo lo dice `personas`.
+
+`afiliacion` depende de `personas` **y** de `estructura` (`dependencies: ['personas',
+'estructura']`), las dos por lectura: no escribe ni una persona ni un grupo. Necesita
+`estructura.gruposAbiertosEn` para saber qué grupos existían un día dado, y
+`personas.miembrosActivos` para la nómina de ese día — ninguna de las dos alcanza sola,
+porque un grupo cerrado no debe declarar aunque su gente siga viva en las tablas de
+`personas` (ver §"Qué NO existe todavía" en `AGENT.md` sobre esa deuda). No depende de
+`permisos`: esa flecha era un error de una versión anterior de este diagrama, de cuando
+`afiliacion` era todavía especulativa.
 
 Orden de construcción que se desprende: `sistema`, `estructura` y `personas` (hechos), y
 a partir de ahí el resto. Es tentativo: cada spec de módulo puede ajustarlo.
@@ -313,7 +322,7 @@ Los módulos no se llaman entre sí para reaccionar a cosas.
 
     afiliacion
        |
-       | emite AfiliacionAprobada
+       | emite AfiliacionDeclarada
        v
     bus de eventos (core, en proceso, sincronico, tipado)
        |
@@ -325,3 +334,9 @@ Los módulos no se llaman entre sí para reaccionar a cosas.
 
 Afiliación no sabe quién escucha. Ése es el punto: la deuda la genera Tesorería sin que
 Afiliación la conozca.
+
+El evento se llama `AfiliacionDeclarada` y no `AfiliacionAprobada`: lo que hace
+`afiliacion.declarar` es una declaración —una fotografía de quién está en cada grupo un
+día dado—, no una aprobación. No hay nada que aprobar. El bus de la primera fila sigue
+sin existir, como el resto de este diagrama: llega recién con Tesorería, su primer
+suscriptor real.

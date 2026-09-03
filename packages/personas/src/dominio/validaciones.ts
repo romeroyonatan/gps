@@ -1,8 +1,9 @@
+import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Rama } from '@gps/estructura/dominio'
 import { nombreDelCargo, type TipoDeCargo } from './cargos'
 import { normalizarNumero } from './documentos'
 import { calcularEdad, type DatosDePersona } from './modelos'
-import { aFechaDeCalendario, type DatosDeIngreso } from './vinculos'
+import type { DatosDeIngreso } from './vinculos'
 
 /** Un problema de validacion, atado a su campo. Por campo y no una lista de
  *  strings sueltos porque el formulario tiene que marcar el input que falla: un

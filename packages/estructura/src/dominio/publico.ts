@@ -19,4 +19,13 @@ export interface Estructura {
    *  necesite leer un grupo cerrado -el historial de quien estuvo ahi- se
    *  agrega el metodo que lo diga, con su consumidor. */
   obtenerGrupo(grupoId: string): Promise<GrupoConRamas | null>
+
+  /** Los ids de los grupos que estaban abiertos el dia `fecha` (aaaa-mm-dd).
+   *  Cerrado ese mismo dia todavia cuenta como abierto, igual que estaVigente
+   *  incluye las dos puntas.
+   *
+   *  Lleva fecha y obtenerGrupo no, porque las dos preguntas son distintas:
+   *  aquella es "se puede inscribir a alguien hoy" y esta es "existia el dia de
+   *  la declaracion". Un grupo que cerro en octubre tuvo nomina en mayo. */
+  gruposAbiertosEn(fecha: string): Promise<ReadonlySet<string>>
 }

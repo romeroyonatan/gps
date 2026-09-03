@@ -1,7 +1,7 @@
 import { ErrorDeApi, useCrearPersona } from '@gps/api'
+import { aFechaDeCalendario } from '@gps/core/fechas'
 import { etiquetaDeEdades, type Rama, ramaDelCatalogo } from '@gps/estructura/dominio'
 import {
-  aFechaDeCalendario,
   CATEGORIAS,
   type Categoria,
   type DatosDeIngreso,

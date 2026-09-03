@@ -1,6 +1,8 @@
+export { useAfiliadosEn, useDeclaraciones, useDeclararAfiliacion } from './afiliacion'
 export { useDistritos } from './estructura'
 export type {
   CrearPersonaMutationVariables,
+  DeclaracionesQuery,
   DistritosQuery,
   PersonasQuery,
   VersionQuery,

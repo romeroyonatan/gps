@@ -14,7 +14,7 @@ export async function crearServidor(config: Config, bd: Bd) {
     landingPage: false,
   })
 
-  return Bun.serve({
+  const servidor = Bun.serve({
     port: config.puerto,
     development: config.entorno === 'desarrollo',
     routes: {
@@ -23,4 +23,9 @@ export async function crearServidor(config: Config, bd: Bd) {
       '/*': inicio,
     },
   })
+
+  // Devuelve tambien el contexto porque quien arranca el proceso necesita
+  // alcanzar a los servicios sin un request encima: el barrido de afiliacion
+  // corre al arrancar, no atras de una consulta.
+  return { servidor, contexto }
 }

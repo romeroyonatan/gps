@@ -4,6 +4,7 @@
 // conocer a los otros: es literalmente su razon de ser (spec 6.1).
 import '@gps/estructura/servidor'
 import '@gps/personas/servidor'
+import { YaDeclaroHoy } from '@gps/afiliacion/servidor'
 import type { Context } from '@gps/core'
 import type { Rama } from '@gps/estructura/dominio'
 import type { Categoria, DatosDePersona, TipoDeCargo } from '@gps/personas/dominio'
@@ -359,5 +360,25 @@ export async function sembrarEscenario(ctx: Context): Promise<void> {
       desde: persona.desde,
       cargos: persona.cargos ?? [],
     })
+  }
+
+  // Las ordinarias del periodo corriente que ya pasaron, y despues una
+  // extraordinaria del grupo 42.
+  //
+  // La extraordinaria queda con la nomina llena y nada que cobrar, porque en el
+  // escenario nadie ingreso despues de la ordinaria. Es el caso que la pantalla
+  // tiene que saber dibujar, asi que sirve que este.
+  await ctx.afiliacion.declararPendientes()
+
+  const grupoDeLaExtraordinaria = gruposPorNumero.get(42)
+  if (!grupoDeLaExtraordinaria) throw new Error('El escenario no tiene el grupo 42.')
+  try {
+    await ctx.afiliacion.declararExtraordinaria(grupoDeLaExtraordinaria)
+  } catch (error) {
+    // Los dos dias del anio en que se siembra el demo justo en una fecha
+    // ordinaria, la declaracion del dia ya la emitio el barrido de arriba y el
+    // grupo 42 no puede declarar dos veces. El escenario queda igual de bueno
+    // -esa ordinaria es la declaracion de hoy- asi que se sigue.
+    if (!(error instanceof YaDeclaroHoy)) throw error
   }
 }

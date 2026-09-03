@@ -47,6 +47,13 @@ frontend `1-labs`), justamente para que un paquete nuevo no lo obligue a nadie a
 acordarse. Si alguna vez se vuelve a una lista explícita de `COPY`, este paso vuelve a
 la receta.
 
+Ejemplo real: `afiliacion` depende de `personas` y de `estructura`
+(`dependencies: ['personas', 'estructura']`), las dos por lectura nada más —no escribe
+ni una persona ni un grupo—. Y no todo hecho de negocio necesita tabla: su calendario (el
+día de corte del período, las fechas ordinarias) es un catálogo en
+`src/dominio/config.ts`, no una tabla, porque cambia poquísimo y no hace falta
+consultarlo.
+
 ## Reglas obligatorias
 
 **Idioma.** El idioma lo decide el dominio, no la capa. Español para lo que nombra
@@ -82,6 +89,18 @@ privado. Lo impone Biome, con dos aclaraciones: `@gps/core` es la plomería y no
 y `packages/demo` está exceptuado incluso para `/servidor`, porque conocer a los otros
 módulos para sembrarlos es literalmente su razón de ser.
 
+**`@gps/core` tiene tres puertas, no una.** El índice (`@gps/core`) es plomería de
+servidor: `Config`, `Core`, `Module`, `Migracion`, `aplicarMigraciones`,
+`ordenarModulos`, `crearServicios`. `@gps/core/graphql` es lo único que depende de
+Pothos: `crearBuilder` y `enumCompartido`. `@gps/core/fechas` es lo isomorfo —hoy sólo
+`aFechaDeCalendario`—, la única de las tres que un `/dominio` o una app pueden importar.
+Están separadas porque el índice arrastra `@pothos/core` (vía `builder.ts`) y
+`drizzle-orm` (vía `migraciones.ts`) con imports **de valor**, y las apps importan
+`aFechaDeCalendario`: un import de tipo no pesa porque TypeScript lo borra al compilar,
+pero uno de valor no se borra, y Metro no hace tree-shaking, así que en mobile entrarían
+seguro. Una función isomorfa nueva va a `@gps/core/fechas` o a un subpath propio —nunca
+al índice.
+
 **Mobile-first.** Todo se diseña primero a 375px. `sm:` y `md:` sólo agregan en
 pantallas grandes, nunca arreglan lo que se rompió en chicas.
 
@@ -94,15 +113,29 @@ convenciones están documentadas pero no implementadas todavía: no hay `auth`, 
 
 ## Qué NO existe todavía
 
-Auth, `Alcance` real, `politicas.ts`, rate limiting, bus de eventos, auditoría,
-archivos, `packages/local`, base en el dispositivo. Cada uno tiene su diseño en la
-spec y llega con su primer consumidor real. No agregarlos por adelantado.
+Auth, `Alcance` real, `politicas.ts`, rate limiting, auditoría, archivos,
+`packages/local`, base en el dispositivo. Cada uno tiene su diseño en la spec y llega
+con su primer consumidor real. No agregarlos por adelantado.
+
+Bus de eventos tampoco, pero ya tiene un consumidor a la vista: cuando llegue Tesorería,
+`afiliacion.declarar` va a emitir `AfiliacionDeclarada` y va a ser Tesorería quien
+calcule la deuda a partir de ese evento, sin que Afiliación la conozca.
 
 Tampoco hay baja ni edición de personas (las columnas `hasta` existen y el historial se
 puede escribir, pero por ahora sólo se llena con altas), ni cargos fuera del ámbito del
 grupo (los distritales, diocesanos y de equipo llegan con el ámbito que los necesite), ni
 equipos, ni forma de buscar una persona sin saber su grupo (la única consulta es
 `personas(grupoId: ID!)`).
+
+Deuda conocida: **cerrar un grupo no cierra las pertenencias de su gente.** `estructura`
+no puede hacerlo porque la dependencia va al revés —no conoce a `personas`—, y ningún
+otro módulo lo hace tampoco. `afiliacion` la esquiva filtrando por `gruposAbiertosEn` al
+declarar, pero `listarPersonas` de un grupo cerrado sigue devolviendo gente.
+
+También queda, de deuda de paridad: la pantalla `Grupo` de mobile no tiene el estado "no
+hay ningún grupo abierto con esa dirección" que sí tiene la de web
+(`apps/web/src/pantallas/Grupo.tsx`). Quedó a la vista al construir las pantallas de
+afiliación y no se resolvió ahí.
 
 La base es SQLite por Drizzle y llega a los módulos por `Core.bd`; las migraciones las
 declara cada módulo y las aplica `aplicarMigraciones` al arrancar. Sigue sin haber

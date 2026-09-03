@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./graphql": "./src/builder.ts",
+    "./fechas": "./src/fechas.ts"
   },
   "scripts": {
     "compile": "tsc --noEmit"

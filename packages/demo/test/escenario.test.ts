@@ -1,12 +1,13 @@
 import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
+import { afiliacion } from '@gps/afiliacion/servidor'
 import { aplicarMigraciones, type Bd, type Context, type Core } from '@gps/core'
 import { estructura } from '@gps/estructura/servidor'
 import { personas } from '@gps/personas/servidor'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { sembrarEscenario } from '../src/servidor/escenario'
 
-function montarContexto(): Context {
+function montarContexto(hora = new Date('2026-08-27T12:00:00Z')): Context {
   const base = new Database(':memory:')
   base.exec('PRAGMA foreign_keys = ON')
   const bd: Bd = drizzle(base)
@@ -19,22 +20,29 @@ function montarContexto(): Context {
     // no puede estar en 1970: con esa hora, nacer en 2020 seria nacer en el
     // futuro y la validacion rechazaria la siembra. Se usa una fecha fija
     // posterior a todas ellas, no la del sistema, para que el test no cambie de
-    // resultado con el paso del tiempo.
-    reloj: { ahora: () => new Date('2026-08-27T00:00:00Z') },
+    // resultado con el paso del tiempo. Al mediodia y no a medianoche:
+    // aFechaDeCalendario usa componentes locales, asi que un instante a las
+    // 00:00 UTC cae en el dia anterior al oeste de Greenwich.
+    reloj: { ahora: () => hora },
     bd,
-    modulos: ['estructura', 'personas'],
+    modulos: ['estructura', 'personas', 'afiliacion'],
     nuevoId: (prefijo) => `${prefijo}_${++contador}`,
   }
 
-  aplicarMigraciones(core, [estructura, personas])
-  // personas depende de estructura, asi que hay que construirla primero y
-  // pasarsela: es el mismo cableado que hace crearServicios en la raiz de
-  // composicion, a mano porque el test arma su propio contexto.
+  aplicarMigraciones(core, [estructura, personas, afiliacion])
+  // personas depende de estructura y afiliacion de las dos, asi que se
+  // construyen en ese orden: es el mismo cableado que hace crearServicios en la
+  // raiz de composicion, a mano porque el test arma su propio contexto.
   const servicioDeEstructura = estructura.createServices(core, {})
+  const servicioDePersonas = personas.createServices(core, { estructura: servicioDeEstructura })
   return {
     actor: null,
     estructura: servicioDeEstructura,
-    personas: personas.createServices(core, { estructura: servicioDeEstructura }),
+    personas: servicioDePersonas,
+    afiliacion: afiliacion.createServices(core, {
+      personas: servicioDePersonas,
+      estructura: servicioDeEstructura,
+    }),
   } as Context
 }
 
@@ -70,6 +78,51 @@ describe('sembrarEscenario', () => {
 
     const todos = (await contexto.estructura.listarDistritos()).flatMap((d) => d.grupos)
     expect(todos.some((grupo) => grupo.numero === 19)).toBe(false)
+  })
+
+  test('deja declaraciones para mirar: la ordinaria vencida y una extraordinaria', async () => {
+    const contexto = montarContexto()
+    await sembrarEscenario(contexto)
+
+    const grupos = (await contexto.estructura.listarDistritos()).flatMap(
+      (distrito) => distrito.grupos,
+    )
+    const grupo42 = grupos.find((grupo) => grupo.numero === 42)
+    expect(grupo42).toBeDefined()
+
+    const declaraciones = await contexto.afiliacion.listarDeclaraciones(grupo42?.id ?? '')
+    // La ordinaria del 1 de mayo de 2026 y la extraordinaria del dia del reloj.
+    expect(declaraciones.map((una) => una.fecha)).toEqual(['2026-08-27', '2026-05-01'])
+
+    // En la ordinaria, que es la primera del periodo, todos son cobrables.
+    const ordinaria = declaraciones[1]
+    const nomina = await contexto.afiliacion.listarAfiliados(ordinaria?.id ?? '')
+    expect(nomina).not.toHaveLength(0)
+    expect(await contexto.afiliacion.listarACobrar(ordinaria?.id ?? '')).toEqual(nomina)
+
+    // En la extraordinaria, la nomina es la misma y no hay nada que cobrar:
+    // nadie ingreso entre mayo y agosto. Es el caso que la pantalla tiene que
+    // saber dibujar.
+    const extraordinaria = declaraciones[0]
+    expect(await contexto.afiliacion.listarAfiliados(extraordinaria?.id ?? '')).toHaveLength(
+      nomina.length,
+    )
+    expect(await contexto.afiliacion.listarACobrar(extraordinaria?.id ?? '')).toEqual([])
+  })
+
+  test('siembra igual los dos dias del anio que caen en una fecha ordinaria', async () => {
+    // El 1 de mayo y el 1 de noviembre la ordinaria del grupo 42 ya lleva la
+    // fecha de hoy, asi que la extraordinaria del escenario no puede emitirse.
+    // Antes eso era un SQLiteError crudo y `bun run demo` no arrancaba.
+    const contexto = montarContexto(new Date('2026-05-01T12:00:00Z'))
+    await sembrarEscenario(contexto)
+
+    const grupos = (await contexto.estructura.listarDistritos()).flatMap(
+      (distrito) => distrito.grupos,
+    )
+    const grupo42 = grupos.find((grupo) => grupo.numero === 42)
+    const declaraciones = await contexto.afiliacion.listarDeclaraciones(grupo42?.id ?? '')
+    expect(declaraciones.map((una) => una.fecha)).toEqual(['2026-05-01'])
   })
 })
 

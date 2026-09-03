@@ -1,4 +1,6 @@
-import { useDistritos, usePersonasDelGrupo } from '@gps/api'
+import { periodoDe } from '@gps/afiliacion/dominio'
+import { useAfiliadosEn, useDistritos, usePersonasDelGrupo } from '@gps/api'
+import { aFechaDeCalendario } from '@gps/core/fechas'
 import { etiquetaDeEdades, RAMAS } from '@gps/estructura/dominio'
 import {
   calcularEdad,
@@ -12,7 +14,7 @@ import { AltaDePersona } from './AltaDePersona'
 
 type Persona = NonNullable<ReturnType<typeof usePersonasDelGrupo>['data']>['personas'][number]
 
-function FilaDePersona(props: { persona: Persona; hoy: Date }) {
+function FilaDePersona(props: { persona: Persona; hoy: Date; afiliada: boolean }) {
   // El "hasta" generado es opcional (string | null | undefined); el del
   // dominio es string | null a secas. Se normaliza solo en esta frontera.
   const vigentes = props.persona.cargos.filter((cargo) =>
@@ -20,7 +22,15 @@ function FilaDePersona(props: { persona: Persona; hoy: Date }) {
   )
   return (
     <li className="px-4 py-3">
-      <p className="text-sm font-medium text-slate-900">{nombreCompleto(props.persona)}</p>
+      <p className="flex items-center gap-2 text-sm font-medium text-slate-900">
+        {/* El signo va antes del nombre: a 375px es lo primero que se ve, y
+            el lector de pantalla necesita el texto del span siguiente. */}
+        <span aria-hidden="true" className={props.afiliada ? 'text-emerald-600' : 'text-slate-300'}>
+          {props.afiliada ? '✓' : '✗'}
+        </span>
+        <span className="sr-only">{props.afiliada ? 'Afiliada' : 'Sin afiliar'}:</span>
+        {nombreCompleto(props.persona)}
+      </p>
       <p className="mt-0.5 text-xs text-slate-500">
         {nombreDelTipo(props.persona.tipoDeDocumento)} {props.persona.numeroDeDocumento}
         <span className="text-slate-400">
@@ -49,6 +59,7 @@ function Seccion(props: {
   detalle?: string
   personas: readonly Persona[]
   hoy: Date
+  afiliados: ReadonlySet<string>
 }) {
   return (
     <section>
@@ -61,7 +72,12 @@ function Seccion(props: {
       ) : (
         <ul className="mt-2 divide-y divide-slate-200 rounded-lg bg-white shadow-sm">
           {props.personas.map((persona) => (
-            <FilaDePersona key={persona.id} persona={persona} hoy={props.hoy} />
+            <FilaDePersona
+              key={persona.id}
+              persona={persona}
+              hoy={props.hoy}
+              afiliada={props.afiliados.has(persona.id)}
+            />
           ))}
         </ul>
       )}
@@ -73,6 +89,17 @@ export function Grupo(props: { id: string }) {
   const arbol = useDistritos()
   const lista = usePersonasDelGrupo(props.id)
   const hoy = new Date()
+
+  const personas = lista.data?.personas ?? []
+  // El periodo lo calcula el cliente, de su propio almanaque: es el mismo
+  // criterio que estaVigente y que calcularEdad, que tampoco los resuelve el
+  // servidor.
+  const periodo = periodoDe(aFechaDeCalendario(hoy))
+  const consulta = useAfiliadosEn(
+    periodo,
+    personas.map((persona) => persona.id),
+  )
+  const afiliados = new Set(consulta.data?.afiliadosEn ?? [])
 
   // Reusa la query del arbol en vez de estrenar grupo(id): TanStack Query ya la
   // tiene en cache porque venis de ahi, y de paso trae el distrito para el
@@ -104,7 +131,6 @@ export function Grupo(props: { id: string }) {
     )
   }
 
-  const personas = lista.data?.personas ?? []
   const adherentes = personas.filter((persona) => persona.pertenencia.categoria === 'adherente')
 
   return (
@@ -115,6 +141,12 @@ export function Grupo(props: { id: string }) {
       <h2 className="mt-1 text-lg font-semibold text-slate-900">
         <span className="text-slate-400">Grupo Scout Nº{grupo.numero} -</span> {grupo.nombre}
       </h2>
+      <Link
+        href={`/grupos/${props.id}/afiliacion`}
+        className="mt-2 inline-block text-sm text-slate-500 hover:text-slate-900"
+      >
+        Afiliación →
+      </Link>
 
       <div className="mt-6 space-y-6">
         {/* En el orden del catalogo, de menor a mayor edad: el mismo criterio
@@ -132,6 +164,7 @@ export function Grupo(props: { id: string }) {
               detalle={etiquetaDeEdades(rama)}
               personas={[...activos, ...beneficiarios]}
               hoy={hoy}
+              afiliados={afiliados}
             />
           )
         })}
@@ -142,7 +175,7 @@ export function Grupo(props: { id: string }) {
           </p>
         )}
 
-        <Seccion titulo="Adherentes" personas={adherentes} hoy={hoy} />
+        <Seccion titulo="Adherentes" personas={adherentes} hoy={hoy} afiliados={afiliados} />
       </div>
 
       <AltaDePersona grupoId={props.id} ramasAbiertas={grupo.ramas} />

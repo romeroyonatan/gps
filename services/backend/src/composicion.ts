@@ -3,10 +3,10 @@ import {
   type Bd,
   type Config,
   type Context,
-  crearBuilder,
   crearServicios,
   ordenarModulos,
 } from '@gps/core'
+import { crearBuilder } from '@gps/core/graphql'
 import type { GraphQLSchema } from 'graphql'
 import { crearCore } from './core'
 import { modulos } from './modules'

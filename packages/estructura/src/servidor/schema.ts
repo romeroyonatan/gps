@@ -1,4 +1,4 @@
-import { type Builder, enumCompartido } from '@gps/core'
+import { type Builder, enumCompartido } from '@gps/core/graphql'
 import type { DistritoConGrupos, GrupoConRamas } from '../dominio/modelos'
 import { RAMAS } from '../dominio/ramas'
 

@@ -4,7 +4,9 @@
   "version": "1.0.0",
   "dependencies": {
     "@expo/metro-runtime": "~57.0.13",
+    "@gps/afiliacion": "workspace:*",
     "@gps/api": "workspace:*",
+    "@gps/core": "workspace:*",
     "@gps/estructura": "workspace:*",
     "@gps/personas": "workspace:*",
     "@react-native-async-storage/async-storage": "2.2.0",

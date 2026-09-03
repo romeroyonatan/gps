@@ -1,0 +1,4 @@
+export { FECHAS_ORDINARIAS, INICIO_DEL_PERIODO } from './config'
+export type { Afiliado, Declaracion } from './modelos'
+export { fechasOrdinariasDelPeriodo, periodoDe } from './periodos'
+export { validarFecha } from './validaciones'

@@ -1,6 +1,7 @@
 // apps/web/src/App.tsx
 import { useVersion } from '@gps/api'
 import { Route, Switch } from 'wouter'
+import { Afiliacion } from './pantallas/Afiliacion'
 import { Estructura } from './pantallas/Estructura'
 import { Grupo } from './pantallas/Grupo'
 
@@ -15,6 +16,9 @@ export function App() {
 
         <Switch>
           <Route path="/" component={Estructura} />
+          <Route path="/grupos/:id/afiliacion">
+            {(params) => <Afiliacion grupoId={params.id} />}
+          </Route>
           <Route path="/grupos/:id">{(params) => <Grupo id={params.id} />}</Route>
           <Route>
             <p className="mt-8 text-sm text-slate-500">No hay nada en esta dirección.</p>
