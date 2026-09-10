@@ -1,4 +1,7 @@
 import { describe, expect, test } from 'bun:test'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { sql } from 'drizzle-orm'
 import { crearBd } from '../src/bd'
 
@@ -9,6 +12,17 @@ describe('crearBd', () => {
     // El generic explicito evita que la inferencia de expect() con un
     // resultado unknown elija el overload de Matchers<undefined>.
     expect(bd.get<number[]>(sql`SELECT 1 + 1`)).toEqual([2])
+  })
+
+  test('activa WAL y espera cinco segundos si la base esta ocupada', () => {
+    const directorio = mkdtempSync(join(tmpdir(), 'gps-bd-'))
+    try {
+      const bd = crearBd(join(directorio, 'gps.db'))
+      expect(bd.values(sql`PRAGMA journal_mode`)).toEqual([['wal']])
+      expect(bd.values(sql`PRAGMA busy_timeout`)).toEqual([[5000]])
+    } finally {
+      rmSync(directorio, { recursive: true, force: true })
+    }
   })
 
   test('deja prendidas las foreign keys: SQLite las ignora por defecto', () => {

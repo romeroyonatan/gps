@@ -3,9 +3,14 @@ import paquete from '../../../package.json'
 import { crearBd } from './bd'
 import { crearServidor } from './server'
 
-function leerEntorno(valor: string | undefined): Entorno {
-  if (valor === 'produccion' || valor === 'prueba' || valor === 'demo') return valor
-  return 'desarrollo'
+export function leerEntorno(valor: string | undefined): Entorno {
+  if (valor === undefined) return 'desarrollo'
+  if (valor === 'desarrollo' || valor === 'produccion' || valor === 'prueba' || valor === 'demo') {
+    return valor
+  }
+  throw new Error(
+    `ENTORNO invalido: "${valor}". Tiene que ser desarrollo, produccion, prueba o demo.`,
+  )
 }
 
 /** La ruta de la base es del backend, no de los modulos: no entra en Config.

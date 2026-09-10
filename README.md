@@ -7,9 +7,9 @@ cambie están en §1 de la spec de arquitectura.
 
 ## Levantarlo
 
-Requiere [Bun](https://bun.sh).
+Requiere [Bun 1.4.2](https://bun.sh).
 
-    curl -fsSL https://bun.sh/install | bash
+    curl -fsSL https://bun.sh/install | bash -s "bun-v1.4.2"
     bun install
     bun run dev                  # todo en http://localhost:3000
 

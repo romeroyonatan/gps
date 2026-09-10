@@ -293,8 +293,9 @@ Los mismos módulos, otro `Core`.
                        +--------------------------+
 
 La mitad izquierda ya existe, salvo lo marcado `(futuro)`: `services/backend/src/bd.ts`
-abre SQLite real por Drizzle, y `bun run demo` (`ENTORNO=demo`) levanta esa misma base
-en memoria, sembrada por `packages/demo` a través de los servicios públicos de cada
+abre SQLite real por Drizzle, con WAL y cinco segundos de espera ante un lock, y
+`bun run demo` (`ENTORNO=demo`) levanta esa misma base en memoria, sembrada por
+`packages/demo` a través de los servicios públicos de cada
 módulo — la siembra no conoce repositorios ni tablas, sólo llama a lo que cualquier
 resolver llamaría.
 

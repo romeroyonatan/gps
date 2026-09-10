@@ -258,7 +258,8 @@ migraciones de todos los módulos lo decide la raíz de composición, no cada pa
 separado. `aplicarMigraciones` corre antes de `createServices` de cualquier módulo —
 ninguno debería poder consultar una tabla que todavía no existe — y sabe qué ya aplicó
 por una tabla propia (`migraciones`, con `modulo` y `nombre` como clave), así que
-correrla de nuevo con la misma base no repite nada.
+correrla de nuevo con la misma base no repite nada. También guarda el contenido aplicado:
+editar una migración ya ejecutada hace fallar el arranque en vez de divergir en silencio.
 
 Una advertencia sobre esa línea, para que la copies sabiendo lo que copiás: el atributo
 `with { type: 'text' }` **es una extensión de Bun** — del estándar sólo `json` lo es — y

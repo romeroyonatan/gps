@@ -1,5 +1,24 @@
 import { describe, expect, test } from 'bun:test'
-import { leerPuerto, leerRutaDeBd } from '../src/index'
+import { leerEntorno, leerPuerto, leerRutaDeBd } from '../src/index'
+
+describe('leerEntorno', () => {
+  test('sin ENTORNO definido, usa desarrollo', () => {
+    expect(leerEntorno(undefined)).toBe('desarrollo')
+  })
+
+  test('acepta los cuatro entornos conocidos', () => {
+    expect(['desarrollo', 'produccion', 'prueba', 'demo'].map(leerEntorno)).toEqual([
+      'desarrollo',
+      'produccion',
+      'prueba',
+      'demo',
+    ])
+  })
+
+  test('con un valor desconocido, lanza en vez de arrancar en desarrollo', () => {
+    expect(() => leerEntorno('production')).toThrow('ENTORNO invalido')
+  })
+})
 
 describe('leerPuerto', () => {
   test('sin PUERTO definido, usa 3000 por defecto', () => {

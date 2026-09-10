@@ -31,9 +31,25 @@ export function aplicarMigraciones(core: Core, modulos: readonly Module<any, any
       modulo TEXT NOT NULL,
       nombre TEXT NOT NULL,
       aplicada_en INTEGER NOT NULL,
+      contenido TEXT,
       PRIMARY KEY (modulo, nombre)
     )`),
   )
+
+  // Compatibilidad con bases creadas antes de registrar el contenido. Guardarlo
+  // permite detectar que alguien edito una migracion que ya fue aplicada.
+  const columnas = core.bd.all<{ name: string }>(sql.raw('PRAGMA table_info(migraciones)'))
+  if (!columnas.some((columna) => columna.name === 'contenido')) {
+    core.bd.run(sql.raw('ALTER TABLE migraciones ADD COLUMN contenido TEXT'))
+  }
+
+  const huerfanasExistentes = core.bd.all(sql.raw('PRAGMA foreign_key_check'))
+  if (huerfanasExistentes.length > 0) {
+    throw new Error(
+      `La base ya tiene filas huerfanas: ${JSON.stringify(huerfanasExistentes)}. ` +
+        'Restaurala o corregila antes de migrar.',
+    )
+  }
 
   // Para todo lo que SQLite no soporta con ALTER (borrar una columna, cambiar
   // un tipo, agregar una restriccion) drizzle-kit emite el baile de recreacion
@@ -45,36 +61,54 @@ export function aplicarMigraciones(core: Core, modulos: readonly Module<any, any
   try {
     for (const modulo of modulos) {
       for (const migracion of modulo.migraciones ?? []) {
-        const yaEsta = core.bd.get(
-          sql`SELECT 1 FROM migraciones
+        const aplicada = core.bd.values<[string | null]>(
+          sql`SELECT contenido FROM migraciones
               WHERE modulo = ${modulo.name} AND nombre = ${migracion.nombre}`,
-        )
-        if (yaEsta) continue
+        )[0]
+        if (aplicada) {
+          const [contenido] = aplicada
+          // La primera corrida con este runner completa las filas historicas;
+          // desde entonces cualquier cambio en el SQL hace fallar el arranque.
+          if (contenido === null) {
+            core.bd.run(
+              sql`UPDATE migraciones SET contenido = ${migracion.sql}
+                  WHERE modulo = ${modulo.name} AND nombre = ${migracion.nombre}`,
+            )
+          } else if (contenido !== migracion.sql) {
+            throw new Error(
+              `La migracion "${modulo.name}/${migracion.nombre}" fue modificada despues de aplicarse.`,
+            )
+          }
+          continue
+        }
 
-        // Las sentencias y su registro van en la misma transaccion: si el SQL
-        // falla a la mitad, la migracion no queda anotada como aplicada y la
-        // proxima corrida la reintenta desde cero.
+        // Las sentencias, el chequeo de integridad y el registro van en la
+        // misma transaccion. Si algo falla, no queda ni el cambio ni su marca.
         core.bd.transaction((tx) => {
           for (const sentencia of migracion.sql.split(SEPARADOR)) {
             if (sentencia.trim()) tx.run(sql.raw(sentencia))
           }
+
+          // Con las foreign keys apagadas el INSERT...SELECT del baile de
+          // recreacion no valida nada. Chequear antes del INSERT al registro
+          // permite revertir la migracion entera si dejo una fila huerfana.
+          const huerfanas = tx.all(sql.raw('PRAGMA foreign_key_check'))
+          if (huerfanas.length > 0) {
+            throw new Error(
+              `La migracion "${modulo.name}/${migracion.nombre}" dejo filas huerfanas: ` +
+                `${JSON.stringify(huerfanas)}.`,
+            )
+          }
+
           tx.run(
-            sql`INSERT INTO migraciones (modulo, nombre, aplicada_en)
-                VALUES (${modulo.name}, ${migracion.nombre}, ${core.reloj.ahora().getTime()})`,
+            sql`INSERT INTO migraciones (modulo, nombre, aplicada_en, contenido)
+                VALUES (
+                  ${modulo.name}, ${migracion.nombre},
+                  ${core.reloj.ahora().getTime()}, ${migracion.sql}
+                )`,
           )
         })
       }
-    }
-
-    // Con las foreign keys apagadas el INSERT...SELECT del baile de recreacion
-    // no valida nada: sin este chequeo, una migracion mal escrita deja filas
-    // huerfanas en silencio y el error aparece meses despues.
-    const huerfanas = core.bd.all(sql.raw('PRAGMA foreign_key_check'))
-    if (huerfanas.length > 0) {
-      throw new Error(
-        `Las migraciones dejaron filas huerfanas: ${JSON.stringify(huerfanas)}. ` +
-          'Revisa el INSERT...SELECT de la ultima migracion.',
-      )
     }
   } finally {
     core.bd.run(sql.raw('PRAGMA foreign_keys = ON'))

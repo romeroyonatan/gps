@@ -101,6 +101,43 @@ describe('aplicarMigraciones', () => {
     expect(bd.all(sql`SELECT nombre FROM migraciones`)).toHaveLength(1)
   })
 
+  test('falla si cambia el contenido de una migracion ya aplicada', () => {
+    const bd = bdEnMemoria()
+    aplicarMigraciones(coreDePrueba(bd), [
+      moduloFalso('personas', [{ nombre: '0000_inicial', sql: 'CREATE TABLE personas (id TEXT)' }]),
+    ])
+
+    expect(() =>
+      aplicarMigraciones(coreDePrueba(bd), [
+        moduloFalso('personas', [
+          { nombre: '0000_inicial', sql: 'CREATE TABLE personas (id TEXT, nombre TEXT)' },
+        ]),
+      ]),
+    ).toThrow(/fue modificada/)
+  })
+
+  test('completa el contenido en registros creados por el runner anterior', () => {
+    const bd = bdEnMemoria()
+    bd.run(
+      sql.raw(`CREATE TABLE migraciones (
+        modulo TEXT NOT NULL,
+        nombre TEXT NOT NULL,
+        aplicada_en INTEGER NOT NULL,
+        PRIMARY KEY (modulo, nombre)
+      )`),
+    )
+    bd.run(sql.raw('CREATE TABLE personas (id TEXT)'))
+    bd.run(
+      sql`INSERT INTO migraciones (modulo, nombre, aplicada_en)
+          VALUES ('personas', '0000_inicial', 0)`,
+    )
+    const migracion = { nombre: '0000_inicial', sql: 'CREATE TABLE personas (id TEXT)' }
+
+    aplicarMigraciones(coreDePrueba(bd), [moduloFalso('personas', [migracion])])
+
+    expect(bd.values(sql`SELECT contenido FROM migraciones`)).toEqual([[migracion.sql]])
+  })
+
   test('registra el modulo, el nombre y la hora que da el reloj de Core', () => {
     // La hora sale de core.reloj y no de la plataforma: por eso el test puede
     // afirmar el instante exacto en vez de un rango.
@@ -180,6 +217,8 @@ describe('aplicarMigraciones', () => {
     expect(() =>
       aplicarMigraciones(coreDePrueba(bd), [moduloFalso('estructura', [INICIAL, huerfana])]),
     ).toThrow(/huerfanas/)
+    expect(bd.all(sql`SELECT nombre FROM migraciones`)).toHaveLength(1)
+    expect(bd.all(sql`SELECT id FROM grupos WHERE id = 'g9'`)).toHaveLength(0)
   })
 
   test('un modulo sin migraciones no rompe nada', () => {

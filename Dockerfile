@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1-labs
 
-FROM oven/bun:1 AS dependencias
+FROM oven/bun:1.4.2 AS dependencias
 WORKDIR /app
 COPY package.json bun.lock bunfig.toml ./
 # --parents copia cada package.json conservando su ruta, y por eso esta linea
@@ -13,7 +13,7 @@ FROM dependencias AS construccion
 COPY . .
 RUN bun run --filter @gps/api codegen
 
-FROM oven/bun:1-slim AS produccion
+FROM oven/bun:1.4.2-slim AS produccion
 WORKDIR /app
 ENV ENTORNO=produccion
 ENV PUERTO=3000
