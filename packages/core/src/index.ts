@@ -1,6 +1,17 @@
 export type { Actor, Alcance, Rol, RolConAmbito } from './actor'
 export type { Context } from './context'
-export type { Bd, Config, Core, Entorno, Logger, Reloj } from './core'
+export type {
+  Almacenamiento,
+  Bd,
+  Config,
+  ConversorDeImagenes,
+  Core,
+  Entorno,
+  Logger,
+  Reloj,
+  Sellador,
+  Sello,
+} from './core'
 export type { Marcas } from './marcas'
 export type { Migracion } from './migraciones'
 export { aplicarMigraciones } from './migraciones'

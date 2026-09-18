@@ -1,8 +1,6 @@
 name: CI
 
 on:
-  push:
-    branches: ["**"]
   pull_request:
 
 jobs:
@@ -39,6 +37,12 @@ jobs:
           fi
 
       - name: Verificar que el servidor arranca y sirve la aplicación
+        env:
+          # En produccion no hay clave por defecto: el proceso no arranca sin
+          # esta. Una de CI y no un secreto porque no firma nada que importe;
+          # lo que se verifica es que el arranque la exija y la sepa leer.
+          CLAVES_DE_SELLO: ci=clave-de-ci-que-no-firma-nada
+          CLAVE_DE_SELLO_ACTIVA: ci
         run: |
           ENTORNO=produccion PUERTO=3000 bun services/backend/src/index.ts &
           for i in $(seq 1 30); do
@@ -52,9 +56,24 @@ jobs:
           # migraciones aplicadas al arrancar: si no se consulta una tabla, un
           # esquema roto pasa igual. El grep atrapa el {"errors":[...]}.
           curl -sf http://localhost:3000/graphql -H 'content-type: application/json' \
-            -d '{"query":"{ distritos { numero zona grupos { numero ramas } } }"}' \
+            -d '{"query":"{ distritos { numero zona grupos { numero unidades { nombre } } } }"}' \
             | grep -q '"distritos"'
+          # Una tabla de cada modulo con migraciones: distritos no toca las de
+          # salidas ni las de personas, asi que una migracion rota ahi pasaba.
+          curl -sf http://localhost:3000/graphql -H 'content-type: application/json' \
+            -d '{"query":"{ permisos(grupoId: \"grupo_inexistente\") { id } }"}' \
+            | grep -q '"permisos"'
           curl -sf http://localhost:3000/ | grep -q '<div id="raiz">'
+
+      - name: Verificar que en produccion no arranca sin clave de sello
+        run: |
+          # Un sello hecho con una clave de desarrollo no prueba nada, y el
+          # error tiene que ser al arrancar y no al primer permiso que alguien
+          # firme.
+          if ENTORNO=produccion PUERTO=3001 bun services/backend/src/index.ts; then
+            echo "::error::El backend arranco en produccion sin CLAVES_DE_SELLO."
+            exit 1
+          fi
 
       - name: Construir la imagen Docker
         run: docker build -t gps:ci .

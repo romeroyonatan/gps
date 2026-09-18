@@ -1,4 +1,19 @@
 """
+Un archivo colgado del permiso: una planificacion, un croquis.
+"""
+type Adjunto {
+  archivoId: ID!
+  id: ID!
+  nombre: String!
+  tipo: String
+
+  """
+  Por donde se descarga. Ruta y no bytes: un binario no viaja por GraphQL.
+  """
+  url: String!
+}
+
+"""
 Una fila de la nómina: cómo estaba esa persona el día de la declaración.
 """
 type Afiliado {
@@ -47,7 +62,7 @@ input DatosDeIngreso {
   categoria: Categoria!
   desde: String!
   grupoId: ID!
-  rama: Rama
+  unidadId: ID
 }
 
 """
@@ -98,7 +113,50 @@ type Distrito {
 }
 
 """
-Un grupo scout y las ramas que tiene abiertas.
+El permiso emitido y lo que el sistema quiere decir sin impedirlo.
+"""
+type Emision {
+  avisos: [String!]!
+  permiso: Permiso!
+}
+
+"""
+Como esta una de las tres firmas de un permiso.
+"""
+type EstadoDeFirma {
+  cargo: TipoDeCargo!
+  fecha: String
+  firmada: Boolean!
+
+  """
+  app o papel. Vacío si todavía no firmó.
+  """
+  modo: String
+  nombreDelCargo: String!
+
+  """
+  Quien firmo, o quien ocupa el cargo hoy. Vacío si nadie lo ocupa.
+  """
+  quien: String
+
+  """
+  Si el sello cierra. Vacío cuando no hay firma o cuando se firmó en papel, que no lleva sello.
+  """
+  verificada: Boolean
+}
+
+"""
+Por donde va un permiso de salida.
+"""
+enum EstadoDePermiso {
+  anulado
+  borrador
+  emitido
+  firmado
+}
+
+"""
+Un grupo scout y las unidades que tiene abiertas.
 """
 type Grupo {
   id: ID!
@@ -106,12 +164,28 @@ type Grupo {
   numero: Int!
 
   """
-  De menor a mayor edad. Vacia si el grupo no abrio ninguna.
+  De menor a mayor edad y, dentro de una rama, por nombre. Vacia si el grupo no abrio ninguna.
   """
-  ramas: [Rama!]!
+  unidades: [Unidad!]!
 }
 
 type Mutation {
+  adjuntarAPermiso(archivoId: ID!, permisoId: ID!): Permiso!
+  agregarParticipante(permisoId: ID!, personaId: ID!): Permiso!
+  anularPermiso(permisoId: ID!): Permiso!
+
+  """
+  Ultimo paso: valida lo recibido y deja el archivo usable.
+  """
+  confirmarSubida(id: ID!): ID!
+  crearPermiso(
+    comoSeViaja: String
+    desde: String!
+    grupoId: ID!
+    hasta: String!
+    lugar: String!
+  ): Permiso!
+
   """
   Da de alta una persona y la inscribe en un grupo.
   """
@@ -121,6 +195,85 @@ type Mutation {
   Declaración extraordinaria: fotografía al grupo con la fecha de hoy.
   """
   declararAfiliacion(grupoId: ID!): Declaracion!
+  elegirUnidades(permisoId: ID!, unidadIds: [ID!]!): Permiso!
+  emitirPermiso(permisoId: ID!): Emision!
+
+  """
+  Registra una firma dibujada. `trazos` es el JSON de los trazos normalizados.
+  """
+  firmarEnApp(cargo: TipoDeCargo!, permisoId: ID!, trazos: String!): Permiso!
+
+  """
+  Declara qué cargos firmaron el escaneo que se subió.
+  """
+  firmarEnPapel(cargos: [TipoDeCargo!]!, escaneoId: ID!, permisoId: ID!): Permiso!
+
+  """
+  Saca un adjunto y borra su archivo. No toca las firmas.
+  """
+  quitarAdjuntoDePermiso(adjuntoId: ID!, permisoId: ID!): Permiso!
+  quitarParticipante(permisoId: ID!, personaId: ID!): Permiso!
+
+  """
+  Crea un borrador nuevo con los datos de un permiso anulado.
+  """
+  reEmitirPermiso(permisoId: ID!): Permiso!
+
+  """
+  Primer paso de una subida: reserva el archivo y dice por donde mandar los bytes.
+  """
+  solicitarSubida(
+    modulo: String!
+    nombre: String!
+    recursoId: ID!
+    tamano: Int!
+    tipo: String!
+  ): SubidaPedida!
+}
+
+type Participante {
+  marca: String!
+  personaId: ID!
+}
+
+type ParticipanteEmitido {
+  apellidos: String!
+  marca: String!
+  nombres: String!
+  numeroDeDocumento: String!
+  personaId: ID!
+  unidad: String!
+}
+
+"""
+Un permiso de salida: lo que un grupo presenta para salir o acampar.
+"""
+type Permiso {
+  adjuntos: [Adjunto!]!
+  comoSeViaja: String
+  desde: String!
+
+  """
+  Los que figuran en el papel, tal como estaban al emitirse.
+  """
+  emitidos: [ParticipanteEmitido!]!
+  estado: EstadoDePermiso!
+  firmas: [EstadoDeFirma!]!
+  hasta: String!
+  id: ID!
+  lugar: String!
+
+  """
+  Los elegidos mientras es borrador.
+  """
+  participantes: [Participante!]!
+  pdfId: ID
+  reemplazaA: ID
+
+  """
+  Qué unidades del grupo van.
+  """
+  unidadIds: [ID!]!
 }
 
 """
@@ -157,9 +310,9 @@ type Pertenencia {
   desde: String!
 
   """
-  Vacía si y sólo si la categoría es adherente.
+  La unidad del grupo. Vacía si y sólo si la categoría es adherente. La rama sale de la unidad, que la pantalla ya tiene del grupo.
   """
-  rama: Rama
+  unidadId: ID
 }
 
 type Query {
@@ -174,9 +327,15 @@ type Query {
   declaraciones(grupoId: ID!): [Declaracion!]!
 
   """
-  El arbol de la diocesis: distritos, sus grupos y sus ramas.
+  El arbol de la diocesis: distritos, sus grupos y sus unidades.
   """
   distritos: [Distrito!]!
+  permiso(id: ID!): Permiso
+
+  """
+  Los permisos de un grupo, del más próximo al más viejo.
+  """
+  permisos(grupoId: ID!): [Permiso!]!
 
   """
   Las personas de un grupo, ordenadas por apellido.
@@ -202,13 +361,40 @@ enum Rama {
 }
 
 """
-Los cargos de un grupo scout.
+Como esta compuesta una unidad. Es un hecho del grupo, no de sus personas.
+"""
+enum SexoDeUnidad {
+  femenina
+  masculina
+  mixta
+}
+
+"""
+Donde mandar los bytes de un archivo, y hasta cuando vale.
+"""
+type SubidaPedida {
+  """
+  Instante en que la URL deja de valer, en ISO 8601.
+  """
+  expira: String!
+  id: ID!
+
+  """
+  Ruta a la que hacer PUT con los bytes. Ya lleva el token.
+  """
+  url: String!
+}
+
+"""
+Los cargos de la asociacion.
 """
 enum TipoDeCargo {
   capellan
+  comisionadoDeDistrito
   director
   jefeDeGrupo
   jefeDeRama
+  jefeScoutDiocesano
   subjefeDeGrupo
 }
 
@@ -218,6 +404,25 @@ Tipos de documento que la asociacion acepta.
 enum TipoDeDocumento {
   dni
   pasaporte
+}
+
+"""
+Una unidad del grupo: la Manada, una de las dos Tropas, el Clan.
+"""
+type Unidad {
+  id: ID!
+
+  """
+  El nombre propio: "San Jorge".
+  """
+  nombre: String!
+
+  """
+  El tipo de unidad de su rama, su nombre y su sexo, ya compuestos.
+  """
+  nombreParaMostrar: String!
+  rama: Rama!
+  sexo: SexoDeUnidad!
 }
 
 """

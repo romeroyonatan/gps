@@ -1,4 +1,6 @@
-import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { sql } from 'drizzle-orm'
+import { integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import type { SexoDeUnidad } from '../dominio/modelos'
 import type { Rama } from '../dominio/ramas'
 
 // Se esparce en cada tabla en vez de abstraerse: Drizzle necesita las columnas
@@ -33,18 +35,30 @@ export const grupos = sqliteTable('grupos', {
   ...marcas,
 })
 
-/** Que ramas tiene abiertas cada grupo. La clave primaria compuesta es lo que
- *  hace que abrir dos veces la misma rama sea un error de la base y no una
- *  regla que haya que acordarse de escribir. No lleva `actualizadoEn`: sus
- *  dos columnas son la clave, asi que la fila no se puede modificar. */
-export const ramasDelGrupo = sqliteTable(
-  'ramas_del_grupo',
+/** Las unidades de cada grupo: la Manada, las dos Tropas, el Clan. Reemplaza a
+ *  `ramas_del_grupo`, cuya clave primaria (grupo, rama) hacia imposible que un
+ *  grupo tuviera dos tropas scout.
+ *
+ *  El UNIQUE es parcial -solo entre las abiertas- por la misma razon que el de
+ *  pertenencias: una unidad cerrada tiene que poder reabrirse con el mismo
+ *  nombre, y un UNIQUE completo lo impediria para siempre. El sexo no entra en
+ *  la clave: lo que distingue dos unidades de la misma rama es el nombre. */
+export const unidades = sqliteTable(
+  'unidades',
   {
+    id: text('id').primaryKey(),
     grupoId: text('grupo_id')
       .notNull()
       .references(() => grupos.id),
     rama: text('rama').$type<Rama>().notNull(),
-    creadoEn: integer('creado_en', { mode: 'timestamp_ms' }).notNull(),
+    sexo: text('sexo').$type<SexoDeUnidad>().notNull(),
+    nombre: text('nombre').notNull(),
+    cerradaEn: integer('cerrada_en', { mode: 'timestamp_ms' }),
+    ...marcas,
   },
-  (tabla) => [primaryKey({ columns: [tabla.grupoId, tabla.rama] })],
+  (tabla) => [
+    uniqueIndex('unidad_abierta_por_grupo_rama_nombre')
+      .on(tabla.grupoId, tabla.rama, tabla.nombre)
+      .where(sql`cerrada_en is null`),
+  ],
 )

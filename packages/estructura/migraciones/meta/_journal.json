@@ -15,6 +15,20 @@
       "when": 1787848343778,
       "tag": "0001_cierre",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789764444288,
+      "tag": "0002_unidades",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789764455344,
+      "tag": "0003_baja_ramas_del_grupo",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,7 @@
 import { type Builder, enumCompartido } from '@gps/core/graphql'
-import type { DistritoConGrupos, GrupoConRamas } from '../dominio/modelos'
+import type { DistritoConGrupos, GrupoConUnidades, Unidad } from '../dominio/modelos'
 import { RAMAS } from '../dominio/ramas'
+import { nombreDeLaUnidad } from '../dominio/unidades'
 
 export function registrarSchema(builder: Builder): void {
   // enumCompartido y no builder.enumType porque personas declara el mismo enum
@@ -15,16 +16,38 @@ export function registrarSchema(builder: Builder): void {
     'Ramas en que la asociacion divide a sus miembros por edad.',
   )
 
-  const GrupoRef = builder.objectRef<GrupoConRamas>('Grupo').implement({
-    description: 'Un grupo scout y las ramas que tiene abiertas.',
+  // El sexo va como enum y no como string por lo mismo que la rama: el conjunto
+  // es cerrado y asi el <select> no necesita su propia query.
+  const SexoRef = builder.enumType('SexoDeUnidad', {
+    values: ['masculina', 'femenina', 'mixta'] as const,
+    description: 'Como esta compuesta una unidad. Es un hecho del grupo, no de sus personas.',
+  })
+
+  const UnidadRef = builder.objectRef<Unidad>('Unidad').implement({
+    description: 'Una unidad del grupo: la Manada, una de las dos Tropas, el Clan.',
+    fields: (t) => ({
+      id: t.exposeID('id'),
+      rama: t.field({ type: RamaRef, resolve: (unidad) => unidad.rama }),
+      sexo: t.field({ type: SexoRef, resolve: (unidad) => unidad.sexo }),
+      nombre: t.exposeString('nombre', { description: 'El nombre propio: "San Jorge".' }),
+      nombreParaMostrar: t.string({
+        description: 'El tipo de unidad de su rama, su nombre y su sexo, ya compuestos.',
+        resolve: nombreDeLaUnidad,
+      }),
+    }),
+  })
+
+  const GrupoRef = builder.objectRef<GrupoConUnidades>('Grupo').implement({
+    description: 'Un grupo scout y las unidades que tiene abiertas.',
     fields: (t) => ({
       id: t.exposeID('id'),
       numero: t.exposeInt('numero'),
       nombre: t.exposeString('nombre'),
-      ramas: t.field({
-        type: [RamaRef],
-        description: 'De menor a mayor edad. Vacia si el grupo no abrio ninguna.',
-        resolve: (grupo) => [...grupo.ramas],
+      unidades: t.field({
+        type: [UnidadRef],
+        description:
+          'De menor a mayor edad y, dentro de una rama, por nombre. Vacia si el grupo no abrio ninguna.',
+        resolve: (grupo) => [...grupo.unidades],
       }),
     }),
   })
@@ -42,7 +65,7 @@ export function registrarSchema(builder: Builder): void {
   builder.queryField('distritos', (t) =>
     t.field({
       type: [DistritoRef],
-      description: 'El arbol de la diocesis: distritos, sus grupos y sus ramas.',
+      description: 'El arbol de la diocesis: distritos, sus grupos y sus unidades.',
       resolve: async (_padre, _args, contexto) => [
         ...(await contexto.estructura.listarDistritos()),
       ],

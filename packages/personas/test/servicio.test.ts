@@ -2,12 +2,13 @@ import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
 import { aplicarMigraciones, type Bd, type Core, type Module, type Reloj } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
-import type { Estructura, GrupoConRamas } from '@gps/estructura/dominio'
+import type { Estructura, GrupoConUnidades, Rama, Unidad } from '@gps/estructura/dominio'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import type { DatosDePersona } from '../src/dominio/modelos'
 import type { DatosDeIngreso } from '../src/dominio/vinculos'
 import { migraciones } from '../src/servidor/migraciones'
 import {
+  CargoInvalido,
   crearServicioDePersonas,
   DatosInvalidos,
   DocumentoDuplicado,
@@ -17,7 +18,18 @@ import {
 
 const HORA = new Date('1970-01-01T00:00:00Z')
 
-const GRUPO: GrupoConRamas = {
+const unidadDe = (id: string, rama: Rama, nombre: string): Unidad => ({
+  id,
+  grupoId: 'grupo_1',
+  rama,
+  sexo: 'mixta',
+  nombre,
+  cerradaEn: null,
+  creadoEn: HORA,
+  actualizadoEn: HORA,
+})
+
+const GRUPO: GrupoConUnidades = {
   id: 'grupo_1',
   numero: 42,
   nombre: 'Ceferino Namuncurá',
@@ -25,17 +37,23 @@ const GRUPO: GrupoConRamas = {
   cerradoEn: null,
   creadoEn: HORA,
   actualizadoEn: HORA,
-  ramas: ['lobatos', 'scouts'],
+  unidades: [
+    unidadDe('unidad_lob', 'lobatos', 'Manada'),
+    unidadDe('unidad_sco', 'scouts', 'Tropa scout'),
+  ],
 }
 
 /** Una estructura falsa: el servicio la recibe por el constructor, no por el
  *  contexto, asi que el test no necesita levantar el otro modulo. Es lo que
  *  hace testeable la dependencia entre modulos. */
-function estructuraFalsa(grupos: readonly GrupoConRamas[] = [GRUPO]): Estructura {
+const DISTRITOS_ABIERTOS = new Set(['distrito_1'])
+
+function estructuraFalsa(grupos: readonly GrupoConUnidades[] = [GRUPO]): Estructura {
   return {
     obtenerGrupo: async (id) => grupos.find((grupo) => grupo.id === id) ?? null,
+    distritoEstaAbierto: async (id) => DISTRITOS_ABIERTOS.has(id),
     // Personas no usa gruposAbiertosEn: se implementa solo para satisfacer la
-    // interfaz. Los GrupoConRamas de este archivo tienen cerradoEn: null.
+    // interfaz. Los GrupoConUnidades de este archivo tienen cerradoEn: null.
     async gruposAbiertosEn(fecha) {
       return new Set(
         grupos
@@ -66,6 +84,22 @@ function montar(
     reloj,
     bd,
     modulos: ['estructura', 'personas'],
+    // Falso pero con el comportamiento que importa: sellar y verificar cierran
+    // entre si, y un dato alterado no verifica.
+    sellador: {
+      sellar: (datos: string) => ({ sello: `sellado:${datos}`, claveId: 'prueba' }),
+      verificar: (datos: string, sello: { sello: string; claveId: string }) =>
+        sello.claveId === 'prueba' && sello.sello === `sellado:${datos}`,
+    },
+    almacenamiento: {
+      guardar: async () => {},
+      leer: async () => new Uint8Array(),
+      eliminar: async () => {},
+    },
+    conversorDeImagenes: { aJpeg: async (contenido: Uint8Array) => contenido },
+    // Falso pero estable y sensible al contenido, que es lo que los tests miran.
+    hash: (contenido: Uint8Array | string) =>
+      `hash:${typeof contenido === 'string' ? contenido : contenido.join(',')}`,
     nuevoId: (prefijo) => `${prefijo}_${++contador}`,
   }
 
@@ -94,7 +128,7 @@ const valida: DatosDePersona = {
 const ingreso: DatosDeIngreso = {
   grupoId: 'grupo_1',
   categoria: 'beneficiario',
-  rama: 'lobatos',
+  unidadId: 'unidad_lob',
   desde: '1969-03-01',
   cargos: [],
 }
@@ -112,7 +146,7 @@ describe('crearPersona con ingreso', () => {
       personaId: 'persona_1',
       grupoId: 'grupo_1',
       categoria: 'beneficiario',
-      rama: 'lobatos',
+      unidadId: 'unidad_lob',
       desde: '1969-03-01',
       hasta: null,
       creadoEn: HORA,
@@ -122,7 +156,7 @@ describe('crearPersona con ingreso', () => {
       {
         id: 'cargo_3',
         personaId: 'persona_1',
-        grupoId: 'grupo_1',
+        ambitoId: 'grupo_1',
         cargo: 'jefeDeRama',
         // El desde del cargo es el de la pertenencia: el formulario no pide la
         // misma fecha dos veces.
@@ -141,32 +175,39 @@ describe('crearPersona con ingreso', () => {
     await expect(servicio.crearPersona(valida, ingreso)).rejects.toThrow(GrupoInexistente)
   })
 
-  test('falla si la rama no esta abierta en ese grupo', async () => {
+  test('falla si la unidad no esta abierta en ese grupo', async () => {
     // La regla que el servidor no podia verificar antes de que un modulo
     // pudiera alcanzar al otro.
     const servicio = montar()
-    await expect(servicio.crearPersona(valida, { ...ingreso, rama: 'castores' })).rejects.toThrow(
-      DatosInvalidos,
-    )
+    await expect(
+      servicio.crearPersona(valida, { ...ingreso, unidadId: 'unidad_de_otro_lado' }),
+    ).rejects.toThrow(DatosInvalidos)
   })
 
   test('un ingreso invalido no deja la persona escrita a medias', async () => {
     // Las tres escrituras van en una transaccion: una persona sin pertenencia
     // no aparece en ninguna pantalla, porque la unica query filtra por grupo.
     const servicio = montar()
-    await expect(servicio.crearPersona(valida, { ...ingreso, rama: 'castores' })).rejects.toThrow()
+    await expect(
+      servicio.crearPersona(valida, { ...ingreso, unidadId: 'unidad_de_otro_lado' }),
+    ).rejects.toThrow()
     expect(await servicio.listarPersonas('grupo_1')).toEqual([])
   })
 })
 
 describe('listarPersonas', () => {
   test('devuelve solo las del grupo pedido', async () => {
-    const otroGrupo: GrupoConRamas = { ...GRUPO, id: 'grupo_2', numero: 7, ramas: ['lobatos'] }
+    const otroGrupo: GrupoConUnidades = {
+      ...GRUPO,
+      id: 'grupo_2',
+      numero: 7,
+      unidades: [unidadDe('unidad_otra', 'lobatos', 'Manada')],
+    }
     const servicio = montar(undefined, estructuraFalsa([GRUPO, otroGrupo]))
     await servicio.crearPersona(valida, ingreso)
     await servicio.crearPersona(
       { ...valida, numeroDeDocumento: '30111223' },
-      { ...ingreso, grupoId: 'grupo_2' },
+      { ...ingreso, grupoId: 'grupo_2', unidadId: 'unidad_otra' },
     )
 
     const delPrimero = await servicio.listarPersonas('grupo_1')
@@ -343,5 +384,157 @@ describe('miembrosActivos', () => {
       { ...ingreso, desde: '1969-05-01' },
     )
     expect(await servicio.miembrosActivos('1969-05-01')).toHaveLength(1)
+  })
+})
+
+describe('asignarCargo', () => {
+  const montarConPersona = async () => {
+    const servicio = montar()
+    const persona = await servicio.crearPersona(valida, ingreso)
+    return { servicio, persona }
+  }
+
+  test('un comisionado queda con el distrito como ambito', async () => {
+    const { servicio, persona } = await montarConPersona()
+    expect(
+      servicio.asignarCargo({
+        personaId: persona.id,
+        cargo: 'comisionadoDeDistrito',
+        ambitoId: 'distrito_1',
+        desde: '1969-03-01',
+      }),
+    ).resolves.toMatchObject({ ambitoId: 'distrito_1', cargo: 'comisionadoDeDistrito' })
+  })
+
+  test('un cargo de distrito apuntando a un grupo se rechaza', async () => {
+    // El ambito sale del catalogo, asi que un grupo no puede hacer de distrito
+    // aunque el id exista.
+    const { servicio, persona } = await montarConPersona()
+    expect(
+      servicio.asignarCargo({
+        personaId: persona.id,
+        cargo: 'comisionadoDeDistrito',
+        ambitoId: 'grupo_1',
+        desde: '1969-03-01',
+      }),
+    ).rejects.toThrow(CargoInvalido)
+  })
+
+  test('el jefe scout diocesano no apunta a ninguna entidad', async () => {
+    const { servicio, persona } = await montarConPersona()
+    expect(
+      servicio.asignarCargo({
+        personaId: persona.id,
+        cargo: 'jefeScoutDiocesano',
+        ambitoId: null,
+        desde: '1969-03-01',
+      }),
+    ).resolves.toMatchObject({ ambitoId: null })
+  })
+
+  test('un cargo diocesano con entidad se rechaza', async () => {
+    const { servicio, persona } = await montarConPersona()
+    expect(
+      servicio.asignarCargo({
+        personaId: persona.id,
+        cargo: 'jefeScoutDiocesano',
+        ambitoId: 'distrito_1',
+        desde: '1969-03-01',
+      }),
+    ).rejects.toThrow(CargoInvalido)
+  })
+
+  test('un cargo de grupo sin entidad se rechaza', async () => {
+    const { servicio, persona } = await montarConPersona()
+    expect(
+      servicio.asignarCargo({
+        personaId: persona.id,
+        cargo: 'jefeDeGrupo',
+        ambitoId: null,
+        desde: '1969-03-01',
+      }),
+    ).rejects.toThrow(CargoInvalido)
+  })
+
+  test('un distrito que no existe o esta cerrado se rechaza', async () => {
+    const { servicio, persona } = await montarConPersona()
+    expect(
+      servicio.asignarCargo({
+        personaId: persona.id,
+        cargo: 'comisionadoDeDistrito',
+        ambitoId: 'distrito_cerrado',
+        desde: '1969-03-01',
+      }),
+    ).rejects.toThrow(CargoInvalido)
+  })
+
+  test('el mismo cargo diocesano dos veces con la misma fecha se rechaza', async () => {
+    // Es el unico duplicado que el UNIQUE de la tabla deja pasar: SQLite trata
+    // dos NULL como distintos.
+    const { servicio, persona } = await montarConPersona()
+    const datos = {
+      personaId: persona.id,
+      cargo: 'jefeScoutDiocesano' as const,
+      ambitoId: null,
+      desde: '1969-03-01',
+    }
+    await servicio.asignarCargo(datos)
+    expect(servicio.asignarCargo(datos)).rejects.toThrow(CargoInvalido)
+  })
+})
+
+describe('ocupantesDelCargo', () => {
+  const montarConDirector = async () => {
+    const servicio = montar()
+    const persona = await servicio.crearPersona(valida, {
+      ...ingreso,
+      cargos: [{ cargo: 'director', hasta: '1972-03-01' }],
+    })
+    return { servicio, persona }
+  }
+
+  test('devuelve a quien ocupaba el cargo ese dia', async () => {
+    const { servicio, persona } = await montarConDirector()
+    const ocupantes = await servicio.ocupantesDelCargo('director', 'grupo_1', '1970-06-15')
+    expect(ocupantes.map((uno) => uno.id)).toEqual([persona.id])
+  })
+
+  test('el ultimo dia del periodo todavia cuenta', async () => {
+    // Las dos puntas inclusivas, igual que estaVigente.
+    const { servicio, persona } = await montarConDirector()
+    const ocupantes = await servicio.ocupantesDelCargo('director', 'grupo_1', '1972-03-01')
+    expect(ocupantes.map((uno) => uno.id)).toEqual([persona.id])
+  })
+
+  test('el dia siguiente al hasta ya no', async () => {
+    const { servicio } = await montarConDirector()
+    expect(await servicio.ocupantesDelCargo('director', 'grupo_1', '1972-03-02')).toEqual([])
+  })
+
+  test('antes del desde tampoco', async () => {
+    const { servicio } = await montarConDirector()
+    expect(await servicio.ocupantesDelCargo('director', 'grupo_1', '1969-02-28')).toEqual([])
+  })
+
+  test('un cargo que nadie ocupaba devuelve la lista vacia', async () => {
+    const { servicio } = await montarConDirector()
+    expect(await servicio.ocupantesDelCargo('capellan', 'grupo_1', '1970-06-15')).toEqual([])
+  })
+
+  test('el mismo cargo en otra entidad no se mezcla', async () => {
+    const { servicio } = await montarConDirector()
+    expect(await servicio.ocupantesDelCargo('director', 'grupo_2', '1970-06-15')).toEqual([])
+  })
+
+  test('un cargo diocesano se consulta con ambito null', async () => {
+    const { servicio, persona } = await montarConDirector()
+    await servicio.asignarCargo({
+      personaId: persona.id,
+      cargo: 'jefeScoutDiocesano',
+      ambitoId: null,
+      desde: '1969-03-01',
+    })
+    const ocupantes = await servicio.ocupantesDelCargo('jefeScoutDiocesano', null, '1970-06-15')
+    expect(ocupantes.map((uno) => uno.id)).toEqual([persona.id])
   })
 })

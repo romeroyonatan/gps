@@ -1,7 +1,7 @@
 import { periodoDe } from '@gps/afiliacion/dominio'
 import { useAfiliadosEn, useDistritos, usePersonasDelGrupo } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
-import { etiquetaDeEdades, RAMAS } from '@gps/estructura/dominio'
+import { etiquetaDeEdades, ramaDelCatalogo } from '@gps/estructura/dominio'
 import {
   calcularEdad,
   estaVigente,
@@ -147,21 +147,30 @@ export function Grupo(props: { id: string }) {
       >
         Afiliación →
       </Link>
+      <Link
+        href={`/grupos/${props.id}/salidas`}
+        className="mt-2 ml-3 inline-block text-sm text-slate-500 hover:text-slate-900"
+      >
+        Salidas →
+      </Link>
 
       <div className="mt-6 space-y-6">
-        {/* En el orden del catalogo, de menor a mayor edad: el mismo criterio
-            que ordenarPorCatalogo en el servidor. Una rama abierta sin nadie se
-            muestra vacia y no se esconde, porque es informacion. */}
-        {RAMAS.filter((rama) => grupo.ramas.includes(rama.id)).map((rama) => {
-          const suyas = personas.filter((persona) => persona.pertenencia.rama === rama.id)
-          // Primero los dirigentes: son los que uno busca cuando abre la rama.
+        {/* Ya vienen ordenadas por el servidor: por catalogo y, dentro de una
+            rama, por nombre. Una unidad abierta sin nadie se muestra vacia y no
+            se esconde, porque es informacion. */}
+        {grupo.unidades.map((unidad) => {
+          const suyas = personas.filter((persona) => persona.pertenencia.unidadId === unidad.id)
+          // Primero los dirigentes: son los que uno busca cuando abre la unidad.
           const activos = suyas.filter((p) => p.pertenencia.categoria === 'activo')
           const beneficiarios = suyas.filter((p) => p.pertenencia.categoria === 'beneficiario')
+          const rama = ramaDelCatalogo(unidad.rama)
           return (
             <Seccion
-              key={rama.id}
-              titulo={rama.nombre}
-              detalle={etiquetaDeEdades(rama)}
+              key={unidad.id}
+              titulo={unidad.nombre}
+              detalle={
+                rama ? `${rama.nombre} · ${etiquetaDeEdades(rama)} · ${unidad.sexo}` : undefined
+              }
               personas={[...activos, ...beneficiarios]}
               hoy={hoy}
               afiliados={afiliados}
@@ -169,16 +178,16 @@ export function Grupo(props: { id: string }) {
           )
         })}
 
-        {grupo.ramas.length === 0 && (
+        {grupo.unidades.length === 0 && (
           <p className="rounded-lg bg-white p-4 text-sm text-slate-500 shadow-sm">
-            El grupo todavía no abrió ninguna rama.
+            El grupo todavía no abrió ninguna unidad.
           </p>
         )}
 
         <Seccion titulo="Adherentes" personas={adherentes} hoy={hoy} afiliados={afiliados} />
       </div>
 
-      <AltaDePersona grupoId={props.id} ramasAbiertas={grupo.ramas} />
+      <AltaDePersona grupoId={props.id} unidadesAbiertas={grupo.unidades} />
     </>
   )
 }

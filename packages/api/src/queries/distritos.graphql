@@ -8,7 +8,13 @@ query Distritos {
       id
       numero
       nombre
-      ramas
+      unidades {
+        id
+        rama
+        sexo
+        nombre
+        nombreParaMostrar
+      }
     }
   }
 }

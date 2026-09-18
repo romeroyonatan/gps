@@ -80,7 +80,10 @@ Un contenedor, un proceso, un puerto. En desarrollo y en producción es el mismo
        |
        | 1. lee y valida la configuracion del entorno
        v
-    core.ts ------------- construye ------------> Core { config, logger, reloj, bd }
+    core.ts ------------- construye ------------> Core { config, logger, reloj, bd,
+                                                        nuevoId, hash, sellador,
+                                                        almacenamiento,
+                                                        conversorDeImagenes }
        |
        | 2. toma la lista de modulos
        v
@@ -245,6 +248,31 @@ obligatorio** de todo repositorio, así que una consulta que se olvide de filtra
 compila. La segunda: las políticas son las **mismas funciones** en el servidor y en la
 pantalla, así que la interfaz no puede ofrecer algo que el servidor vaya a rechazar.
 
+Un grupo se subdivide en **unidades**: la Manada, las dos Tropas, el Clan. La rama sigue
+siendo el catálogo —el tramo de edad, y cómo se llama el tipo de unidad que le
+corresponde—, y la unidad es la instancia concreta que ese grupo abrió, con su sexo
+(masculina, femenina o mixta) y su nombre propio. Es la misma separación que hay entre los
+cargos, que los nombra el código, y los equipos, que los crea alguien. Por eso un grupo
+puede tener dos tropas scout, que es lo que la tabla `ramas_del_grupo` —clave
+`(grupo, rama)`— no podía representar. Las ramas abiertas de un grupo se derivan de sus
+unidades, sin repetir.
+
+Las cuatro capacidades que `Core` sumó con `salidas` son todas plataforma que un módulo no
+puede tocar: `hash` es sha256 y dice si unos bytes cambiaron; `sellador` es HMAC con una
+clave secreta y dice además que los escribimos nosotros —sin secreto, quien alcanza la base
+recalcula el hash y el sello no prueba nada—; `almacenamiento` mueve los bytes de los
+archivos, que no van a SQLite; y `conversorDeImagenes` pasa a JPEG las fotos HEIC de los
+iPhone, que `pdf-lib` no sabe leer.
+
+Las claves de sello **no** están en `Config`: las lee el backend del entorno y se las pasa a
+`crearCore`, igual que la ruta de la base. Ningún módulo las lee —usan el `sellador` ya
+construido— así que meterlas en `Config` sólo las expondría a todos. Cada firma guarda con
+qué clave se selló, que es lo que permite rotar sin invalidar lo ya firmado.
+
+La persona pertenece a una unidad y no a una rama: la rama sale de la unidad. A quién se
+pone en cuál lo deciden los dirigentes; el sistema no lo valida ni lo sugiere, y `Persona`
+no guarda sexo.
+
 Quien ocupa cada cargo lo dice `personas`, no `estructura` — ver §7. Cuando llegue
 `auth`, la cadena de dependencias va a ser `auth` → `personas` → `estructura`.
 
@@ -257,12 +285,14 @@ dependencia de módulo que ya existe hoy: `personas` depende de `estructura`.
     core                        plomeria; todos dependen de el
 
     estructura      archivos    no dependen de ningun otro modulo
-       ^                ^
-       |                |
-    personas           permisos
-       ^  ^
-       |  |
-       |  +-- salud
+       ^  ^             ^
+       |  |             |
+    personas  +---------+
+       ^  ^  |
+       |  |  |
+       |  +--+-- salidas    depende de las tres: personas, estructura y archivos
+       |
+       +-- salud
        |
     afiliacion      depende tambien de estructura, directo y no solo via personas
        ^
@@ -283,8 +313,19 @@ ningún otro módulo (`dependencies: []`), y quién ocupa cada cargo lo dice `pe
 `personas.miembrosActivos` para la nómina de ese día — ninguna de las dos alcanza sola,
 porque un grupo cerrado no debe declarar aunque su gente siga viva en las tablas de
 `personas` (ver §"Qué NO existe todavía" en `AGENT.md` sobre esa deuda). No depende de
-`permisos`: esa flecha era un error de una versión anterior de este diagrama, de cuando
+`salidas`: esa flecha era un error de una versión anterior de este diagrama, de cuando
 `afiliacion` era todavía especulativa.
+
+`salidas` —el permiso de salida, que en el diagrama viejo se llamaba `permisos`— depende de
+las tres: de `personas` por los participantes y por quién ocupa cada cargo el día que
+firma, de `estructura` por el grupo y su distrito, y de `archivos` por el PDF, los escaneos
+de lo firmado en papel y los adjuntos. Se renombró porque "permisos" choca de frente con la
+autorización: `puedeVerPermiso` no se puede leer.
+
+`archivos` no depende de nadie y, sobre todo, **no conoce ninguna regla de permisos**: para
+autorizar una descarga le pregunta al módulo dueño, que se registra en la raíz de
+composición. Depender de sus dueños sería un ciclo, y un archivo cuyo módulo no esté en ese
+registro no se entrega.
 
 Orden de construcción que se desprende: `sistema`, `estructura` y `personas` (hechos), y
 a partir de ahí el resto. Es tentativo: cada spec de módulo puede ajustarlo.

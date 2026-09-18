@@ -1,6 +1,6 @@
 import { ErrorDeApi, useCrearPersona } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
-import { etiquetaDeEdades, type Rama, ramaDelCatalogo } from '@gps/estructura/dominio'
+import { etiquetaDeEdades, ramaDelCatalogo, type Unidad } from '@gps/estructura/dominio'
 import {
   CATEGORIAS,
   type Categoria,
@@ -39,16 +39,19 @@ function Campo(props: { etiqueta: string; problema?: string; children: ReactNode
   )
 }
 
-export function AltaDePersona(props: { grupoId: string; ramasAbiertas: readonly Rama[] }) {
+export function AltaDePersona(props: {
+  grupoId: string
+  unidadesAbiertas: readonly Pick<Unidad, 'id' | 'rama' | 'nombre' | 'sexo'>[]
+}) {
   const alta = useCrearPersona()
   const hoy = new Date()
   const vacio = (): DatosDeIngreso => ({
     grupoId: props.grupoId,
     categoria: 'beneficiario',
-    // La primera rama abierta del grupo, no una fija: el <select> solo ofrece
+    // La primera unidad abierta del grupo, no una fija: el <select> solo ofrece
     // las que el grupo tiene abiertas, asi que un default que no este ahi seria
     // un formulario que arranca invalido.
-    rama: props.ramasAbiertas[0] ?? null,
+    unidadId: props.unidadesAbiertas[0]?.id ?? null,
     desde: aFechaDeCalendario(hoy),
     cargos: [],
   })
@@ -82,12 +85,16 @@ export function AltaDePersona(props: { grupoId: string; ramasAbiertas: readonly 
   }
 
   function cambiarCategoria(categoria: Categoria) {
-    // Un adherente no pertenece a ninguna rama: limpiarla al cambiar evita que
-    // el formulario quede en un estado que el dominio rechaza sin que se vea.
+    // Un adherente no pertenece a ninguna unidad: limpiarla al cambiar evita
+    // que el formulario quede en un estado que el dominio rechaza sin que se
+    // vea.
     setIngreso({
       ...ingreso,
       categoria,
-      rama: categoria === 'adherente' ? null : (ingreso.rama ?? props.ramasAbiertas[0] ?? null),
+      unidadId:
+        categoria === 'adherente'
+          ? null
+          : (ingreso.unidadId ?? props.unidadesAbiertas[0]?.id ?? null),
     })
   }
 
@@ -97,7 +104,7 @@ export function AltaDePersona(props: { grupoId: string; ramasAbiertas: readonly 
     // experiencia de uso; que el servidor las corra igual es la garantia.
     const encontrados = [
       ...validarPersona(datos, hoy),
-      ...validarIngreso(ingreso, props.ramasAbiertas, hoy),
+      ...validarIngreso(ingreso, props.unidadesAbiertas, hoy),
     ]
     setProblemas(encontrados)
     if (encontrados.length > 0) return
@@ -186,24 +193,25 @@ export function AltaDePersona(props: { grupoId: string; ramasAbiertas: readonly 
           </select>
         </Campo>
 
-        <Campo etiqueta="Rama" problema={problemaDe('rama')}>
+        <Campo etiqueta="Unidad" problema={problemaDe('unidad')}>
           <select
             className={CLASE_DE_INPUT}
-            // Un adherente es, por definicion, el que no esta en ninguna rama.
+            // Un adherente es, por definicion, el que no esta en ninguna unidad.
             disabled={ingreso.categoria === 'adherente'}
-            value={ingreso.rama ?? ''}
-            onChange={(evento) =>
-              setIngreso({ ...ingreso, rama: (evento.target.value || null) as Rama | null })
-            }
+            value={ingreso.unidadId ?? ''}
+            onChange={(evento) => setIngreso({ ...ingreso, unidadId: evento.target.value || null })}
           >
             <option value="">—</option>
-            {/* Solo las ramas abiertas del grupo. Es la misma regla que corre el
-                servidor con estructura.obtenerGrupo, no una version aparte. */}
-            {props.ramasAbiertas.map((rama) => {
-              const catalogo = ramaDelCatalogo(rama)
+            {/* Solo las unidades abiertas del grupo. Es la misma regla que
+                corre el servidor con estructura.obtenerGrupo, no una version
+                aparte. */}
+            {props.unidadesAbiertas.map((unidad) => {
+              const catalogo = ramaDelCatalogo(unidad.rama)
               return (
-                <option key={rama} value={rama}>
-                  {catalogo ? `${catalogo.nombre} (${etiquetaDeEdades(catalogo)})` : rama}
+                <option key={unidad.id} value={unidad.id}>
+                  {unidad.nombre}
+                  {catalogo &&
+                    ` (${catalogo.nombre}, ${etiquetaDeEdades(catalogo)}, ${unidad.sexo})`}
                 </option>
               )
             })}

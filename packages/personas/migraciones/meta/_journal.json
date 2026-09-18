@@ -15,6 +15,34 @@
       "when": 1787960102636,
       "tag": "0001_pertenencias_y_cargos",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789764818328,
+      "tag": "0002_pertenencia_en_unidad",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789764826146,
+      "tag": "0003_baja_rama_de_pertenencia",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1789767771636,
+      "tag": "0004_cargo_con_ambito",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1789767781972,
+      "tag": "0005_baja_grupo_de_cargo",
+      "breakpoints": true
     }
   ]
 }

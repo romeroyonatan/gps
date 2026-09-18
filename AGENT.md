@@ -52,6 +52,18 @@ frontend `1-labs`), justamente para que un paquete nuevo no lo obligue a nadie a
 acordarse. Si alguna vez se vuelve a una lista explícita de `COPY`, este paso vuelve a
 la receta.
 
+Ejemplo del final de la cadena: `salidas` —el permiso de salida— depende de `personas`,
+`estructura` y `archivos`. Su `/dominio` decide con parámetros (quiénes son los tres
+firmantes, qué candidatos hay según las unidades elegidas, qué mensaje se sella) y las
+pantallas usan esas mismas funciones; su `/servidor` se parte por caso de uso
+(`borradores.ts`, `emision.ts`, `firmas.ts`, `pdf.ts`, `consultas.ts`) y `servicio.ts` es
+sólo contrato y composición. El PDF se queda en `/servidor` aunque `pdf-lib` sea isomorfo:
+`/dominio` lo importa el navegador, y un import de valor entraría al bundle de mobile.
+
+`archivos`, en cambio, **no se parte**: solicitar, confirmar y descargar son orquestación de
+efectos sin decisión separable, y quedan en su `servicio.ts`. Es el otro lado de la misma
+regla.
+
 Ejemplo real: `afiliacion` depende de `personas` y de `estructura`
 (`dependencies: ['personas', 'estructura']`), las dos por lectura nada más —no escribe
 ni una persona ni un grupo—. La selección de sus nóminas declarables es una regla pura en
@@ -120,7 +132,7 @@ convenciones están documentadas pero no implementadas todavía: no hay `auth`, 
 
 ## Qué NO existe todavía
 
-Auth, `Alcance` real, `politicas.ts`, rate limiting, auditoría, archivos,
+Auth, `Alcance` real, `politicas.ts`, rate limiting, auditoría,
 `packages/local`, base en el dispositivo. Cada uno tiene su diseño en la spec y llega
 con su primer consumidor real. No agregarlos por adelantado.
 
@@ -129,10 +141,30 @@ Bus de eventos tampoco, pero ya tiene un consumidor a la vista: cuando llegue Te
 calcule la deuda a partir de ese evento, sin que Afiliación la conozca.
 
 Tampoco hay baja ni edición de personas (las columnas `hasta` existen y el historial se
-puede escribir, pero por ahora sólo se llena con altas), ni cargos fuera del ámbito del
-grupo (los distritales, diocesanos y de equipo llegan con el ámbito que los necesite), ni
-equipos, ni forma de buscar una persona sin saber su grupo (la única consulta es
-`personas(grupoId: ID!)`).
+puede escribir, pero por ahora sólo se llena con altas), ni cargos de equipo, ni equipos, ni
+forma de buscar una persona sin saber su grupo (la única consulta es
+`personas(grupoId: ID!)`). Los cargos **sí** tienen ámbito: `grupo`, `distrito` y
+`diocesis`, con comisionado de distrito y jefe scout diocesano. Un cargo distrital no
+aparece en ninguna pantalla todavía: `listarPersonas` filtra los cargos por el grupo, así
+que el comisionado sólo se ve como firmante de un permiso.
+
+**Firma con certificado** (PAdES) tampoco: hoy la firma en la app es el dibujo, sellado con
+HMAC sobre el hash del PDF, los trazos, el cargo, la persona y la fecha. Cada firma guarda
+con qué clave se selló, así que rotar es agregar una clave nueva y apuntar
+`CLAVE_DE_SELLO_ACTIVA` a ella; las viejas se quedan para verificar. Retirar una clave exige
+re-sellar verificando primero —nunca a ciegas, eso lavaría una firma adulterada— y eso no
+está construido. Si una clave se filtra, las firmas selladas con ella dejan de probar nada:
+se anula y se re-emite el permiso.
+
+La firma en papel **no se verifica**: quien sube el escaneo declara qué cargos lo firmaron.
+El respaldo es el escaneo, que va como página anexa del PDF. Con `auth` se registra además
+quién lo declaró.
+
+Tampoco hay forma de abrir o cerrar una unidad desde las pantallas: el servicio de
+`estructura` las tiene (`abrirUnidad`, `cerrarUnidad`) y el demo las usa, pero ninguna
+mutation las expone. Llega con la pantalla que las necesite. Y una unidad no se puede
+renombrar, así que los nombres por defecto que dejó la migración —"Tropa scout" a secas—
+sólo se corrigen sembrando de nuevo.
 
 Deuda conocida: **cerrar un grupo no cierra las pertenencias de su gente.** `estructura`
 no puede hacerlo porque la dependencia va al revés —no conoce a `personas`—, y ningún
