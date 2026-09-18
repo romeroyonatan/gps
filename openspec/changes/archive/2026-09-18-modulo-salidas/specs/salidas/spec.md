@@ -169,6 +169,14 @@ firmas del mismo permiso.
 - **WHEN** se sube un escaneo y se lo asocia a las firmas del jefe de grupo y del director
 - **THEN** las dos firmas quedan registradas en modo `papel` con el mismo escaneo
 
+#### Scenario: Escanear con una impresora
+- **WHEN** el escaneo que se sube es un PDF
+- **THEN** la firma queda registrada igual que con una foto
+
+#### Scenario: Un archivo que no se puede anexar
+- **WHEN** se intenta respaldar una firma con un archivo que no es imagen ni PDF, como un documento de Word
+- **THEN** el sistema rechaza la firma, diciendo que suba una foto o un PDF
+
 ### Requirement: Permiso firmado
 Cuando las tres firmas estén registradas, el permiso SHALL pasar a `firmado`. El sistema
 SHALL ofrecer el PDF firmado: el PDF emitido con las firmas en la app estampadas en su
@@ -182,6 +190,14 @@ escaneos agregadas como páginas.
 #### Scenario: Firma mixta
 - **WHEN** el comisionado y el jefe de grupo firmaron en la app y el director en papel
 - **THEN** el PDF firmado muestra dos firmas dibujadas y el escaneo del director como página adicional
+
+#### Scenario: Un escaneo en PDF de varias páginas
+- **WHEN** el escaneo de una firma es un PDF de dos páginas
+- **THEN** las dos se anexan al PDF firmado, conservando su contenido
+
+#### Scenario: Un escaneo ilegible
+- **WHEN** el escaneo de una firma no se puede leer
+- **THEN** el PDF firmado se sigue pudiendo descargar, y el anexo dice que ese archivo no se pudo mostrar
 
 ### Requirement: El PDF firmado se compone
 El PDF firmado SHALL componerse a partir del PDF emitido y del estado actual de las firmas,
@@ -233,13 +249,43 @@ al permiso del que salió.
 - **THEN** el sistema rechaza la operación
 
 ### Requirement: Adjuntos
-El sistema SHALL permitir adjuntar archivos (por ejemplo, planificaciones) a un permiso en
-cualquier estado, y listarlos. Los adjuntos MUST NOT formar parte del PDF ni del hash que
-sellan las firmas.
+El sistema SHALL permitir adjuntar archivos a un permiso en cualquier estado, y listarlos
+con su nombre. Un adjunto no se anexa al PDF, así que SHALL poder ser cualquiera de los
+tipos admitidos, incluida una planificación en Word. Los adjuntos MUST NOT formar parte del
+PDF ni del hash que sellan las firmas.
 
 #### Scenario: Adjuntar a un firmado
 - **WHEN** se adjunta una planificación a un permiso `firmado`
 - **THEN** el adjunto queda listado y las firmas siguen verificadas
+
+#### Scenario: Una planificación en Word
+- **WHEN** se adjunta un `.docx`
+- **THEN** el adjunto queda listado
+
+#### Scenario: Un archivo de otro permiso
+- **WHEN** se intenta adjuntar un archivo que no es de este permiso
+- **THEN** el sistema rechaza la operación
+
+### Requirement: Quitar un adjunto
+El sistema SHALL permitir quitar un adjunto de un permiso en cualquier estado, lo que
+SHALL borrar también su archivo. Quitar un adjunto MUST NOT alterar las firmas ni los
+escaneos que las respaldan. Un adjunto de otro permiso MUST NOT poder quitarse.
+
+#### Scenario: Se cargó el archivo equivocado
+- **WHEN** se quita un adjunto
+- **THEN** deja de figurar y su archivo ya no se puede descargar
+
+#### Scenario: Quitar de un permiso firmado
+- **WHEN** se quita un adjunto de un permiso `firmado`
+- **THEN** las tres firmas siguen verificadas
+
+#### Scenario: El escaneo de una firma no es un adjunto
+- **WHEN** se quita un adjunto de un permiso que además tiene una firma en papel
+- **THEN** el escaneo de esa firma sigue existiendo
+
+#### Scenario: Un adjunto de otro permiso
+- **WHEN** se intenta quitar un adjunto que pertenece a otro permiso
+- **THEN** el sistema rechaza la operación
 
 ### Requirement: Listar permisos de un grupo
 El sistema SHALL listar los permisos de un grupo con su estado, lugar y fechas, del más

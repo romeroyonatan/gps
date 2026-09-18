@@ -25,12 +25,21 @@ MUST NOT poder descargarse ni asociarse a nada.
 
 ### Requirement: Tipos y tamaños admitidos
 El sistema SHALL rechazar al solicitar la subida cualquier tipo MIME fuera de la lista
-admitida (imágenes JPEG, PNG, HEIC y HEIF, y PDF) y cualquier tamaño por encima del máximo
-configurado.
+admitida y cualquier tamaño por encima del máximo configurado. La lista SHALL incluir
+imágenes (JPEG, PNG, HEIC, HEIF), PDF y documentos de oficina (Word, Excel y sus
+equivalentes de LibreOffice). El sistema MUST NOT admitir tipos que el navegador ejecute al
+mostrarlos, como HTML o SVG.
+
+El sistema no decide para qué sirve cada archivo: el módulo dueño restringe más cuando lo
+necesita.
 
 #### Scenario: Tipo no admitido
 - **WHEN** se solicita subir un archivo `application/zip`
-- **THEN** el sistema rechaza la solicitud
+- **THEN** el sistema rechaza la solicitud, diciendo qué tipo se rechazó
+
+#### Scenario: Una planificación en Word
+- **WHEN** se solicita subir un `.docx`
+- **THEN** el sistema acepta la solicitud
 
 #### Scenario: Demasiado grande
 - **WHEN** se solicita subir un archivo más grande que el máximo
@@ -67,3 +76,42 @@ autorizado, y MUST rechazar la descarga si el dueño no lo autoriza o no está r
 #### Scenario: Dueño no registrado
 - **WHEN** se pide descargar un archivo cuyo módulo dueño no está registrado
 - **THEN** el sistema rechaza la descarga
+
+### Requirement: La descarga lleva el nombre del archivo
+Al entregar un archivo, el sistema SHALL informar su nombre original, y SHALL permitir
+pedirlo para bajar en vez de para mostrar. Un nombre que pueda romper la forma de esa
+respuesta SHALL entregarse saneado.
+
+#### Scenario: Guardar no deja el id como nombre
+- **WHEN** se descarga un archivo llamado "escaneo.jpg"
+- **THEN** la respuesta informa ese nombre y no el identificador interno
+
+#### Scenario: Pedirlo para bajar
+- **WHEN** se pide el archivo indicando que se quiere descargar
+- **THEN** la respuesta indica que se baje en vez de mostrarse
+
+#### Scenario: Un nombre con comillas
+- **WHEN** se descarga un archivo cuyo nombre tiene comillas
+- **THEN** la respuesta sigue siendo válida y el nombre va sin ellas
+
+### Requirement: Borrar un archivo
+El sistema SHALL permitir al módulo dueño borrar uno de sus archivos, indicando además de
+qué recurso suyo es. El sistema MUST NOT borrar un archivo a pedido de un módulo que no es
+su dueño, ni de otro recurso del mismo módulo. Borrar SHALL quitar el registro y el
+contenido.
+
+#### Scenario: El dueño borra
+- **WHEN** el módulo dueño borra un archivo de su recurso
+- **THEN** el archivo deja de existir y su contenido tampoco se puede descargar
+
+#### Scenario: Otro módulo no puede
+- **WHEN** un módulo que no es el dueño pide borrar el archivo
+- **THEN** el archivo sigue existiendo
+
+#### Scenario: Otro recurso del mismo módulo tampoco
+- **WHEN** el módulo dueño pide borrarlo declarando otro recurso
+- **THEN** el archivo sigue existiendo
+
+#### Scenario: Borrar algo que no existe
+- **WHEN** se pide borrar un archivo inexistente
+- **THEN** la operación informa que no borró nada, sin fallar
