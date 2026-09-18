@@ -4,10 +4,17 @@
 // conocer a los otros: es literalmente su razon de ser (spec 6.1).
 import '@gps/estructura/servidor'
 import '@gps/personas/servidor'
+import '@gps/salidas/servidor'
 import { YaDeclaroHoy } from '@gps/afiliacion/servidor'
 import type { Context } from '@gps/core'
+import { aFechaDeCalendario } from '@gps/core/fechas'
 import { RAMAS, type Rama, type SexoDeUnidad } from '@gps/estructura/dominio'
-import type { Categoria, DatosDePersona, TipoDeCargo } from '@gps/personas/dominio'
+import {
+  ambitoDelCargo,
+  type Categoria,
+  type DatosDePersona,
+  type TipoDeCargo,
+} from '@gps/personas/dominio'
 
 /** La diocesis de la demostracion. Los grupos abren conjuntos distintos de
  *  ramas a proposito: uno completo, varios parciales y uno todavia sin
@@ -122,6 +129,10 @@ const PERSONAS: readonly {
   unidad?: string
   desde: string
   cargos?: readonly { cargo: TipoDeCargo; hasta: string | null }[]
+  /** Cargos fuera del grupo. Van aparte de `cargos` porque no se asignan en el
+   *  alta: esos son del grupo al que la persona ingresa, y estos apuntan al
+   *  distrito de ese grupo o a la diocesis, que no es una entidad. */
+  cargosDeAmbitoMayor?: readonly { cargo: TipoDeCargo; hasta: string | null }[]
 }[] = [
   // El grueso en el 42, que tiene las seis ramas abiertas, con una persona por
   // rama de castores a adultos: es el que ejercita la pantalla llena.
@@ -270,6 +281,10 @@ const PERSONAS: readonly {
       { cargo: 'subjefeDeGrupo', hasta: '2028-03-01' },
       { cargo: 'jefeDeRama', hasta: null },
     ],
+    // Y ademas comisionada del distrito 1, que es el de su grupo: un cargo
+    // distrital lo ocupa un dirigente de alguno de sus grupos. Es quien firma
+    // los permisos de salida de todos los grupos del distrito.
+    cargosDeAmbitoMayor: [{ cargo: 'comisionadoDeDistrito', hasta: '2029-03-01' }],
   },
   {
     // El sacerdote a cargo del grupo: adherente, sin rama, con cargo.
@@ -331,6 +346,9 @@ const PERSONAS: readonly {
     rama: 'scouts',
     desde: '2011-03-05',
     cargos: [{ cargo: 'jefeDeRama', hasta: '2024-12-31' }],
+    // El unico cargo de la diocesis: no apunta a ninguna entidad, porque hay
+    // una sola diocesis por instancia.
+    cargosDeAmbitoMayor: [{ cargo: 'jefeScoutDiocesano', hasta: null }],
   },
 ]
 
@@ -347,7 +365,7 @@ function nombrePorDefecto(rama: Rama): string {
   return RAMAS.find((entrada) => entrada.id === rama)?.unidad ?? rama
 }
 
-export async function sembrarEscenario(ctx: Context): Promise<void> {
+export async function sembrarEscenario(ctx: Context, ahora: Date): Promise<void> {
   for (const datos of DIOCESIS) {
     const distrito = await ctx.estructura.crearDistrito({
       numero: datos.numero,
@@ -398,13 +416,25 @@ export async function sembrarEscenario(ctx: Context): Promise<void> {
     if (persona.rama !== null && !suya) {
       throw new Error(`El grupo ${persona.numeroDeGrupo} no tiene unidad de ${persona.rama}.`)
     }
-    await ctx.personas.crearPersona(persona.datos, {
+    const creada = await ctx.personas.crearPersona(persona.datos, {
       grupoId: grupo.id,
       categoria: persona.categoria,
       unidadId: suya?.id ?? null,
       desde: persona.desde,
       cargos: persona.cargos ?? [],
     })
+
+    // Aparte del alta: el ambito de estos no es el grupo al que ingresa. El
+    // catalogo dice cual es, y de ahi sale a que entidad apuntan.
+    for (const suyo of persona.cargosDeAmbitoMayor ?? []) {
+      await ctx.personas.asignarCargo({
+        personaId: creada.id,
+        cargo: suyo.cargo,
+        ambitoId: ambitoDelCargo(suyo.cargo) === 'diocesis' ? null : grupo.distritoId,
+        desde: persona.desde,
+        hasta: suyo.hasta,
+      })
+    }
   }
 
   // Las ordinarias del periodo corriente que ya pasaron, y despues una
@@ -425,5 +455,101 @@ export async function sembrarEscenario(ctx: Context): Promise<void> {
     // grupo 42 no puede declarar dos veces. El escenario queda igual de bueno
     // -esa ordinaria es la declaracion de hoy- asi que se sigue.
     if (!(error instanceof YaDeclaroHoy)) throw error
+  }
+
+  await sembrarSalidas(ctx, grupoDeLaExtraordinaria, ahora)
+}
+
+/** Tres permisos del grupo 42, uno por estado que la pantalla tiene que saber
+ *  dibujar: un borrador a medio armar, uno emitido con una sola firma, y uno
+ *  firmado por los tres. El anulado no se siembra: se llega apretando un boton
+ *  y no aporta un caso de dibujo distinto.
+ *
+ *  Las fechas salen del reloj y no son fijas: un permiso sembrado en 2026 con
+ *  fecha 2026 quedaria vencido para siempre, y el aviso de anticipacion no se
+ *  veria nunca. */
+async function sembrarSalidas(
+  ctx: Context,
+  grupo: { id: string; unidades: readonly { id: string; rama: string }[] },
+  ahora: Date,
+) {
+  // `ahora` entra por parametro y no sale del sistema: es la regla de
+  // portabilidad, y el plugin de Biome la hace cumplir tambien aca.
+  const enDias = (dias: number) =>
+    aFechaDeCalendario(new Date(ahora.getTime() + dias * 24 * 60 * 60 * 1000))
+
+  const tropas = grupo.unidades.filter((unidad) => unidad.rama === 'scouts').map((u) => u.id)
+  const manada = grupo.unidades.find((unidad) => unidad.rama === 'lobatos')
+  const gente = await ctx.personas.listarPersonas(grupo.id)
+
+  /** Arma un permiso con las unidades y todo el que pueda ir. */
+  async function armar(datos: {
+    lugar: string
+    dentroDe: number
+    dura: number
+    comoSeViaja?: string
+    unidades: readonly string[]
+  }) {
+    const permiso = await ctx.salidas.crearPermiso(grupo.id, {
+      lugar: datos.lugar,
+      desde: enDias(datos.dentroDe),
+      hasta: enDias(datos.dentroDe + datos.dura),
+      comoSeViaja: datos.comoSeViaja ?? null,
+    })
+    await ctx.salidas.elegirUnidades(permiso.id, datos.unidades)
+    for (const persona of gente) {
+      const unidadId = persona.pertenencia.unidadId
+      if (unidadId !== null && !datos.unidades.includes(unidadId)) continue
+      await ctx.salidas.agregarParticipante(permiso.id, persona.id)
+    }
+    return permiso
+  }
+
+  // Un garabato cualquiera: lo que importa es que se vea una firma dibujada.
+  const firma = {
+    trazos: [
+      [
+        [0.05, 0.6],
+        [0.2, 0.2],
+        [0.35, 0.7],
+        [0.5, 0.25],
+        [0.7, 0.6],
+        [0.9, 0.35],
+      ],
+    ] as const,
+  }
+
+  // Borrador: todavia se edita, y con fecha cercana para que se vea el aviso
+  // de anticipacion.
+  await armar({
+    lugar: 'Reserva Natural Otamendi',
+    dentroDe: 8,
+    dura: 1,
+    unidades: manada ? [manada.id] : [],
+  })
+
+  // Emitido con una sola firma: el caso de "falta que firmen".
+  const emitido = await armar({
+    lugar: 'Sierra de la Ventana',
+    dentroDe: 45,
+    dura: 2,
+    comoSeViaja: 'Micro contratado desde la parroquia',
+    unidades: tropas,
+  })
+  await ctx.salidas.emitir(emitido.id)
+  await ctx.salidas.firmarEnApp(emitido.id, 'jefeDeGrupo', firma)
+
+  // Firmado por los tres, todos en la app: el escaneo de un papel necesitaria
+  // una imagen de verdad en el paquete, y el caso mixto ya lo cubren los tests.
+  const firmado = await armar({
+    lugar: 'Camping El Durazno',
+    dentroDe: 90,
+    dura: 3,
+    comoSeViaja: 'Combis de las familias',
+    unidades: tropas,
+  })
+  await ctx.salidas.emitir(firmado.id)
+  for (const cargo of ['jefeDeGrupo', 'director', 'comisionadoDeDistrito'] as const) {
+    await ctx.salidas.firmarEnApp(firmado.id, cargo, firma)
   }
 }

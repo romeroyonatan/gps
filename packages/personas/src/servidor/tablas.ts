@@ -77,7 +77,7 @@ export const pertenencias = sqliteTable(
   ],
 )
 
-/** Los cargos de una persona en un grupo, con su periodo.
+/** Los cargos de una persona, con su ambito y su periodo.
  *
  *  A diferencia de `pertenencias`, el UNIQUE es completo y no parcial: un cargo
  *  puede nacer con su `hasta` puesto cuatro anios adelante -un mandato-, asi
@@ -91,11 +91,19 @@ export const cargos = sqliteTable(
     personaId: text('persona_id')
       .notNull()
       .references(() => personas.id),
-    grupoId: text('grupo_id').notNull(),
+    /** El grupo, el distrito, o NULL para los de la diocesis, que no es una
+     *  entidad. Cual de los tres es lo dice el catalogo a partir de `cargo`, no
+     *  una columna: guardarlo tambien seria un dato que puede contradecir al
+     *  catalogo. Sin foreign key por la misma razon que grupo_id en
+     *  pertenencias: las dos tablas son de estructura. */
+    ambitoId: text('ambito_id'),
     cargo: text('cargo').$type<TipoDeCargo>().notNull(),
     desde: text('desde').notNull(),
     hasta: text('hasta'),
     ...marcas,
   },
-  (tabla) => [unique().on(tabla.personaId, tabla.grupoId, tabla.cargo, tabla.desde)],
+  // SQLite trata dos NULL como distintos en un UNIQUE, asi que esto no ataja el
+  // duplicado exacto de un cargo diocesano -ambito_id es NULL-: eso lo valida
+  // el servicio.
+  (tabla) => [unique().on(tabla.personaId, tabla.ambitoId, tabla.cargo, tabla.desde)],
 )

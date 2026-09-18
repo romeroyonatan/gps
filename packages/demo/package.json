@@ -11,9 +11,11 @@
   },
   "dependencies": {
     "@gps/afiliacion": "workspace:*",
+    "@gps/archivos": "workspace:*",
     "@gps/core": "workspace:*",
     "@gps/estructura": "workspace:*",
-    "@gps/personas": "workspace:*"
+    "@gps/personas": "workspace:*",
+    "@gps/salidas": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "latest",

@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test'
-import { leerEntorno, leerPuerto, leerRutaDeBd } from '../src/index'
+import {
+  leerClavesDeSello,
+  leerDirectorioDeArchivos,
+  leerEntorno,
+  leerPuerto,
+  leerRutaDeBd,
+} from '../src/index'
 
 describe('leerEntorno', () => {
   test('sin ENTORNO definido, usa desarrollo', () => {
@@ -47,5 +53,57 @@ describe('leerRutaDeBd', () => {
     // Es lo que garantiza que un build de demostracion no pueda apuntar a
     // datos reales, ni siquiera por una variable de entorno mal puesta.
     expect(leerRutaDeBd('demo', '/datos/gps.db')).toBe(':memory:')
+  })
+})
+
+describe('leerClavesDeSello', () => {
+  test('fuera de produccion hay una clave fija: levantar el proyecto no pide configurar nada', () => {
+    expect(leerClavesDeSello('desarrollo', undefined, undefined)).toEqual({
+      claves: { dev: 'clave-de-sello-solo-para-desarrollo' },
+      activa: 'dev',
+    })
+  })
+
+  test('en produccion faltar es un error, no un default silencioso', () => {
+    // Una clave de desarrollo en produccion hace que los sellos no prueben
+    // nada, y nadie se entera hasta que importa.
+    expect(() => leerClavesDeSello('produccion', undefined, undefined)).toThrow()
+  })
+
+  test('lee varias claves: es lo que permite rotar sin invalidar lo ya firmado', () => {
+    expect(leerClavesDeSello('produccion', '2026-03=una,2026-09=otra', '2026-09')).toEqual({
+      claves: { '2026-03': 'una', '2026-09': 'otra' },
+      activa: '2026-09',
+    })
+  })
+
+  test('sin activa declarada toma la primera', () => {
+    expect(leerClavesDeSello('produccion', 'sola=una', undefined).activa).toBe('sola')
+  })
+
+  test('una clave con `=` adentro no se parte: solo cuenta el primero', () => {
+    // Las claves suelen venir en base64, que termina en `=`.
+    expect(leerClavesDeSello('produccion', 'k=YWJj==', 'k').claves.k).toBe('YWJj==')
+  })
+
+  test('una activa que no esta entre las claves es un error', () => {
+    // Sellar con una clave inexistente seria sellar con undefined.
+    expect(() => leerClavesDeSello('produccion', 'a=una', 'b')).toThrow()
+  })
+
+  test('un par sin `=` o sin clave es un error', () => {
+    expect(() => leerClavesDeSello('produccion', 'suelta', undefined)).toThrow()
+    expect(() => leerClavesDeSello('produccion', 'a=', undefined)).toThrow()
+  })
+})
+
+describe('leerDirectorioDeArchivos', () => {
+  test('en demo no se puede configurar: no escribe sobre archivos de verdad', () => {
+    expect(leerDirectorioDeArchivos('demo', '/datos/reales')).toBe('')
+  })
+
+  test('fuera de demo, el del entorno o el default', () => {
+    expect(leerDirectorioDeArchivos('produccion', '/datos/archivos')).toBe('/datos/archivos')
+    expect(leerDirectorioDeArchivos('desarrollo', undefined)).toBe('./archivos')
   })
 })

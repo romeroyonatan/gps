@@ -1,6 +1,7 @@
 import type { Core } from '@gps/core'
 import type { Estructura } from '@gps/estructura/dominio'
 import { and, eq, gte, isNull, lte, or } from 'drizzle-orm'
+import { ambitoDelCargo, nombreDelCargo, type TipoDeCargo } from '../dominio/cargos'
 import { nombreDelTipo, normalizarNumero, type TipoDeDocumento } from '../dominio/documentos'
 import type { DatosDePersona } from '../dominio/modelos'
 import type { Personas } from '../dominio/publico'
@@ -38,6 +39,15 @@ export class GrupoInexistente extends Error {
   readonly grupoId: string
 }
 
+/** El cargo no se puede asignar: el ambito no coincide con la entidad que se
+ *  paso, la entidad no existe o esta cerrada, o ya estaba asignado igual. */
+export class CargoInvalido extends Error {
+  constructor(motivo: string) {
+    super(motivo)
+    this.name = 'CargoInvalido'
+  }
+}
+
 /** Lo que este modulo hace, que es mas que lo que publica: ver Personas en
  *  /dominio/publico.ts. `extends` es lo que hace que la implementacion no pueda
  *  quedar corta sin que TypeScript se entere. */
@@ -45,6 +55,16 @@ export interface ServicioDePersonas extends Personas {
   crearPersona(datos: DatosDePersona, ingreso: DatosDeIngreso): Promise<PersonaConVinculos>
   /** Las personas con pertenencia vigente en ese grupo, ordenadas por apellido. */
   listarPersonas(grupoId: string): Promise<readonly PersonaConVinculos[]>
+
+  /** Le da a una persona un cargo en la entidad que corresponde a su ambito:
+   *  un grupo, un distrito, o ninguna si es de la diocesis. */
+  asignarCargo(datos: {
+    personaId: string
+    cargo: TipoDeCargo
+    ambitoId: string | null
+    desde: string
+    hasta?: string | null
+  }): Promise<Cargo>
 }
 
 /** El orden alfabetico lo hace Intl y no un ORDER BY: SQLite compara bytes, asi
@@ -123,7 +143,7 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
       const cargosDeLaPersona: Cargo[] = ingreso.cargos.map((datosDelCargo) => ({
         id: core.nuevoId('cargo'),
         personaId: persona.id,
-        grupoId: ingreso.grupoId,
+        ambitoId: ingreso.grupoId,
         cargo: datosDelCargo.cargo,
         // El desde del cargo es el de la pertenencia: sin edicion todavia, y
         // pedir la misma fecha una vez por cargo no le sirve a nadie.
@@ -146,6 +166,105 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
       return { ...persona, pertenencia, cargos: cargosDeLaPersona }
     },
 
+    async miembrosDelGrupo(grupoId, fecha) {
+      // Vigente ese dia, con las dos puntas inclusivas: la misma regla que
+      // estaVigente. No sirve filtrar por `hasta IS NULL`, que es "hoy".
+      return core.bd
+        .select()
+        .from(pertenencias)
+        .innerJoin(personas, eq(personas.id, pertenencias.personaId))
+        .where(
+          and(
+            eq(pertenencias.grupoId, grupoId),
+            lte(pertenencias.desde, fecha),
+            or(isNull(pertenencias.hasta), gte(pertenencias.hasta, fecha)),
+          ),
+        )
+        .all()
+        .map((fila) => ({
+          persona: fila.personas,
+          unidadId: fila.pertenencias.unidadId,
+          categoria: fila.pertenencias.categoria,
+        }))
+    },
+
+    async ocupantesDelCargo(cargo, ambitoId, fecha) {
+      // Las dos puntas inclusivas, igual que estaVigente: un mandato que
+      // termina el 30 de mayo todavia vale el 30 de mayo. El hasta puede estar
+      // en el futuro -es un mandato-, por eso no alcanza con `hasta IS NULL`.
+      return core.bd
+        .select()
+        .from(personas)
+        .innerJoin(tablaDeCargos, eq(tablaDeCargos.personaId, personas.id))
+        .where(
+          and(
+            eq(tablaDeCargos.cargo, cargo),
+            ambitoId === null
+              ? isNull(tablaDeCargos.ambitoId)
+              : eq(tablaDeCargos.ambitoId, ambitoId),
+            lte(tablaDeCargos.desde, fecha),
+            or(isNull(tablaDeCargos.hasta), gte(tablaDeCargos.hasta, fecha)),
+          ),
+        )
+        .orderBy(tablaDeCargos.desde)
+        .all()
+        .map((fila) => fila.personas)
+    },
+
+    async asignarCargo(datos) {
+      // Que la entidad exista y siga abierta lo verifica estructura, no una
+      // foreign key: sus tablas son de otro modulo. Es la misma perdida
+      // consciente que grupo_id en pertenencias.
+      const ambito = ambitoDelCargo(datos.cargo)
+      const nombre = nombreDelCargo(datos.cargo)
+      if (ambito === 'diocesis') {
+        if (datos.ambitoId !== null) {
+          throw new CargoInvalido(`${nombre} es de la diocesis: no apunta a ninguna entidad.`)
+        }
+      } else if (datos.ambitoId === null) {
+        throw new CargoInvalido(`${nombre} necesita el ${ambito} al que corresponde.`)
+      } else if (ambito === 'grupo') {
+        if (!(await estructura.obtenerGrupo(datos.ambitoId))) {
+          throw new CargoInvalido(`${nombre}: el grupo no existe o esta cerrado.`)
+        }
+      } else if (!(await estructura.distritoEstaAbierto(datos.ambitoId))) {
+        throw new CargoInvalido(`${nombre}: el distrito no existe o esta cerrado.`)
+      }
+
+      // El UNIQUE de la tabla ataja el duplicado exacto salvo cuando ambito_id
+      // es NULL: SQLite trata dos NULL como distintos. Por eso el de la
+      // diocesis se verifica aca, que es el unico caso que la base deja pasar.
+      if (ambito === 'diocesis') {
+        const yaEsta = core.bd
+          .select({ id: tablaDeCargos.id })
+          .from(tablaDeCargos)
+          .where(
+            and(
+              eq(tablaDeCargos.personaId, datos.personaId),
+              eq(tablaDeCargos.cargo, datos.cargo),
+              isNull(tablaDeCargos.ambitoId),
+              eq(tablaDeCargos.desde, datos.desde),
+            ),
+          )
+          .get()
+        if (yaEsta) throw new CargoInvalido(`${nombre} ya esta cargado con esa fecha.`)
+      }
+
+      const ahora = core.reloj.ahora()
+      const cargo: Cargo = {
+        id: core.nuevoId('cargo'),
+        personaId: datos.personaId,
+        ambitoId: datos.ambitoId,
+        cargo: datos.cargo,
+        desde: datos.desde,
+        hasta: datos.hasta ?? null,
+        creadoEn: ahora,
+        actualizadoEn: ahora,
+      }
+      core.bd.insert(tablaDeCargos).values(cargo).run()
+      return cargo
+    },
+
     async listarPersonas(grupoId) {
       // Dos consultas y el armado en memoria, el mismo criterio que
       // listarDistritos: con la cantidad de personas de un grupo alcanza de
@@ -160,7 +279,7 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
       const filasDeCargos = core.bd
         .select()
         .from(tablaDeCargos)
-        .where(eq(tablaDeCargos.grupoId, grupoId))
+        .where(eq(tablaDeCargos.ambitoId, grupoId))
         .all()
 
       const cargosPorPersona = new Map<string, Cargo[]>()

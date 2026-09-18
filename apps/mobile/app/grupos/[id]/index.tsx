@@ -134,6 +134,9 @@ export default function Pantalla() {
             <Link href={`/grupos/${id}/afiliacion`} className="mt-2 text-sm text-slate-500">
               Afiliación →
             </Link>
+            <Link href={`/grupos/${id}/salidas`} className="mt-2 text-sm text-slate-500">
+              Salidas →
+            </Link>
 
             {/* Ya vienen ordenadas por el servidor: por catalogo y, dentro de
                 una rama, por nombre. Los dirigentes antes que los beneficiarios,

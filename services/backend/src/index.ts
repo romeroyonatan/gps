@@ -1,6 +1,9 @@
 import type { Config, Entorno } from '@gps/core'
 import paquete from '../../../package.json'
+import { crearAlmacenamientoEnDisco, crearAlmacenamientoEnMemoria } from './almacenamiento'
 import { crearBd } from './bd'
+import { crearConversorDeImagenes } from './conversor'
+import { crearSellador } from './sellador'
 import { crearServidor } from './server'
 
 export function leerEntorno(valor: string | undefined): Entorno {
@@ -19,6 +22,59 @@ export function leerEntorno(valor: string | undefined): Entorno {
 export function leerRutaDeBd(entorno: Entorno, valor: string | undefined): string {
   if (entorno === 'demo') return ':memory:'
   return valor ?? './gps.db'
+}
+
+/** Las claves con las que se sellan las firmas, en `id=clave` separados por
+ *  coma, y cual esta activa. Del backend y no de Config por la misma razon que
+ *  la ruta de la base: ningun modulo las lee -usan core.sellador ya armado- y
+ *  meterlas en Config las expondria a todos.
+ *
+ *  Fuera de produccion hay una clave fija, para que levantar el proyecto no
+ *  pida configurar nada. En produccion faltar es un error al arrancar y no un
+ *  default silencioso: una clave de desarrollo en produccion hace que los
+ *  sellos no prueben nada, y nadie se entera. */
+const CLAVE_DE_DESARROLLO = { id: 'dev', clave: 'clave-de-sello-solo-para-desarrollo' }
+
+export function leerClavesDeSello(
+  entorno: Entorno,
+  valor: string | undefined,
+  activa: string | undefined,
+): { claves: Record<string, string>; activa: string } {
+  if (valor === undefined || valor === '') {
+    if (entorno === 'produccion') {
+      throw new Error('Falta CLAVES_DE_SELLO. En produccion no hay clave por defecto.')
+    }
+    return { claves: { [CLAVE_DE_DESARROLLO.id]: CLAVE_DE_DESARROLLO.clave }, activa: 'dev' }
+  }
+
+  const claves: Record<string, string> = {}
+  for (const par of valor.split(',')) {
+    // Solo el primer `=`: una clave puede tener `=` adentro, como cualquier
+    // base64.
+    const corte = par.indexOf('=')
+    const id = par.slice(0, corte).trim()
+    const clave = par.slice(corte + 1)
+    if (corte < 1 || clave === '') {
+      throw new Error(`CLAVES_DE_SELLO invalida: "${par}". El formato es id=clave,id=clave.`)
+    }
+    claves[id] = clave
+  }
+
+  const elegida = activa ?? Object.keys(claves)[0]
+  if (elegida === undefined || claves[elegida] === undefined) {
+    throw new Error(
+      `CLAVE_DE_SELLO_ACTIVA "${activa}" no esta en CLAVES_DE_SELLO (${Object.keys(claves).join(', ')}).`,
+    )
+  }
+  return { claves, activa: elegida }
+}
+
+/** Donde se guardan los bytes de los archivos subidos. Mismo criterio que la
+ *  ruta de la base: en demo no se puede configurar, asi que un build de
+ *  demostracion no puede escribir sobre archivos de verdad. */
+export function leerDirectorioDeArchivos(entorno: Entorno, valor: string | undefined): string {
+  if (entorno === 'demo') return ''
+  return valor ?? './archivos'
 }
 
 export function leerPuerto(valor: string | undefined): number {
@@ -42,7 +98,24 @@ export function leerConfig(): Config {
 if (import.meta.main) {
   const config = leerConfig()
   const bd = crearBd(leerRutaDeBd(config.entorno, process.env.BD))
-  const { servidor, contexto } = await crearServidor(config, bd)
+  const claves = leerClavesDeSello(
+    config.entorno,
+    process.env.CLAVES_DE_SELLO,
+    process.env.CLAVE_DE_SELLO_ACTIVA,
+  )
+  // En demo los archivos viven en memoria, igual que su base: un build de
+  // demostracion no deja nada en el disco de nadie.
+  const { servidor, contexto } = await crearServidor(
+    config,
+    bd,
+    crearSellador(claves.claves, claves.activa),
+    config.entorno === 'demo'
+      ? crearAlmacenamientoEnMemoria()
+      : crearAlmacenamientoEnDisco(
+          leerDirectorioDeArchivos(config.entorno, process.env.DIRECTORIO_DE_ARCHIVOS),
+        ),
+    crearConversorDeImagenes(),
+  )
 
   // Las declaraciones ordinarias de afiliacion. Lo que corre a diario no es la
   // declaracion -que pasa dos veces al anio- sino la pregunta: un proceso no

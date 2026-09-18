@@ -147,6 +147,12 @@ export function Grupo(props: { id: string }) {
       >
         Afiliación →
       </Link>
+      <Link
+        href={`/grupos/${props.id}/salidas`}
+        className="mt-2 ml-3 inline-block text-sm text-slate-500 hover:text-slate-900"
+      >
+        Salidas →
+      </Link>
 
       <div className="mt-6 space-y-6">
         {/* Ya vienen ordenadas por el servidor: por catalogo y, dentro de una

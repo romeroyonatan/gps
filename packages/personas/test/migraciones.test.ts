@@ -14,6 +14,22 @@ function coreDePrueba(bd: Bd): Core {
     reloj: { ahora: () => HORA },
     bd,
     modulos: ['personas'],
+    // Falso pero con el comportamiento que importa: sellar y verificar cierran
+    // entre si, y un dato alterado no verifica.
+    sellador: {
+      sellar: (datos: string) => ({ sello: `sellado:${datos}`, claveId: 'prueba' }),
+      verificar: (datos: string, sello: { sello: string; claveId: string }) =>
+        sello.claveId === 'prueba' && sello.sello === `sellado:${datos}`,
+    },
+    almacenamiento: {
+      guardar: async () => {},
+      leer: async () => new Uint8Array(),
+      eliminar: async () => {},
+    },
+    conversorDeImagenes: { aJpeg: async (contenido: Uint8Array) => contenido },
+    // Falso pero estable y sensible al contenido, que es lo que los tests miran.
+    hash: (contenido: Uint8Array | string) =>
+      `hash:${typeof contenido === 'string' ? contenido : contenido.join(',')}`,
     nuevoId: (prefijo) => `${prefijo}_fijo`,
   }
 }
@@ -174,6 +190,50 @@ describe('pertenencias y cargos', () => {
     ])
   })
 
+  test('el cargo apunta a un ambito y ya no a un grupo', () => {
+    const columnas = bd
+      .all<{ name: string }>(sql`PRAGMA table_info(cargos)`)
+      .map((columna) => columna.name)
+    expect(columnas).toContain('ambito_id')
+    expect(columnas).not.toContain('grupo_id')
+  })
+
+  test('un cargo diocesano no apunta a ninguna entidad', () => {
+    // La diocesis no es una entidad -hay una sola por instancia-, asi que
+    // ambito_id tiene que poder ser NULL.
+    insertar('p1', 'dni', '30111222')
+    expect(() =>
+      bd.run(
+        sql`INSERT INTO cargos VALUES ('c1', 'p1', NULL, 'jefeScoutDiocesano', '2026-03-01', NULL, 0, 0)`,
+      ),
+    ).not.toThrow()
+  })
+
+  test('cada cargo de grupo queda apuntando a su mismo grupo', () => {
+    // La base arranca ya migrada: el caso se arma levantando una hasta 0003,
+    // sembrando cargos con grupo y aplicando despues las dos que faltan.
+    const base = new Database(':memory:')
+    base.exec('PRAGMA foreign_keys = ON')
+    const vieja: Bd = drizzle(base)
+    aplicarMigraciones(coreDePrueba(vieja), [
+      { ...moduloFalso, migraciones: migraciones.slice(0, 4) },
+    ])
+    vieja.run(
+      sql`INSERT INTO personas VALUES ('p1', 'dni', '30111222', 'Ana', 'Perez', '1980-05-01', 0, 0)`,
+    )
+    vieja.run(
+      sql`INSERT INTO cargos VALUES ('c1', 'p1', 'g1', 'jefeDeGrupo', '2026-03-01', '2030-03-01', 0, 0)`,
+    )
+
+    aplicarMigraciones(coreDePrueba(vieja), [moduloFalso])
+
+    expect(
+      vieja.values<[string, string, string | null, string, string, string | null]>(
+        sql`SELECT id, persona_id, ambito_id, cargo, desde, hasta FROM cargos`,
+      ),
+    ).toEqual([['c1', 'p1', 'g1', 'jefeDeGrupo', '2026-03-01', '2030-03-01']])
+  })
+
   test('aplica las migraciones del modulo', () => {
     const aplicadas = bd
       .values<[string]>(sql`SELECT nombre FROM migraciones ORDER BY nombre`)
@@ -183,6 +243,8 @@ describe('pertenencias y cargos', () => {
       '0001_pertenencias_y_cargos',
       '0002_pertenencia_en_unidad',
       '0003_baja_rama_de_pertenencia',
+      '0004_cargo_con_ambito',
+      '0005_baja_grupo_de_cargo',
     ])
   })
 })

@@ -14,6 +14,8 @@ import pertenenciaEnUnidad from '../../migraciones/0002_pertenencia_en_unidad.sq
 import bajaRamaDePertenencia from '../../migraciones/0003_baja_rama_de_pertenencia.sql' with {
   type: 'text',
 }
+import cargoConAmbito from '../../migraciones/0004_cargo_con_ambito.sql' with { type: 'text' }
+import bajaGrupoDeCargo from '../../migraciones/0005_baja_grupo_de_cargo.sql' with { type: 'text' }
 
 /** Las migraciones del modulo, en orden. Agregar una es generarla con
  *  `bunx drizzle-kit generate --name <x>` y sumarle una linea a esta lista.
@@ -26,4 +28,6 @@ export const migraciones: readonly Migracion[] = [
   { nombre: '0001_pertenencias_y_cargos', sql: pertenenciasYCargos },
   { nombre: '0002_pertenencia_en_unidad', sql: pertenenciaEnUnidad },
   { nombre: '0003_baja_rama_de_pertenencia', sql: bajaRamaDePertenencia },
+  { nombre: '0004_cargo_con_ambito', sql: cargoConAmbito },
+  { nombre: '0005_baja_grupo_de_cargo', sql: bajaGrupoDeCargo },
 ]

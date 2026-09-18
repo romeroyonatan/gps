@@ -1,4 +1,4 @@
-import { aFechaDeCalendario } from '@gps/core/fechas'
+import { aFechaDeCalendario, esFechaDeCalendario } from '@gps/core/fechas'
 import type { Unidad } from '@gps/estructura/dominio'
 import { nombreDelCargo, type TipoDeCargo } from './cargos'
 import { normalizarNumero } from './documentos'
@@ -34,21 +34,6 @@ const FORMATO = {
     esperado: 'Un pasaporte tiene entre 5 y 15 caracteres alfanuméricos.',
   },
 } as const
-
-/** Que la cadena sea una fecha real del almanaque, y no solo que tenga la forma.
- *  Sin el ida y vuelta por Date, "2010-02-30" pasaria la expresion regular.
- *
- *  `new Date(...)` con valores explicitos es determinista y no consulta el
- *  reloj, asi que no toca la regla de portabilidad -y este archivo vive en
- *  /dominio, donde ni siquiera aplica el plugin. */
-function esFechaDeCalendario(texto: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(texto)) return false
-  const [anio = 0, mes = 0, dia = 0] = texto.split('-').map(Number)
-  const fecha = new Date(Date.UTC(anio, mes - 1, dia))
-  return (
-    fecha.getUTCFullYear() === anio && fecha.getUTCMonth() === mes - 1 && fecha.getUTCDate() === dia
-  )
-}
 
 /** Las reglas que tiene que cumplir el alta de una persona. Devuelve la lista de
  *  problemas, vacia si esta todo bien. Acumula: no corta en el primero.

@@ -85,11 +85,15 @@ sello = HMAC-SHA256(clave[claveId],
           H0 | cargo | personaId | fecha | trazosCanonicos)
 ```
 
-`Config` suma `clavesDeSello: Record<string, string>` y `claveDeSelloActiva: string`, leídas
-de variables de entorno. `Core` suma `sellador` con `sellar(datos) -> { sello, claveId }` y
+`Core` suma `sellador` con `sellar(datos) -> { sello, claveId }` y
 `verificar(datos, sello, claveId) -> boolean` (devuelve `false` si la clave no existe). Va en
 `Core` porque `/servidor` no puede importar `node:crypto` y `crypto.subtle` no existe en
 Hermes.
+
+Las claves **no** entran en `Config`: las lee el backend de variables de entorno y se las
+pasa a `crearCore`, igual que la ruta de la base (ver el comentario de `leerRutaDeBd`).
+Ningún módulo las lee —usan el `sellador` ya construido—, así que meterlas en `Config` sólo
+las expondría a todos. Lo mismo vale para el directorio de archivos.
 
 `trazosCanonicos` es la serialización JSON de los trazos con coordenadas redondeadas a 4
 decimales: sin eso, un re-guardado que cambie la representación del número rompería sellos
@@ -170,7 +174,8 @@ los clientes no cubren es la web desde una Mac, que sube el `.heic` tal cual. `p
 convertir en el request tarda 1-2 s por foto de 12 MP; pasar a una cola si pesa.
 
 `Almacenamiento` en `Core`: `guardar`, `leer`, `eliminar` sobre claves. Implementación de
-disco en `services/backend`, directorio desde `Config`; en demo, en memoria.
+disco en `services/backend`, con el directorio leído del entorno igual que la ruta de la
+base; en demo, en memoria.
 `urlDeSubida` de la spec §9.1 no entra: con rutas propias la URL la arma `archivos`. Entra
 cuando llegue S3.
 
@@ -254,8 +259,9 @@ va a su `/dominio`.
 
 1. Migración de `personas` (recrear `cargos`) al arrancar, como las demás.
 2. Migraciones iniciales de `archivos` y `salidas`.
-3. Nuevas variables de entorno: claves de sello y directorio de archivos; el backend falla
-   al arrancar si faltan fuera de `desarrollo`/`demo`, que usan valores fijos.
+3. Nuevas variables de entorno, leídas por el backend (no por `Config`): claves de sello y
+   directorio de archivos. El backend falla al arrancar si faltan fuera de
+   `desarrollo`/`demo`/`prueba`, que usan valores fijos.
 4. Rollback: no hay datos reales; se restaura la base anterior.
 
 ## Open Questions

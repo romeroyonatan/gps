@@ -196,6 +196,16 @@ export function crearServicioDeEstructura(core: Core): ServicioDeEstructura {
       }))
     },
 
+    async distritoEstaAbierto(distritoId) {
+      return (
+        core.bd
+          .select({ id: distritos.id })
+          .from(distritos)
+          .where(and(eq(distritos.id, distritoId), isNull(distritos.cerradoEn)))
+          .get() !== undefined
+      )
+    },
+
     async gruposAbiertosEn(fecha) {
       // El filtro va en memoria y no en el WHERE: cerrado_en es un instante en
       // milisegundos y `fecha` es un dia del almanaque, asi que compararlos

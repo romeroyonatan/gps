@@ -23,6 +23,12 @@ export interface Estructura {
    *  agrega el metodo que lo diga, con su consumidor. */
   obtenerGrupo(grupoId: string): Promise<GrupoConUnidades | null>
 
+  /** Si el distrito existe y sigue abierto. Booleano y no el Distrito entero
+   *  porque el unico consumidor -validar el ambito de un cargo distrital- no
+   *  necesita mas: el dia que alguien necesite leerlo, se agrega el metodo que
+   *  lo devuelva, con su consumidor. */
+  distritoEstaAbierto(distritoId: string): Promise<boolean>
+
   /** Los ids de los grupos que estaban abiertos el dia `fecha` (aaaa-mm-dd).
    *  Cerrado ese mismo dia todavia cuenta como abierto, igual que estaVigente
    *  incluye las dos puntas.

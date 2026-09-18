@@ -1,6 +1,6 @@
 import { type Builder, enumCompartido } from '@gps/core/graphql'
 import { GraphQLError } from 'graphql'
-import { TIPOS_DE_CARGO, type TipoDeCargo } from '../dominio/cargos'
+import { TIPOS_DE_CARGO } from '../dominio/cargos'
 import { CATEGORIAS, type Categoria } from '../dominio/categorias'
 import { TIPOS_DE_DOCUMENTO } from '../dominio/documentos'
 import type { DatosDePersona } from '../dominio/modelos'
@@ -35,10 +35,15 @@ export function registrarSchema(builder: Builder): void {
     values: CATEGORIAS.map((categoria) => categoria.id) as unknown as readonly Categoria[],
   })
 
-  const TipoDeCargoRef = builder.enumType('TipoDeCargo', {
-    description: 'Los cargos de un grupo scout.',
-    values: TIPOS_DE_CARGO.map((cargo) => cargo.id) as unknown as readonly TipoDeCargo[],
-  })
+  // enumCompartido y no builder.enumType porque salidas declara el mismo enum
+  // para el cargo de cada firma, y Pothos aborta si un nombre se registra dos
+  // veces. La descripcion tiene que ser identica en los dos.
+  const TipoDeCargoRef = enumCompartido(
+    builder,
+    'TipoDeCargo',
+    TIPOS_DE_CARGO.map((cargo) => cargo.id),
+    'Los cargos de la asociacion.',
+  )
 
   // No expone grupoId: la query ya filtra por grupo, y devolverlo en cada fila
   // seria repetir el argumento de la consulta.

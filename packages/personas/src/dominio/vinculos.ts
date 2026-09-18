@@ -30,15 +30,19 @@ export interface Pertenencia extends Marcas {
   readonly hasta: string | null
 }
 
-/** Un cargo de una persona en un grupo, con su periodo. */
+/** Un cargo de una persona, con su ambito y su periodo. */
 export interface Cargo extends Marcas {
   readonly id: string
   readonly personaId: string
-  /** El grupo del cargo, propio y no derivado de la pertenencia vigente: con
-   *  historial, quien se muda tiene dos pertenencias y el cargo pertenece a una
-   *  de las dos. Sin esta columna, cerrar una pertenencia cambiaria
-   *  retroactivamente el ambito de todos sus cargos. */
-  readonly grupoId: string
+  /** La entidad del ambito del cargo: el grupo, el distrito, o null para los de
+   *  la diocesis, que no es una entidad. Cual de los tres lo dice
+   *  `ambitoDelCargo(cargo)`, no una columna.
+   *
+   *  Es propio y no derivado de la pertenencia vigente: con historial, quien se
+   *  muda tiene dos pertenencias y el cargo pertenece a una de las dos. Sin esta
+   *  columna, cerrar una pertenencia cambiaria retroactivamente el ambito de
+   *  todos sus cargos. */
+  readonly ambitoId: string | null
   readonly cargo: TipoDeCargo
   readonly desde: string
   /** aaaa-mm-dd, null si no tiene fin previsto. A diferencia del de una
@@ -56,7 +60,7 @@ export interface PersonaConVinculos extends Persona {
 
 /** Lo propio de un cargo en el alta. No lleva `desde`: el del cargo es el de la
  *  pertenencia, asi el formulario no pide la misma fecha cinco veces. */
-export type DatosDeCargo = Omit<Cargo, 'id' | 'personaId' | 'grupoId' | 'desde' | keyof Marcas>
+export type DatosDeCargo = Omit<Cargo, 'id' | 'personaId' | 'ambitoId' | 'desde' | keyof Marcas>
 
 /** Lo que entra por el alta ademas de los datos personales. Derivado de
  *  Pertenencia por la misma razon que DatosDePersona sale de Persona: agregar un

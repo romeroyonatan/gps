@@ -14,6 +14,22 @@ function coreDePrueba(bd: Bd): Core {
     reloj: { ahora: () => HORA },
     bd,
     modulos: ['afiliacion'],
+    // Falso pero con el comportamiento que importa: sellar y verificar cierran
+    // entre si, y un dato alterado no verifica.
+    sellador: {
+      sellar: (datos: string) => ({ sello: `sellado:${datos}`, claveId: 'prueba' }),
+      verificar: (datos: string, sello: { sello: string; claveId: string }) =>
+        sello.claveId === 'prueba' && sello.sello === `sellado:${datos}`,
+    },
+    almacenamiento: {
+      guardar: async () => {},
+      leer: async () => new Uint8Array(),
+      eliminar: async () => {},
+    },
+    conversorDeImagenes: { aJpeg: async (contenido: Uint8Array) => contenido },
+    // Falso pero estable y sensible al contenido, que es lo que los tests miran.
+    hash: (contenido: Uint8Array | string) =>
+      `hash:${typeof contenido === 'string' ? contenido : contenido.join(',')}`,
     nuevoId: (prefijo) => `${prefijo}_fijo`,
   }
 }

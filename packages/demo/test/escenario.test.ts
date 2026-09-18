@@ -1,14 +1,22 @@
 import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
 import { afiliacion } from '@gps/afiliacion/servidor'
+import { archivos, autorizadores } from '@gps/archivos/servidor'
 import { aplicarMigraciones, type Bd, type Context, type Core } from '@gps/core'
+import { aFechaDeCalendario } from '@gps/core/fechas'
 import { ramasDeLasUnidades } from '@gps/estructura/dominio'
 import { estructura } from '@gps/estructura/servidor'
 import { personas } from '@gps/personas/servidor'
+import { salidas } from '@gps/salidas/servidor'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { sembrarEscenario } from '../src/servidor/escenario'
 
-function montarContexto(hora = new Date('2026-08-27T12:00:00Z')): Context {
+/** El dia que ven los tests. Fija y no la del sistema para que el resultado no
+ *  cambie con el paso del tiempo, y posterior a todas las fechas de nacimiento
+ *  que siembra el demo. */
+const HORA = new Date('2026-08-27T12:00:00Z')
+
+function montarContexto(hora = HORA): Context {
   const base = new Database(':memory:')
   base.exec('PRAGMA foreign_keys = ON')
   const bd: Bd = drizzle(base)
@@ -26,16 +34,36 @@ function montarContexto(hora = new Date('2026-08-27T12:00:00Z')): Context {
     // 00:00 UTC cae en el dia anterior al oeste de Greenwich.
     reloj: { ahora: () => hora },
     bd,
-    modulos: ['estructura', 'personas', 'afiliacion'],
+    modulos: ['estructura', 'personas', 'afiliacion', 'archivos', 'salidas'],
+    // Falso pero con el comportamiento que importa: sellar y verificar cierran
+    // entre si, y un dato alterado no verifica.
+    sellador: {
+      sellar: (datos: string) => ({ sello: `sellado:${datos}`, claveId: 'prueba' }),
+      verificar: (datos: string, sello: { sello: string; claveId: string }) =>
+        sello.claveId === 'prueba' && sello.sello === `sellado:${datos}`,
+    },
+    almacenamiento: {
+      guardar: async () => {},
+      leer: async () => new Uint8Array(),
+      eliminar: async () => {},
+    },
+    conversorDeImagenes: { aJpeg: async (contenido: Uint8Array) => contenido },
+    // Falso pero estable y sensible al contenido, que es lo que los tests miran.
+    hash: (contenido: Uint8Array | string) =>
+      `hash:${typeof contenido === 'string' ? contenido : contenido.join(',')}`,
     nuevoId: (prefijo) => `${prefijo}_${++contador}`,
   }
 
-  aplicarMigraciones(core, [estructura, personas, afiliacion])
+  aplicarMigraciones(core, [estructura, personas, afiliacion, archivos, salidas])
   // personas depende de estructura y afiliacion de las dos, asi que se
   // construyen en ese orden: es el mismo cableado que hace crearServicios en la
   // raiz de composicion, a mano porque el test arma su propio contexto.
   const servicioDeEstructura = estructura.createServices(core, {})
   const servicioDePersonas = personas.createServices(core, { estructura: servicioDeEstructura })
+  // Lo que hace la raiz de composicion: sin esto, `archivos` no entrega nada
+  // porque nadie reclama los archivos de salidas.
+  autorizadores.salidas = async () => true
+  const servicioDeArchivos = archivos.createServices(core, {})
   return {
     actor: null,
     estructura: servicioDeEstructura,
@@ -43,6 +71,12 @@ function montarContexto(hora = new Date('2026-08-27T12:00:00Z')): Context {
     afiliacion: afiliacion.createServices(core, {
       personas: servicioDePersonas,
       estructura: servicioDeEstructura,
+    }),
+    archivos: servicioDeArchivos,
+    salidas: salidas.createServices(core, {
+      personas: servicioDePersonas,
+      estructura: servicioDeEstructura,
+      archivos: servicioDeArchivos,
     }),
   } as Context
 }
@@ -53,7 +87,7 @@ describe('sembrarEscenario', () => {
     // datos del demo cruzan las mismas reglas que los reales, asi que es
     // imposible sembrar algo que el sistema consideraria invalido.
     const contexto = montarContexto()
-    await sembrarEscenario(contexto)
+    await sembrarEscenario(contexto, HORA)
 
     const arbol = await contexto.estructura.listarDistritos()
     expect(arbol).toHaveLength(4)
@@ -64,7 +98,7 @@ describe('sembrarEscenario', () => {
     // El demo existe para mirar pantallas: si todos los grupos fueran iguales
     // no mostraria ni el caso lleno ni el vacio, que son los que se rompen.
     const contexto = montarContexto()
-    await sembrarEscenario(contexto)
+    await sembrarEscenario(contexto, HORA)
 
     const todos = (await contexto.estructura.listarDistritos()).flatMap((d) => d.grupos)
     expect(todos.some((grupo) => ramasDeLasUnidades(grupo.unidades).length === 6)).toBe(true)
@@ -73,7 +107,7 @@ describe('sembrarEscenario', () => {
 
   test('deja un grupo con dos tropas scout, que es lo que antes no se podia', async () => {
     const contexto = montarContexto()
-    await sembrarEscenario(contexto)
+    await sembrarEscenario(contexto, HORA)
 
     const todos = (await contexto.estructura.listarDistritos()).flatMap((d) => d.grupos)
     const scouts = todos
@@ -82,11 +116,45 @@ describe('sembrarEscenario', () => {
     expect(scouts?.map((unidad) => unidad.sexo).sort()).toEqual(['femenina', 'masculina'])
   })
 
+  test('siembra los cargos que un permiso de salida necesita para firmarse', async () => {
+    // Los tres firmantes: jefe de grupo y director del grupo, y comisionado del
+    // distrito al que ese grupo pertenece.
+    const contexto = montarContexto()
+    await sembrarEscenario(contexto, HORA)
+
+    const grupos = (await contexto.estructura.listarDistritos()).flatMap((d) =>
+      d.grupos.map((grupo) => ({ ...grupo, distritoId: d.id })),
+    )
+    const g42 = grupos.find((grupo) => grupo.numero === 42)
+    if (!g42) throw new Error('el escenario no tiene el grupo 42')
+    const hoy = aFechaDeCalendario(new Date())
+
+    for (const cargo of ['jefeDeGrupo', 'director'] as const) {
+      expect((await contexto.personas.ocupantesDelCargo(cargo, g42.id, hoy)).length).toBe(1)
+    }
+    expect(
+      (await contexto.personas.ocupantesDelCargo('comisionadoDeDistrito', g42.distritoId, hoy))
+        .length,
+    ).toBe(1)
+  })
+
+  test('siembra el cargo de la diocesis, que no apunta a ninguna entidad', async () => {
+    const contexto = montarContexto()
+    await sembrarEscenario(contexto, HORA)
+
+    const ocupantes = await contexto.personas.ocupantesDelCargo(
+      'jefeScoutDiocesano',
+      null,
+      aFechaDeCalendario(new Date()),
+    )
+    expect(ocupantes.length).toBe(1)
+  })
+
   test('el grupo cerrado no aparece en el arbol', async () => {
     // Ejercita el filtro de listarDistritos con datos sembrados por el demo,
     // no armados a mano en el test.
     const contexto = montarContexto()
-    await sembrarEscenario(contexto)
+    await sembrarEscenario(contexto, HORA)
 
     const todos = (await contexto.estructura.listarDistritos()).flatMap((d) => d.grupos)
     expect(todos.some((grupo) => grupo.numero === 19)).toBe(false)
@@ -94,7 +162,7 @@ describe('sembrarEscenario', () => {
 
   test('deja declaraciones para mirar: la ordinaria vencida y una extraordinaria', async () => {
     const contexto = montarContexto()
-    await sembrarEscenario(contexto)
+    await sembrarEscenario(contexto, HORA)
 
     const grupos = (await contexto.estructura.listarDistritos()).flatMap(
       (distrito) => distrito.grupos,
@@ -127,7 +195,7 @@ describe('sembrarEscenario', () => {
     // fecha de hoy, asi que la extraordinaria del escenario no puede emitirse.
     // Antes eso era un SQLiteError crudo y `bun run demo` no arrancaba.
     const contexto = montarContexto(new Date('2026-05-01T12:00:00Z'))
-    await sembrarEscenario(contexto)
+    await sembrarEscenario(contexto, HORA)
 
     const grupos = (await contexto.estructura.listarDistritos()).flatMap(
       (distrito) => distrito.grupos,
@@ -141,7 +209,7 @@ describe('sembrarEscenario', () => {
 describe('sembrarEscenario: personas', () => {
   test('siembra las doce personas del grupo 42, el que tiene las seis ramas', async () => {
     const contexto = montarContexto()
-    await sembrarEscenario(contexto)
+    await sembrarEscenario(contexto, HORA)
     const distritos = await contexto.estructura.listarDistritos()
     const grupo42 = distritos.flatMap((d) => d.grupos).find((g) => g.numero === 42)
     expect(await contexto.personas.listarPersonas(grupo42?.id ?? '')).toHaveLength(12)
@@ -151,7 +219,7 @@ describe('sembrarEscenario: personas', () => {
     // Un demo donde todas las personas tienen la misma edad no muestra si la
     // pantalla aguanta el numero de un digito ni el de dos.
     const contexto = montarContexto()
-    await sembrarEscenario(contexto)
+    await sembrarEscenario(contexto, HORA)
 
     const distritos = await contexto.estructura.listarDistritos()
     const grupo42 = distritos.flatMap((d) => d.grupos).find((g) => g.numero === 42)
@@ -164,7 +232,7 @@ describe('sembrarEscenario: personas', () => {
 
   test('hay al menos un pasaporte entre los DNI', async () => {
     const contexto = montarContexto()
-    await sembrarEscenario(contexto)
+    await sembrarEscenario(contexto, HORA)
 
     const distritos = await contexto.estructura.listarDistritos()
     const grupo42 = distritos.flatMap((d) => d.grupos).find((g) => g.numero === 42)
@@ -179,7 +247,7 @@ describe('sembrarEscenario: personas', () => {
     // Ávila antes que Bustos: si el orden fuera por bytes, "Ávila" caeria
     // ultima. Es el test que ejercita Intl.Collator con datos del demo.
     const contexto = montarContexto()
-    await sembrarEscenario(contexto)
+    await sembrarEscenario(contexto, HORA)
 
     const distritos = await contexto.estructura.listarDistritos()
     const grupo42 = distritos.flatMap((d) => d.grupos).find((g) => g.numero === 42)
@@ -190,7 +258,7 @@ describe('sembrarEscenario: personas', () => {
 
   test('reparte las personas en grupos, con un grupo lleno y uno vacio', async () => {
     const ctx = montarContexto()
-    await sembrarEscenario(ctx)
+    await sembrarEscenario(ctx, HORA)
     const distritos = await ctx.estructura.listarDistritos()
     const grupo42 = distritos.flatMap((d) => d.grupos).find((g) => g.numero === 42)
     const grupo88 = distritos.flatMap((d) => d.grupos).find((g) => g.numero === 88)
@@ -204,7 +272,7 @@ describe('sembrarEscenario: personas', () => {
 
   test('siembra un cargo vigente y uno vencido', async () => {
     const ctx = montarContexto()
-    await sembrarEscenario(ctx)
+    await sembrarEscenario(ctx, HORA)
     const distritos = await ctx.estructura.listarDistritos()
     const grupo42 = distritos.flatMap((d) => d.grupos).find((g) => g.numero === 42)
     const cargos = (await ctx.personas.listarPersonas(grupo42?.id ?? '')).flatMap((p) => p.cargos)
