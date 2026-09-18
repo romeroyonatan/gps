@@ -8,17 +8,24 @@
  *  para el mayor de 21 que participa como beneficiario y no quiere chicos a
  *  cargo, que es lo que la distingue de ser dirigente.
  *
+ *  `unidad` es como se llama la subdivision del grupo que da esa rama: la
+ *  Manada de lobatos, la Tropa scout. Es el tipo, no el nombre propio -ese lo
+ *  pone cada grupo-, y por eso vive en el catalogo y no en la tabla: se deriva
+ *  de la rama y no lo elige nadie. Scouts y raiders llevan la rama en el tipo
+ *  porque a las dos se les dice tropa; la de adultos es "Tropa" a secas, que
+ *  es como se la nombra.
+ *
  *  Agregar una rama es cambio solo de codigo. Sacar o renombrar una NO lo es:
- *  `ramas_del_grupo` sigue guardando el id viejo, y la fila queda invisible
+ *  `unidades` sigue guardando el id viejo, y la fila queda invisible
  *  (el servicio filtra lo que no esta en el catalogo). Hay que migrar los
  *  datos en la misma entrega. */
 export const RAMAS = [
-  { id: 'castores', nombre: 'Castores', desde: 5, hasta: 7 },
-  { id: 'lobatos', nombre: 'Lobatos', desde: 7, hasta: 10 },
-  { id: 'scouts', nombre: 'Scouts', desde: 10, hasta: 14 },
-  { id: 'raiders', nombre: 'Raiders', desde: 14, hasta: 17 },
-  { id: 'rovers', nombre: 'Rovers', desde: 17, hasta: 21 },
-  { id: 'adultos', nombre: 'Adultos', desde: 21, hasta: null },
+  { id: 'castores', nombre: 'Castores', desde: 5, hasta: 7, unidad: 'Colonia' },
+  { id: 'lobatos', nombre: 'Lobatos', desde: 7, hasta: 10, unidad: 'Manada' },
+  { id: 'scouts', nombre: 'Scouts', desde: 10, hasta: 14, unidad: 'Tropa scout' },
+  { id: 'raiders', nombre: 'Raiders', desde: 14, hasta: 17, unidad: 'Tropa raider' },
+  { id: 'rovers', nombre: 'Rovers', desde: 17, hasta: 21, unidad: 'Clan' },
+  { id: 'adultos', nombre: 'Adultos', desde: 21, hasta: null, unidad: 'Tropa' },
 ] as const
 
 export type Rama = (typeof RAMAS)[number]['id']

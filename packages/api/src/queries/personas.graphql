@@ -9,7 +9,7 @@ query Personas($grupoId: ID!) {
     fechaDeNacimiento
     pertenencia {
       categoria
-      rama
+      unidadId
       desde
     }
     cargos {

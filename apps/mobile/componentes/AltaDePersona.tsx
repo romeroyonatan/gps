@@ -1,6 +1,6 @@
 import { ErrorDeApi, useCrearPersona } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
-import { etiquetaDeEdades, type Rama, ramaDelCatalogo } from '@gps/estructura/dominio'
+import { etiquetaDeEdades, ramaDelCatalogo, type Unidad } from '@gps/estructura/dominio'
 import {
   CATEGORIAS,
   type Categoria,
@@ -68,13 +68,16 @@ function Opciones<T extends string>(props: {
   )
 }
 
-export function AltaDePersona(props: { grupoId: string; ramasAbiertas: readonly Rama[] }) {
+export function AltaDePersona(props: {
+  grupoId: string
+  unidadesAbiertas: readonly Pick<Unidad, 'id' | 'rama' | 'nombre' | 'sexo'>[]
+}) {
   const alta = useCrearPersona()
   const hoy = new Date()
   const vacio = (): DatosDeIngreso => ({
     grupoId: props.grupoId,
     categoria: 'beneficiario',
-    rama: props.ramasAbiertas[0] ?? null,
+    unidadId: props.unidadesAbiertas[0]?.id ?? null,
     desde: aFechaDeCalendario(hoy),
     cargos: [],
   })
@@ -99,12 +102,15 @@ export function AltaDePersona(props: { grupoId: string; ramasAbiertas: readonly 
   }
 
   function cambiarCategoria(categoria: Categoria) {
-    // Un adherente no pertenece a ninguna rama: limpiarla al cambiar evita que
+    // Un adherente no pertenece a ninguna unidad: limpiarla al cambiar evita que
     // el formulario quede en un estado que el dominio rechaza sin que se vea.
     setIngreso({
       ...ingreso,
       categoria,
-      rama: categoria === 'adherente' ? null : (ingreso.rama ?? props.ramasAbiertas[0] ?? null),
+      unidadId:
+        categoria === 'adherente'
+          ? null
+          : (ingreso.unidadId ?? props.unidadesAbiertas[0]?.id ?? null),
     })
   }
 
@@ -114,7 +120,7 @@ export function AltaDePersona(props: { grupoId: string; ramasAbiertas: readonly 
     // isomorfo.
     const encontrados = [
       ...validarPersona(datos, hoy),
-      ...validarIngreso(ingreso, props.ramasAbiertas, hoy),
+      ...validarIngreso(ingreso, props.unidadesAbiertas, hoy),
     ]
     setProblemas(encontrados)
     if (encontrados.length > 0) return
@@ -131,11 +137,11 @@ export function AltaDePersona(props: { grupoId: string; ramasAbiertas: readonly 
     )
   }
 
-  const ramasComoOpciones = props.ramasAbiertas.map((rama) => {
-    const catalogo = ramaDelCatalogo(rama)
+  const unidadesComoOpciones = props.unidadesAbiertas.map((unidad) => {
+    const catalogo = ramaDelCatalogo(unidad.rama)
     return {
-      id: rama,
-      nombre: catalogo ? `${catalogo.nombre} ${etiquetaDeEdades(catalogo)}` : rama,
+      id: unidad.id,
+      nombre: catalogo ? `${unidad.nombre} ${etiquetaDeEdades(catalogo)}` : unidad.nombre,
     }
   })
 
@@ -192,14 +198,14 @@ export function AltaDePersona(props: { grupoId: string; ramasAbiertas: readonly 
         <Opciones opciones={CATEGORIAS} elegida={ingreso.categoria} onElegir={cambiarCategoria} />
       </Campo>
 
-      <Campo etiqueta="Rama" problema={problemaDe('rama')}>
-        {/* Solo las ramas abiertas del grupo, y ninguna si es adherente: la
+      <Campo etiqueta="Unidad" problema={problemaDe('unidad')}>
+        {/* Solo las unidades abiertas del grupo, y ninguna si es adherente: la
             misma regla que corre el servidor con estructura.obtenerGrupo. */}
         <Opciones
-          opciones={ramasComoOpciones}
-          elegida={ingreso.rama}
+          opciones={unidadesComoOpciones}
+          elegida={ingreso.unidadId}
           deshabilitado={ingreso.categoria === 'adherente'}
-          onElegir={(rama: Rama) => setIngreso({ ...ingreso, rama })}
+          onElegir={(unidadId: string) => setIngreso({ ...ingreso, unidadId })}
         />
       </Campo>
 

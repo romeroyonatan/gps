@@ -134,6 +134,12 @@ grupo (los distritales, diocesanos y de equipo llegan con el ámbito que los nec
 equipos, ni forma de buscar una persona sin saber su grupo (la única consulta es
 `personas(grupoId: ID!)`).
 
+Tampoco hay forma de abrir o cerrar una unidad desde las pantallas: el servicio de
+`estructura` las tiene (`abrirUnidad`, `cerrarUnidad`) y el demo las usa, pero ninguna
+mutation las expone. Llega con la pantalla que las necesite. Y una unidad no se puede
+renombrar, así que los nombres por defecto que dejó la migración —"Tropa scout" a secas—
+sólo se corrigen sembrando de nuevo.
+
 Deuda conocida: **cerrar un grupo no cierra las pertenencias de su gente.** `estructura`
 no puede hacerlo porque la dependencia va al revés —no conoce a `personas`—, y ningún
 otro módulo lo hace tampoco. `afiliacion` la esquiva filtrando por `gruposAbiertosEn` al

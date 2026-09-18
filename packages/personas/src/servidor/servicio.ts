@@ -68,7 +68,7 @@ const alfabeto = new Intl.Collator('es')
 export function crearServicioDePersonas(core: Core, estructura: Estructura): ServicioDePersonas {
   return {
     async crearPersona(datos, ingreso) {
-      // Primero el grupo: sin el no se pueden validar ni la rama ni la
+      // Primero el grupo: sin el no se pueden validar ni la unidad ni la
       // existencia del destino, y no tiene sentido validar lo demas.
       const grupo = await estructura.obtenerGrupo(ingreso.grupoId)
       if (!grupo) throw new GrupoInexistente(ingreso.grupoId)
@@ -76,7 +76,7 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
       const hoy = core.reloj.ahora()
       const problemas: readonly Problema[] = [
         ...validarPersona(datos, hoy),
-        ...validarIngreso(ingreso, grupo.ramas, hoy),
+        ...validarIngreso(ingreso, grupo.unidades, hoy),
       ]
       if (problemas.length > 0) throw new DatosInvalidos(problemas)
 
@@ -114,7 +114,7 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
         personaId: persona.id,
         grupoId: ingreso.grupoId,
         categoria: ingreso.categoria,
-        rama: ingreso.rama,
+        unidadId: ingreso.unidadId,
         desde: ingreso.desde,
         hasta: null,
         creadoEn: ahora,

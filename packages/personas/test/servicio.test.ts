@@ -2,7 +2,7 @@ import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
 import { aplicarMigraciones, type Bd, type Core, type Module, type Reloj } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
-import type { Estructura, GrupoConRamas } from '@gps/estructura/dominio'
+import type { Estructura, GrupoConUnidades, Rama, Unidad } from '@gps/estructura/dominio'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import type { DatosDePersona } from '../src/dominio/modelos'
 import type { DatosDeIngreso } from '../src/dominio/vinculos'
@@ -17,7 +17,18 @@ import {
 
 const HORA = new Date('1970-01-01T00:00:00Z')
 
-const GRUPO: GrupoConRamas = {
+const unidadDe = (id: string, rama: Rama, nombre: string): Unidad => ({
+  id,
+  grupoId: 'grupo_1',
+  rama,
+  sexo: 'mixta',
+  nombre,
+  cerradaEn: null,
+  creadoEn: HORA,
+  actualizadoEn: HORA,
+})
+
+const GRUPO: GrupoConUnidades = {
   id: 'grupo_1',
   numero: 42,
   nombre: 'Ceferino Namuncurá',
@@ -25,17 +36,20 @@ const GRUPO: GrupoConRamas = {
   cerradoEn: null,
   creadoEn: HORA,
   actualizadoEn: HORA,
-  ramas: ['lobatos', 'scouts'],
+  unidades: [
+    unidadDe('unidad_lob', 'lobatos', 'Manada'),
+    unidadDe('unidad_sco', 'scouts', 'Tropa scout'),
+  ],
 }
 
 /** Una estructura falsa: el servicio la recibe por el constructor, no por el
  *  contexto, asi que el test no necesita levantar el otro modulo. Es lo que
  *  hace testeable la dependencia entre modulos. */
-function estructuraFalsa(grupos: readonly GrupoConRamas[] = [GRUPO]): Estructura {
+function estructuraFalsa(grupos: readonly GrupoConUnidades[] = [GRUPO]): Estructura {
   return {
     obtenerGrupo: async (id) => grupos.find((grupo) => grupo.id === id) ?? null,
     // Personas no usa gruposAbiertosEn: se implementa solo para satisfacer la
-    // interfaz. Los GrupoConRamas de este archivo tienen cerradoEn: null.
+    // interfaz. Los GrupoConUnidades de este archivo tienen cerradoEn: null.
     async gruposAbiertosEn(fecha) {
       return new Set(
         grupos
@@ -94,7 +108,7 @@ const valida: DatosDePersona = {
 const ingreso: DatosDeIngreso = {
   grupoId: 'grupo_1',
   categoria: 'beneficiario',
-  rama: 'lobatos',
+  unidadId: 'unidad_lob',
   desde: '1969-03-01',
   cargos: [],
 }
@@ -112,7 +126,7 @@ describe('crearPersona con ingreso', () => {
       personaId: 'persona_1',
       grupoId: 'grupo_1',
       categoria: 'beneficiario',
-      rama: 'lobatos',
+      unidadId: 'unidad_lob',
       desde: '1969-03-01',
       hasta: null,
       creadoEn: HORA,
@@ -141,32 +155,39 @@ describe('crearPersona con ingreso', () => {
     await expect(servicio.crearPersona(valida, ingreso)).rejects.toThrow(GrupoInexistente)
   })
 
-  test('falla si la rama no esta abierta en ese grupo', async () => {
+  test('falla si la unidad no esta abierta en ese grupo', async () => {
     // La regla que el servidor no podia verificar antes de que un modulo
     // pudiera alcanzar al otro.
     const servicio = montar()
-    await expect(servicio.crearPersona(valida, { ...ingreso, rama: 'castores' })).rejects.toThrow(
-      DatosInvalidos,
-    )
+    await expect(
+      servicio.crearPersona(valida, { ...ingreso, unidadId: 'unidad_de_otro_lado' }),
+    ).rejects.toThrow(DatosInvalidos)
   })
 
   test('un ingreso invalido no deja la persona escrita a medias', async () => {
     // Las tres escrituras van en una transaccion: una persona sin pertenencia
     // no aparece en ninguna pantalla, porque la unica query filtra por grupo.
     const servicio = montar()
-    await expect(servicio.crearPersona(valida, { ...ingreso, rama: 'castores' })).rejects.toThrow()
+    await expect(
+      servicio.crearPersona(valida, { ...ingreso, unidadId: 'unidad_de_otro_lado' }),
+    ).rejects.toThrow()
     expect(await servicio.listarPersonas('grupo_1')).toEqual([])
   })
 })
 
 describe('listarPersonas', () => {
   test('devuelve solo las del grupo pedido', async () => {
-    const otroGrupo: GrupoConRamas = { ...GRUPO, id: 'grupo_2', numero: 7, ramas: ['lobatos'] }
+    const otroGrupo: GrupoConUnidades = {
+      ...GRUPO,
+      id: 'grupo_2',
+      numero: 7,
+      unidades: [unidadDe('unidad_otra', 'lobatos', 'Manada')],
+    }
     const servicio = montar(undefined, estructuraFalsa([GRUPO, otroGrupo]))
     await servicio.crearPersona(valida, ingreso)
     await servicio.crearPersona(
       { ...valida, numeroDeDocumento: '30111223' },
-      { ...ingreso, grupoId: 'grupo_2' },
+      { ...ingreso, grupoId: 'grupo_2', unidadId: 'unidad_otra' },
     )
 
     const delPrimero = await servicio.listarPersonas('grupo_1')

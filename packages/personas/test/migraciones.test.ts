@@ -72,7 +72,7 @@ const insertarPertenencia = (
 ) =>
   bd.run(
     sql`INSERT INTO pertenencias
-        VALUES (${id}, ${personaId}, ${grupoId}, 'beneficiario', 'lobatos', '2026-03-01', ${hasta}, 0, 0)`,
+        VALUES (${id}, ${personaId}, ${grupoId}, 'beneficiario', '2026-03-01', ${hasta}, 0, 0, 'unidad_1')`,
   )
 
 describe('pertenencias y cargos', () => {
@@ -125,10 +125,64 @@ describe('pertenencias y cargos', () => {
     expect(columnas.find((columna) => columna.name === 'hasta')?.type).toBe('TEXT')
   })
 
-  test('aplica las dos migraciones del modulo', () => {
+  test('la pertenencia apunta a una unidad y ya no guarda la rama', () => {
+    // La rama sale de la unidad: guardar las dos seria un dato duplicado que
+    // puede contradecirse.
+    const columnas = bd
+      .all<{ name: string }>(sql`PRAGMA table_info(pertenencias)`)
+      .map((columna) => columna.name)
+    expect(columnas).toContain('unidad_id')
+    expect(columnas).not.toContain('rama')
+  })
+
+  test('cada pertenencia queda apuntando a la unidad de su rama en su grupo', () => {
+    // La base arranca ya migrada, asi que el caso se arma al reves: se levanta
+    // una base con las migraciones hasta 0001, se siembran pertenencias con
+    // rama y recien ahi se aplican las dos que faltan.
+    const base = new Database(':memory:')
+    base.exec('PRAGMA foreign_keys = ON')
+    const vieja: Bd = drizzle(base)
+    aplicarMigraciones(coreDePrueba(vieja), [
+      { ...moduloFalso, migraciones: migraciones.slice(0, 2) },
+    ])
+    vieja.run(
+      sql`INSERT INTO personas VALUES ('p1', 'dni', '30111222', 'Ana', 'Perez', '2010-05-01', 0, 0)`,
+    )
+    vieja.run(
+      sql`INSERT INTO personas VALUES ('p2', 'dni', '30111223', 'Luis', 'Paz', '1980-05-01', 0, 0)`,
+    )
+    vieja.run(
+      sql`INSERT INTO pertenencias
+          VALUES ('pe1', 'p1', 'g1', 'beneficiario', 'lobatos', '2026-03-01', NULL, 0, 0)`,
+    )
+    // Un adherente: sin rama, tiene que quedar sin unidad.
+    vieja.run(
+      sql`INSERT INTO pertenencias
+          VALUES ('pe2', 'p2', 'g1', 'adherente', NULL, '2026-03-01', NULL, 0, 0)`,
+    )
+
+    aplicarMigraciones(coreDePrueba(vieja), [moduloFalso])
+
+    expect(
+      vieja.values<[string, string, string, string | null]>(
+        sql`SELECT id, categoria, desde, unidad_id FROM pertenencias ORDER BY id`,
+      ),
+    ).toEqual([
+      // El mismo id que arma la migracion 0002 de estructura para esa rama.
+      ['pe1', 'beneficiario', '2026-03-01', 'unidad_g1_lobatos'],
+      ['pe2', 'adherente', '2026-03-01', null],
+    ])
+  })
+
+  test('aplica las migraciones del modulo', () => {
     const aplicadas = bd
       .values<[string]>(sql`SELECT nombre FROM migraciones ORDER BY nombre`)
       .map(([nombre]) => nombre)
-    expect(aplicadas).toEqual(['0000_inicial', '0001_pertenencias_y_cargos'])
+    expect(aplicadas).toEqual([
+      '0000_inicial',
+      '0001_pertenencias_y_cargos',
+      '0002_pertenencia_en_unidad',
+      '0003_baja_rama_de_pertenencia',
+    ])
   })
 })

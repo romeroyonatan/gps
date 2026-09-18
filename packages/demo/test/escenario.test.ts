@@ -2,6 +2,7 @@ import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
 import { afiliacion } from '@gps/afiliacion/servidor'
 import { aplicarMigraciones, type Bd, type Context, type Core } from '@gps/core'
+import { ramasDeLasUnidades } from '@gps/estructura/dominio'
 import { estructura } from '@gps/estructura/servidor'
 import { personas } from '@gps/personas/servidor'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
@@ -66,8 +67,19 @@ describe('sembrarEscenario', () => {
     await sembrarEscenario(contexto)
 
     const todos = (await contexto.estructura.listarDistritos()).flatMap((d) => d.grupos)
-    expect(todos.some((grupo) => grupo.ramas.length === 6)).toBe(true)
-    expect(todos.some((grupo) => grupo.ramas.length === 0)).toBe(true)
+    expect(todos.some((grupo) => ramasDeLasUnidades(grupo.unidades).length === 6)).toBe(true)
+    expect(todos.some((grupo) => grupo.unidades.length === 0)).toBe(true)
+  })
+
+  test('deja un grupo con dos tropas scout, que es lo que antes no se podia', async () => {
+    const contexto = montarContexto()
+    await sembrarEscenario(contexto)
+
+    const todos = (await contexto.estructura.listarDistritos()).flatMap((d) => d.grupos)
+    const scouts = todos
+      .find((grupo) => grupo.numero === 42)
+      ?.unidades.filter((unidad) => unidad.rama === 'scouts')
+    expect(scouts?.map((unidad) => unidad.sexo).sort()).toEqual(['femenina', 'masculina'])
   })
 
   test('el grupo cerrado no aparece en el arbol', async () => {

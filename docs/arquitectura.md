@@ -245,6 +245,19 @@ obligatorio** de todo repositorio, así que una consulta que se olvide de filtra
 compila. La segunda: las políticas son las **mismas funciones** en el servidor y en la
 pantalla, así que la interfaz no puede ofrecer algo que el servidor vaya a rechazar.
 
+Un grupo se subdivide en **unidades**: la Manada, las dos Tropas, el Clan. La rama sigue
+siendo el catálogo —el tramo de edad, y cómo se llama el tipo de unidad que le
+corresponde—, y la unidad es la instancia concreta que ese grupo abrió, con su sexo
+(masculina, femenina o mixta) y su nombre propio. Es la misma separación que hay entre los
+cargos, que los nombra el código, y los equipos, que los crea alguien. Por eso un grupo
+puede tener dos tropas scout, que es lo que la tabla `ramas_del_grupo` —clave
+`(grupo, rama)`— no podía representar. Las ramas abiertas de un grupo se derivan de sus
+unidades, sin repetir.
+
+La persona pertenece a una unidad y no a una rama: la rama sale de la unidad. A quién se
+pone en cuál lo deciden los dirigentes; el sistema no lo valida ni lo sugiere, y `Persona`
+no guarda sexo.
+
 Quien ocupa cada cargo lo dice `personas`, no `estructura` — ver §7. Cuando llegue
 `auth`, la cadena de dependencias va a ser `auth` → `personas` → `estructura`.
 

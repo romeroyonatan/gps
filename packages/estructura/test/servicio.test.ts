@@ -3,8 +3,14 @@ import { describe, expect, test } from 'bun:test'
 import { aplicarMigraciones, type Bd, type Core, type Module, type Reloj } from '@gps/core'
 import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
+import type { Rama } from '../src/dominio/ramas'
+import { ramasDeLasUnidades } from '../src/dominio/unidades'
 import { migraciones } from '../src/servidor/migraciones'
-import { crearServicioDeEstructura, type ServicioDeEstructura } from '../src/servidor/servicio'
+import {
+  crearServicioDeEstructura,
+  type ServicioDeEstructura,
+  UnidadInvalida,
+} from '../src/servidor/servicio'
 
 const HORA = new Date('1970-01-01T00:00:00Z')
 
@@ -44,6 +50,11 @@ function montarConBd(reloj: Reloj = { ahora: () => HORA }): {
 
 const montar = (): ServicioDeEstructura => montarConBd().servicio
 
+/** Casi todos los tests abrian ramas y solo miran que rama quedo. Con unidades
+ *  hace falta un nombre, que a esos tests no les importa: lo pone el helper. */
+const abrirUnidadDe = (servicio: ServicioDeEstructura, grupoId: string, rama: Rama) =>
+  servicio.abrirUnidad({ grupoId, rama, sexo: 'mixta', nombre: `La de ${rama}` })
+
 describe('crearDistrito', () => {
   test('devuelve el distrito con el id y las marcas que da Core', () => {
     const servicio = montar()
@@ -81,38 +92,68 @@ describe('listarDistritos', () => {
       nombre: 'Ceferino Namuncurá',
       distritoId: distrito.id,
     })
-    await servicio.abrirRama(grupo.id, 'lobatos')
-    await servicio.abrirRama(grupo.id, 'scouts')
+    await abrirUnidadDe(servicio, grupo.id, 'lobatos')
+    await abrirUnidadDe(servicio, grupo.id, 'scouts')
 
     const arbol = await servicio.listarDistritos()
     expect(arbol).toHaveLength(1)
     expect(arbol[0]?.zona).toBe('San Isidro')
     expect(arbol[0]?.grupos).toHaveLength(1)
     expect(arbol[0]?.grupos[0]?.numero).toBe(42)
-    expect(arbol[0]?.grupos[0]?.ramas).toEqual(['lobatos', 'scouts'])
+    expect(ramasDeLasUnidades(arbol[0]?.grupos[0]?.unidades ?? [])).toEqual(['lobatos', 'scouts'])
   })
 
-  test('las ramas vuelven en orden del catalogo, no en el que se abrieron', async () => {
+  test('las unidades vuelven en orden del catalogo, no en el que se abrieron', async () => {
     // La pantalla las muestra de menor a mayor edad; que ese orden dependa de
     // en que orden se cargaron seria un bug dificil de ver.
     const servicio = montar()
     const distrito = await servicio.crearDistrito({ numero: 1, zona: 'San Isidro' })
     const grupo = await servicio.crearGrupo({ numero: 1, nombre: 'Uno', distritoId: distrito.id })
-    await servicio.abrirRama(grupo.id, 'rovers')
-    await servicio.abrirRama(grupo.id, 'castores')
-    await servicio.abrirRama(grupo.id, 'scouts')
+    await abrirUnidadDe(servicio, grupo.id, 'rovers')
+    await abrirUnidadDe(servicio, grupo.id, 'castores')
+    await abrirUnidadDe(servicio, grupo.id, 'scouts')
 
     const arbol = await servicio.listarDistritos()
-    expect(arbol[0]?.grupos[0]?.ramas).toEqual(['castores', 'scouts', 'rovers'])
+    expect(arbol[0]?.grupos[0]?.unidades.map((unidad) => unidad.rama)).toEqual([
+      'castores',
+      'scouts',
+      'rovers',
+    ])
   })
 
-  test('un grupo sin ramas abiertas viene con la lista vacia', async () => {
+  test('dentro de una rama las unidades vienen por nombre', async () => {
+    // Dos tropas scout: el orden lo decide el nombre y no el de carga, por la
+    // misma razon que el orden entre ramas lo decide el catalogo.
+    const servicio = montar()
+    const distrito = await servicio.crearDistrito({ numero: 1, zona: 'San Isidro' })
+    const grupo = await servicio.crearGrupo({ numero: 1, nombre: 'Uno', distritoId: distrito.id })
+    await servicio.abrirUnidad({
+      grupoId: grupo.id,
+      rama: 'scouts',
+      sexo: 'masculina',
+      nombre: 'San Jorge',
+    })
+    await servicio.abrirUnidad({
+      grupoId: grupo.id,
+      rama: 'scouts',
+      sexo: 'femenina',
+      nombre: 'Ana Frank',
+    })
+
+    const arbol = await servicio.listarDistritos()
+    expect(arbol[0]?.grupos[0]?.unidades.map((unidad) => unidad.nombre)).toEqual([
+      'Ana Frank',
+      'San Jorge',
+    ])
+  })
+
+  test('un grupo sin unidades abiertas viene con la lista vacia', async () => {
     const servicio = montar()
     const distrito = await servicio.crearDistrito({ numero: 1, zona: 'San Isidro' })
     await servicio.crearGrupo({ numero: 88, nombre: 'Ocho Ocho', distritoId: distrito.id })
 
     const arbol = await servicio.listarDistritos()
-    expect(arbol[0]?.grupos[0]?.ramas).toEqual([])
+    expect(arbol[0]?.grupos[0]?.unidades).toEqual([])
   })
 
   test('un distrito sin grupos viene con la lista vacia', async () => {
@@ -141,29 +182,29 @@ describe('listarDistritos', () => {
     expect(servicio.crearDistrito({ numero: 1, zona: 'Quilmes' })).rejects.toThrow()
   })
 
-  test('una rama que ya no esta en el catalogo no se muestra', async () => {
+  test('una unidad de una rama que ya no esta en el catalogo no se muestra', async () => {
     // Sacar una rama de RAMAS esta descripto como cambio solo de codigo, pero
-    // ramas_del_grupo sigue guardando el id viejo. Que se cuele hasta el enum
-    // de GraphQL anula la query entera -`ramas: [Rama!]!` es no nulo hasta
-    // arriba-, asi que el servicio la filtra: se pierde una rama, no la app.
+    // unidades sigue guardando el id viejo. Que se cuele hasta el enum de
+    // GraphQL anula la query entera -`rama: Rama!` es no nulo hasta arriba-,
+    // asi que el servicio la filtra: se pierde una unidad, no la app.
     const { servicio, bd } = montarConBd()
     const distrito = await servicio.crearDistrito({ numero: 1, zona: 'San Isidro' })
     const grupo = await servicio.crearGrupo({ numero: 1, nombre: 'Uno', distritoId: distrito.id })
-    await servicio.abrirRama(grupo.id, 'scouts')
+    await abrirUnidadDe(servicio, grupo.id, 'scouts')
     bd.run(
       sql.raw(
-        `INSERT INTO ramas_del_grupo (grupo_id, rama, creado_en)
-         VALUES ('${grupo.id}', 'pioneros', 0)`,
+        `INSERT INTO unidades (id, grupo_id, rama, sexo, nombre, cerrada_en, creado_en, actualizado_en)
+         VALUES ('u_vieja', '${grupo.id}', 'pioneros', 'mixta', 'Los Pioneros', NULL, 0, 0)`,
       ),
     )
 
     const arbol = await servicio.listarDistritos()
-    expect(arbol[0]?.grupos[0]?.ramas).toEqual(['scouts'])
+    expect(arbol[0]?.grupos[0]?.unidades.map((unidad) => unidad.rama)).toEqual(['scouts'])
   })
 })
 
 describe('obtenerGrupo', () => {
-  test('devuelve el grupo con sus ramas abiertas, ordenadas por catalogo', async () => {
+  test('devuelve el grupo con sus unidades abiertas, ordenadas por catalogo', async () => {
     const { servicio } = montarConBd()
     const distrito = await servicio.crearDistrito({ numero: 1, zona: 'San Isidro' })
     const grupo = await servicio.crearGrupo({
@@ -173,13 +214,11 @@ describe('obtenerGrupo', () => {
     })
     // Se abren desordenadas a proposito: el orden de salida tiene que ser el
     // del catalogo, no el de insercion.
-    await servicio.abrirRama(grupo.id, 'scouts')
-    await servicio.abrirRama(grupo.id, 'castores')
+    await abrirUnidadDe(servicio, grupo.id, 'scouts')
+    await abrirUnidadDe(servicio, grupo.id, 'castores')
 
-    expect(await servicio.obtenerGrupo(grupo.id)).toEqual({
-      ...grupo,
-      ramas: ['castores', 'scouts'],
-    })
+    const obtenido = await servicio.obtenerGrupo(grupo.id)
+    expect(obtenido?.unidades.map((unidad) => unidad.rama)).toEqual(['castores', 'scouts'])
   })
 
   test('devuelve null si el grupo no existe', async () => {
@@ -202,7 +241,7 @@ describe('obtenerGrupo', () => {
     expect(await servicio.obtenerGrupo(grupo.id)).toBeNull()
   })
 
-  test('un grupo sin ramas abiertas devuelve la lista vacia', async () => {
+  test('un grupo sin unidades abiertas devuelve la lista vacia', async () => {
     const { servicio } = montarConBd()
     const distrito = await servicio.crearDistrito({ numero: 4, zona: 'Morón' })
     const grupo = await servicio.crearGrupo({
@@ -210,17 +249,155 @@ describe('obtenerGrupo', () => {
       nombre: 'Padre Mario Pantaleo',
       distritoId: distrito.id,
     })
-    expect((await servicio.obtenerGrupo(grupo.id))?.ramas).toEqual([])
+    expect((await servicio.obtenerGrupo(grupo.id))?.unidades).toEqual([])
   })
 })
 
-describe('abrirRama', () => {
-  test('abrir dos veces la misma rama falla', async () => {
-    const servicio = montar()
+describe('abrirUnidad', () => {
+  const montarConGrupo = async () => {
+    const { servicio } = montarConBd()
     const distrito = await servicio.crearDistrito({ numero: 1, zona: 'San Isidro' })
     const grupo = await servicio.crearGrupo({ numero: 1, nombre: 'Uno', distritoId: distrito.id })
-    await servicio.abrirRama(grupo.id, 'lobatos')
-    expect(servicio.abrirRama(grupo.id, 'lobatos')).rejects.toThrow()
+    return { servicio, grupo }
+  }
+
+  test('un grupo puede tener dos tropas scout, que es lo que antes no podia', async () => {
+    const { servicio, grupo } = await montarConGrupo()
+    await servicio.abrirUnidad({
+      grupoId: grupo.id,
+      rama: 'scouts',
+      sexo: 'femenina',
+      nombre: 'Santa Juana',
+    })
+    expect(
+      servicio.abrirUnidad({
+        grupoId: grupo.id,
+        rama: 'scouts',
+        sexo: 'masculina',
+        nombre: 'San Jorge',
+      }),
+    ).resolves.toMatchObject({ nombre: 'San Jorge', sexo: 'masculina' })
+  })
+
+  test('dos unidades abiertas de la misma rama no pueden compartir nombre', async () => {
+    const { servicio, grupo } = await montarConGrupo()
+    const datos = {
+      grupoId: grupo.id,
+      rama: 'scouts',
+      sexo: 'mixta',
+      nombre: 'San Jorge',
+    } as const
+    await servicio.abrirUnidad(datos)
+    expect(servicio.abrirUnidad(datos)).rejects.toThrow()
+  })
+
+  test('el mismo nombre se puede repetir en otra rama', async () => {
+    const { servicio, grupo } = await montarConGrupo()
+    await servicio.abrirUnidad({
+      grupoId: grupo.id,
+      rama: 'scouts',
+      sexo: 'mixta',
+      nombre: 'San Jorge',
+    })
+    expect(
+      servicio.abrirUnidad({
+        grupoId: grupo.id,
+        rama: 'raiders',
+        sexo: 'mixta',
+        nombre: 'San Jorge',
+      }),
+    ).resolves.toMatchObject({ rama: 'raiders' })
+  })
+
+  test('el nombre en blanco no alcanza: es lo unico que distingue dos unidades', async () => {
+    const { servicio, grupo } = await montarConGrupo()
+    expect(
+      servicio.abrirUnidad({ grupoId: grupo.id, rama: 'scouts', sexo: 'mixta', nombre: '   ' }),
+    ).rejects.toThrow(UnidadInvalida)
+  })
+
+  test('el nombre se guarda sin los espacios de los bordes', async () => {
+    const { servicio, grupo } = await montarConGrupo()
+    expect(
+      servicio.abrirUnidad({
+        grupoId: grupo.id,
+        rama: 'scouts',
+        sexo: 'mixta',
+        nombre: '  San Jorge  ',
+      }),
+    ).resolves.toMatchObject({ nombre: 'San Jorge' })
+  })
+
+  test('una rama que no esta en el catalogo no abre unidad', async () => {
+    const { servicio, grupo } = await montarConGrupo()
+    expect(
+      servicio.abrirUnidad({
+        grupoId: grupo.id,
+        rama: 'pioneros' as never,
+        sexo: 'mixta',
+        nombre: 'Los Pioneros',
+      }),
+    ).rejects.toThrow(UnidadInvalida)
+  })
+
+  test('un grupo cerrado no abre unidades', async () => {
+    const { servicio, grupo } = await montarConGrupo()
+    await servicio.cerrarGrupo(grupo.id)
+    expect(
+      servicio.abrirUnidad({
+        grupoId: grupo.id,
+        rama: 'scouts',
+        sexo: 'mixta',
+        nombre: 'San Jorge',
+      }),
+    ).rejects.toThrow(UnidadInvalida)
+  })
+
+  test('un grupo que no existe no abre unidades', async () => {
+    const { servicio } = montarConBd()
+    expect(
+      servicio.abrirUnidad({
+        grupoId: 'grupo_inexistente',
+        rama: 'scouts',
+        sexo: 'mixta',
+        nombre: 'San Jorge',
+      }),
+    ).rejects.toThrow(UnidadInvalida)
+  })
+})
+
+describe('cerrarUnidad', () => {
+  const montarConUnidad = async () => {
+    const { servicio } = montarConBd()
+    const distrito = await servicio.crearDistrito({ numero: 1, zona: 'San Isidro' })
+    const grupo = await servicio.crearGrupo({ numero: 1, nombre: 'Uno', distritoId: distrito.id })
+    const unidad = await servicio.abrirUnidad({
+      grupoId: grupo.id,
+      rama: 'scouts',
+      sexo: 'mixta',
+      nombre: 'San Jorge',
+    })
+    return { servicio, grupo, unidad }
+  }
+
+  test('una unidad cerrada deja de aparecer entre las del grupo', async () => {
+    const { servicio, grupo, unidad } = await montarConUnidad()
+    await servicio.cerrarUnidad(unidad.id)
+    expect((await servicio.obtenerGrupo(grupo.id))?.unidades).toEqual([])
+  })
+
+  test('cerrar libera el nombre: se puede volver a abrir igual', async () => {
+    // Es la razon por la que el UNIQUE es parcial y no completo.
+    const { servicio, grupo, unidad } = await montarConUnidad()
+    await servicio.cerrarUnidad(unidad.id)
+    expect(
+      servicio.abrirUnidad({
+        grupoId: grupo.id,
+        rama: 'scouts',
+        sexo: 'mixta',
+        nombre: 'San Jorge',
+      }),
+    ).resolves.toMatchObject({ nombre: 'San Jorge' })
   })
 })
 

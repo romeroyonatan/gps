@@ -1,19 +1,25 @@
 import { useDistritos } from '@gps/api'
-import { etiquetaDeEdades, type Rama, ramaDelCatalogo } from '@gps/estructura/dominio'
+import { etiquetaDeEdades, ramaDelCatalogo, type Unidad } from '@gps/estructura/dominio'
 import { Link } from 'wouter'
 
-function EtiquetaDeRama(props: { rama: Rama }) {
-  const rama = ramaDelCatalogo(props.rama)
+/** El nombre propio y, en gris, el tramo de edad de su rama. Se muestra el
+ *  nombre y no la rama porque es lo que distingue dos tropas del mismo grupo. */
+function EtiquetaDeUnidad(props: { unidad: Pick<Unidad, 'rama' | 'nombre'> }) {
+  const rama = ramaDelCatalogo(props.unidad.rama)
   if (!rama) return null
-  const edades = etiquetaDeEdades(rama)
   return (
     <li className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">
-      {rama.nombre} <span className="text-slate-400">{edades}</span>
+      {props.unidad.nombre} <span className="text-slate-400">{etiquetaDeEdades(rama)}</span>
     </li>
   )
 }
 
-function Grupo(props: { id: string; numero: number; nombre: string; ramas: readonly Rama[] }) {
+function Grupo(props: {
+  id: string
+  numero: number
+  nombre: string
+  unidades: readonly Pick<Unidad, 'id' | 'rama' | 'nombre'>[]
+}) {
   return (
     <li>
       <Link
@@ -23,12 +29,12 @@ function Grupo(props: { id: string; numero: number; nombre: string; ramas: reado
         <p className="text-sm font-medium text-slate-900">
           <span className="text-slate-400">Grupo Scout Nº{props.numero} -</span> {props.nombre}
         </p>
-        {props.ramas.length === 0 ? (
-          <p className="mt-1.5 text-xs text-slate-400">Todavía no abrió ninguna rama</p>
+        {props.unidades.length === 0 ? (
+          <p className="mt-1.5 text-xs text-slate-400">Todavía no abrió ninguna unidad</p>
         ) : (
           <ul className="mt-1.5 flex flex-wrap gap-1.5">
-            {props.ramas.map((rama) => (
-              <EtiquetaDeRama key={rama} rama={rama} />
+            {props.unidades.map((unidad) => (
+              <EtiquetaDeUnidad key={unidad.id} unidad={unidad} />
             ))}
           </ul>
         )}
@@ -68,7 +74,7 @@ export function Estructura() {
                   id={grupo.id}
                   numero={grupo.numero}
                   nombre={grupo.nombre}
-                  ramas={grupo.ramas}
+                  unidades={grupo.unidades}
                 />
               ))}
             </ul>

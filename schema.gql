@@ -47,7 +47,7 @@ input DatosDeIngreso {
   categoria: Categoria!
   desde: String!
   grupoId: ID!
-  rama: Rama
+  unidadId: ID
 }
 
 """
@@ -98,7 +98,7 @@ type Distrito {
 }
 
 """
-Un grupo scout y las ramas que tiene abiertas.
+Un grupo scout y las unidades que tiene abiertas.
 """
 type Grupo {
   id: ID!
@@ -106,9 +106,9 @@ type Grupo {
   numero: Int!
 
   """
-  De menor a mayor edad. Vacia si el grupo no abrio ninguna.
+  De menor a mayor edad y, dentro de una rama, por nombre. Vacia si el grupo no abrio ninguna.
   """
-  ramas: [Rama!]!
+  unidades: [Unidad!]!
 }
 
 type Mutation {
@@ -157,9 +157,9 @@ type Pertenencia {
   desde: String!
 
   """
-  Vacía si y sólo si la categoría es adherente.
+  La unidad del grupo. Vacía si y sólo si la categoría es adherente. La rama sale de la unidad, que la pantalla ya tiene del grupo.
   """
-  rama: Rama
+  unidadId: ID
 }
 
 type Query {
@@ -174,7 +174,7 @@ type Query {
   declaraciones(grupoId: ID!): [Declaracion!]!
 
   """
-  El arbol de la diocesis: distritos, sus grupos y sus ramas.
+  El arbol de la diocesis: distritos, sus grupos y sus unidades.
   """
   distritos: [Distrito!]!
 
@@ -202,6 +202,15 @@ enum Rama {
 }
 
 """
+Como esta compuesta una unidad. Es un hecho del grupo, no de sus personas.
+"""
+enum SexoDeUnidad {
+  femenina
+  masculina
+  mixta
+}
+
+"""
 Los cargos de un grupo scout.
 """
 enum TipoDeCargo {
@@ -218,6 +227,25 @@ Tipos de documento que la asociacion acepta.
 enum TipoDeDocumento {
   dni
   pasaporte
+}
+
+"""
+Una unidad del grupo: la Manada, una de las dos Tropas, el Clan.
+"""
+type Unidad {
+  id: ID!
+
+  """
+  El nombre propio: "San Jorge".
+  """
+  nombre: String!
+
+  """
+  El tipo de unidad de su rama, su nombre y su sexo, ya compuestos.
+  """
+  nombreParaMostrar: String!
+  rama: Rama!
+  sexo: SexoDeUnidad!
 }
 
 """

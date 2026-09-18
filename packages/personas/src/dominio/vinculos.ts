@@ -1,6 +1,5 @@
 import type { Marcas } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
-import type { Rama } from '@gps/estructura/dominio'
 import type { TipoDeCargo } from './cargos'
 import type { Categoria } from './categorias'
 import type { Persona } from './modelos'
@@ -13,9 +12,12 @@ export interface Pertenencia extends Marcas {
   readonly personaId: string
   readonly grupoId: string
   readonly categoria: Categoria
-  /** null si y solo si la categoria es adherente: el adherente es el que no
-   *  esta en ninguna rama, y es justo lo que lo define. */
-  readonly rama: Rama | null
+  /** La unidad del grupo a la que pertenece: una de las dos tropas, la manada.
+   *  null si y solo si la categoria es adherente: el adherente es el que no
+   *  esta en ninguna unidad, y es justo lo que lo define.
+   *
+   *  La rama no se guarda: sale de la unidad, que ya la tiene. */
+  readonly unidadId: string | null
   /** aaaa-mm-dd. Texto y no Date por la misma razon que fechaDeNacimiento: se
    *  ingresa a un grupo un dia del almanaque, no en un instante con zona
    *  horaria. Ver el comentario en modelos.ts. */

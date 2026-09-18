@@ -1,10 +1,17 @@
 import type { Core } from '@gps/core'
 import { and, eq, isNull } from 'drizzle-orm'
-import type { Distrito, DistritoConGrupos, Grupo, GrupoConRamas } from '../dominio/modelos'
+import type {
+  Distrito,
+  DistritoConGrupos,
+  Grupo,
+  GrupoConUnidades,
+  SexoDeUnidad,
+  Unidad,
+} from '../dominio/modelos'
 import type { Estructura } from '../dominio/publico'
-import { RAMAS, type Rama } from '../dominio/ramas'
+import { RAMAS, type Rama, ramaDelCatalogo } from '../dominio/ramas'
 import { grupoEstabaAbiertoEn } from '../dominio/vigencia'
-import { distritos, grupos, ramasDelGrupo } from './tablas'
+import { distritos, grupos, unidades } from './tablas'
 
 /** Lo que este modulo hace, que es mas que lo que publica: ver Estructura en
  *  /dominio/publico.ts. `extends` es lo que hace que la implementacion no pueda
@@ -12,23 +19,44 @@ import { distritos, grupos, ramasDelGrupo } from './tablas'
 export interface ServicioDeEstructura extends Estructura {
   crearDistrito(datos: { numero: number; zona: string }): Promise<Distrito>
   crearGrupo(datos: { numero: number; nombre: string; distritoId: string }): Promise<Grupo>
-  abrirRama(grupoId: string, rama: Rama): Promise<void>
+  abrirUnidad(datos: {
+    grupoId: string
+    rama: Rama
+    sexo: SexoDeUnidad
+    nombre: string
+  }): Promise<Unidad>
+  cerrarUnidad(unidadId: string): Promise<void>
   cerrarGrupo(grupoId: string): Promise<void>
   listarDistritos(): Promise<readonly DistritoConGrupos[]>
 }
 
-/** De menor a mayor edad, como las muestra la pantalla. Sin esto el orden
- *  seria el de insercion, que es un detalle de como se cargaron los datos.
+/** De menor a mayor edad y, dentro de una rama, por nombre: como las muestra
+ *  la pantalla. Sin esto el orden seria el de insercion, que es un detalle de
+ *  como se cargaron los datos.
  *
- *  Recorrer el catalogo y quedarse con las abiertas ordena y filtra de una:
- *  una rama que ya no esta en RAMAS no se muestra, en vez de colarse hasta el
- *  enum de GraphQL. Importa porque `ramas: [Rama!]!` es no nulo hasta arriba,
- *  asi que un id viejo en `ramas_del_grupo` -sacar una rama del catalogo esta
- *  descripto como cambio solo de codigo- anularia la query `distritos`
- *  entera: pantalla en blanco, no un grupo mal dibujado. */
-function ordenarPorCatalogo(ramas: readonly Rama[]): Rama[] {
-  const abiertas = new Set<string>(ramas)
-  return RAMAS.map((rama) => rama.id).filter((id) => abiertas.has(id))
+ *  Recorrer el catalogo ordena y filtra de una: una unidad de una rama que ya
+ *  no esta en RAMAS no se muestra, en vez de colarse hasta el enum de GraphQL.
+ *  Importa porque `rama: Rama!` es no nulo hasta arriba, asi que un id viejo
+ *  -sacar una rama del catalogo esta descripto como cambio solo de codigo-
+ *  anularia la query `distritos` entera: pantalla en blanco, no un grupo mal
+ *  dibujado. */
+const alfabeto = new Intl.Collator('es')
+
+function ordenarPorCatalogo(deLasUnidades: readonly Unidad[]): Unidad[] {
+  return RAMAS.flatMap((rama) =>
+    deLasUnidades
+      .filter((unidad) => unidad.rama === rama.id)
+      .sort((una, otra) => alfabeto.compare(una.nombre, otra.nombre)),
+  )
+}
+
+/** La unidad no se puede abrir: el nombre esta vacio, o la rama no existe. Las
+ *  dos son del mismo campo desde el punto de vista de quien la llama. */
+export class UnidadInvalida extends Error {
+  constructor(motivo: string) {
+    super(motivo)
+    this.name = 'UnidadInvalida'
+  }
 }
 
 /** Los metodos devuelven Promise aunque el driver de SQLite sea sincrono: es
@@ -62,8 +90,42 @@ export function crearServicioDeEstructura(core: Core): ServicioDeEstructura {
       return grupo
     },
 
-    async abrirRama(grupoId, rama) {
-      core.bd.insert(ramasDelGrupo).values({ grupoId, rama, creadoEn: core.reloj.ahora() }).run()
+    async abrirUnidad(datos) {
+      const nombre = datos.nombre.trim()
+      if (nombre === '') throw new UnidadInvalida('La unidad necesita un nombre.')
+      if (ramaDelCatalogo(datos.rama) === undefined) {
+        throw new UnidadInvalida(`La rama ${datos.rama} no existe.`)
+      }
+      // El grupo abierto lo verifica esta consulta y no la foreign key: la
+      // clave solo sabe que el grupo existe, no que sigue abierto. El UNIQUE
+      // parcial de la tabla ataja el nombre repetido.
+      const abierto = core.bd
+        .select({ id: grupos.id })
+        .from(grupos)
+        .where(and(eq(grupos.id, datos.grupoId), isNull(grupos.cerradoEn)))
+        .get()
+      if (!abierto) throw new UnidadInvalida('El grupo no existe o esta cerrado.')
+
+      const ahora = core.reloj.ahora()
+      const unidad = {
+        id: core.nuevoId('unidad'),
+        ...datos,
+        nombre,
+        cerradaEn: null,
+        creadoEn: ahora,
+        actualizadoEn: ahora,
+      }
+      core.bd.insert(unidades).values(unidad).run()
+      return unidad
+    },
+
+    async cerrarUnidad(unidadId) {
+      const ahora = core.reloj.ahora()
+      core.bd
+        .update(unidades)
+        .set({ cerradaEn: ahora, actualizadoEn: ahora })
+        .where(eq(unidades.id, unidadId))
+        .run()
     },
 
     async cerrarGrupo(grupoId) {
@@ -87,10 +149,10 @@ export function crearServicioDeEstructura(core: Core): ServicioDeEstructura {
 
       const filas = core.bd
         .select()
-        .from(ramasDelGrupo)
-        .where(eq(ramasDelGrupo.grupoId, grupoId))
+        .from(unidades)
+        .where(and(eq(unidades.grupoId, grupoId), isNull(unidades.cerradaEn)))
         .all()
-      return { ...grupo, ramas: ordenarPorCatalogo(filas.map((fila) => fila.rama)) }
+      return { ...grupo, unidades: ordenarPorCatalogo(filas) }
     },
 
     async listarDistritos() {
@@ -109,19 +171,22 @@ export function crearServicioDeEstructura(core: Core): ServicioDeEstructura {
         .where(isNull(grupos.cerradoEn))
         .orderBy(grupos.numero)
         .all()
-      const filasRamas = core.bd.select().from(ramasDelGrupo).all()
+      const filasUnidades = core.bd.select().from(unidades).where(isNull(unidades.cerradaEn)).all()
 
-      const ramasPorGrupo = new Map<string, Rama[]>()
-      for (const fila of filasRamas) {
-        const abiertas = ramasPorGrupo.get(fila.grupoId) ?? []
-        abiertas.push(fila.rama)
-        ramasPorGrupo.set(fila.grupoId, abiertas)
+      const unidadesPorGrupo = new Map<string, Unidad[]>()
+      for (const fila of filasUnidades) {
+        const abiertas = unidadesPorGrupo.get(fila.grupoId) ?? []
+        abiertas.push(fila)
+        unidadesPorGrupo.set(fila.grupoId, abiertas)
       }
 
-      const gruposPorDistrito = new Map<string, GrupoConRamas[]>()
+      const gruposPorDistrito = new Map<string, GrupoConUnidades[]>()
       for (const grupo of filasGrupos) {
         const delDistrito = gruposPorDistrito.get(grupo.distritoId) ?? []
-        delDistrito.push({ ...grupo, ramas: ordenarPorCatalogo(ramasPorGrupo.get(grupo.id) ?? []) })
+        delDistrito.push({
+          ...grupo,
+          unidades: ordenarPorCatalogo(unidadesPorGrupo.get(grupo.id) ?? []),
+        })
         gruposPorDistrito.set(grupo.distritoId, delDistrito)
       }
 

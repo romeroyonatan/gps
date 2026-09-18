@@ -6,20 +6,28 @@ import '@gps/estructura/servidor'
 import '@gps/personas/servidor'
 import { YaDeclaroHoy } from '@gps/afiliacion/servidor'
 import type { Context } from '@gps/core'
-import type { Rama } from '@gps/estructura/dominio'
+import { RAMAS, type Rama, type SexoDeUnidad } from '@gps/estructura/dominio'
 import type { Categoria, DatosDePersona, TipoDeCargo } from '@gps/personas/dominio'
 
 /** La diocesis de la demostracion. Los grupos abren conjuntos distintos de
  *  ramas a proposito: uno completo, varios parciales y uno todavia sin
  *  ninguna. Un demo donde todos los grupos son iguales no muestra si la
- *  pantalla aguanta el caso lleno ni el vacio, que son los que se rompen. */
+ *  pantalla aguanta el caso lleno ni el vacio, que son los que se rompen.
+ *
+ *  Casi todas las unidades se declaran con la rama sola y el escenario les pone
+ *  nombre y sexo por defecto: lo que importa de ellas es que existan. Las que
+ *  se escriben enteras son las que ejercitan el caso nuevo -el grupo 42 tiene
+ *  dos tropas scout, una femenina y una masculina-, que es justo lo que antes
+ *  no se podia representar. */
+type UnidadDelEscenario = Rama | { rama: Rama; sexo: SexoDeUnidad; nombre: string }
+
 const DIOCESIS: readonly {
   numero: number
   zona: string
   grupos: readonly {
     numero: number
     nombre: string
-    ramas: readonly Rama[]
+    ramas: readonly UnidadDelEscenario[]
     cerrado?: boolean
   }[]
 }[] = [
@@ -40,7 +48,15 @@ const DIOCESIS: readonly {
       {
         numero: 42,
         nombre: 'Ceferino Namuncurá',
-        ramas: ['castores', 'lobatos', 'scouts', 'raiders', 'rovers', 'adultos'],
+        ramas: [
+          'castores',
+          'lobatos',
+          { rama: 'scouts', sexo: 'femenina', nombre: 'Santa Juana de Arco' },
+          { rama: 'scouts', sexo: 'masculina', nombre: 'San Jorge' },
+          'raiders',
+          'rovers',
+          'adultos',
+        ],
       },
       { numero: 61, nombre: 'San Francisco de Asís', ramas: ['scouts'] },
     ],
@@ -102,6 +118,8 @@ const PERSONAS: readonly {
   numeroDeGrupo: number
   categoria: Categoria
   rama: Rama | null
+  /** Solo cuando el grupo tiene dos unidades de esa rama. */
+  unidad?: string
   desde: string
   cargos?: readonly { cargo: TipoDeCargo; hasta: string | null }[]
 }[] = [
@@ -144,6 +162,9 @@ const PERSONAS: readonly {
     numeroDeGrupo: 42,
     categoria: 'beneficiario',
     rama: 'scouts',
+    // La unica en la otra tropa scout del grupo: sin alguien de cada lado, la
+    // pantalla muestra dos tropas y una vacia, que no es el caso a mirar.
+    unidad: 'Santa Juana de Arco',
     desde: '2023-03-04',
   },
   {
@@ -320,6 +341,12 @@ const PERSONAS: readonly {
  *  Este archivo conoce a todos los modulos que quiera representar, que es lo
  *  que el resto de la arquitectura evita. La diferencia es que agregar un
  *  modulo no obliga a tocarlo: el sistema funciona igual sin que lo mencione. */
+/** El tipo de unidad de la rama alcanza como nombre cuando el grupo tiene una
+ *  sola: "Manada", "Clan". Los grupos con dos de la misma rama los escriben. */
+function nombrePorDefecto(rama: Rama): string {
+  return RAMAS.find((entrada) => entrada.id === rama)?.unidad ?? rama
+}
+
 export async function sembrarEscenario(ctx: Context): Promise<void> {
   for (const datos of DIOCESIS) {
     const distrito = await ctx.estructura.crearDistrito({
@@ -334,8 +361,12 @@ export async function sembrarEscenario(ctx: Context): Promise<void> {
         distritoId: distrito.id,
       })
 
-      for (const rama of datosDelGrupo.ramas) {
-        await ctx.estructura.abrirRama(grupo.id, rama)
+      for (const unidad of datosDelGrupo.ramas) {
+        const datosDeLaUnidad =
+          typeof unidad === 'string'
+            ? { rama: unidad, sexo: 'mixta' as const, nombre: nombrePorDefecto(unidad) }
+            : unidad
+        await ctx.estructura.abrirUnidad({ grupoId: grupo.id, ...datosDeLaUnidad })
       }
 
       if (datosDelGrupo.cerrado) {
@@ -347,16 +378,30 @@ export async function sembrarEscenario(ctx: Context): Promise<void> {
   const gruposPorNumero = new Map(
     (await ctx.estructura.listarDistritos())
       .flatMap((distrito) => distrito.grupos)
-      .map((grupo) => [grupo.numero, grupo.id]),
+      .map((grupo) => [grupo.numero, grupo]),
   )
 
   for (const persona of PERSONAS) {
-    const grupoId = gruposPorNumero.get(persona.numeroDeGrupo)
-    if (!grupoId) throw new Error(`El escenario no tiene el grupo ${persona.numeroDeGrupo}.`)
+    const grupo = gruposPorNumero.get(persona.numeroDeGrupo)
+    if (!grupo) throw new Error(`El escenario no tiene el grupo ${persona.numeroDeGrupo}.`)
+    // La persona dice su rama y, cuando el grupo tiene dos unidades de esa
+    // rama, cual de las dos. Sin `unidad` cae en la primera, que es lo correcto
+    // para los grupos que tienen una sola.
+    const suya =
+      persona.rama === null
+        ? null
+        : grupo.unidades.find(
+            (unidad) =>
+              unidad.rama === persona.rama &&
+              (persona.unidad === undefined || unidad.nombre === persona.unidad),
+          )
+    if (persona.rama !== null && !suya) {
+      throw new Error(`El grupo ${persona.numeroDeGrupo} no tiene unidad de ${persona.rama}.`)
+    }
     await ctx.personas.crearPersona(persona.datos, {
-      grupoId,
+      grupoId: grupo.id,
       categoria: persona.categoria,
-      rama: persona.rama,
+      unidadId: suya?.id ?? null,
       desde: persona.desde,
       cargos: persona.cargos ?? [],
     })
@@ -373,7 +418,7 @@ export async function sembrarEscenario(ctx: Context): Promise<void> {
   const grupoDeLaExtraordinaria = gruposPorNumero.get(42)
   if (!grupoDeLaExtraordinaria) throw new Error('El escenario no tiene el grupo 42.')
   try {
-    await ctx.afiliacion.declararExtraordinaria(grupoDeLaExtraordinaria)
+    await ctx.afiliacion.declararExtraordinaria(grupoDeLaExtraordinaria.id)
   } catch (error) {
     // Los dos dias del anio en que se siembra el demo justo en una fecha
     // ordinaria, la declaracion del dia ya la emitio el barrido de arriba y el

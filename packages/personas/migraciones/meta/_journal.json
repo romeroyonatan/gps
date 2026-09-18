@@ -15,6 +15,20 @@
       "when": 1787960102636,
       "tag": "0001_pertenencias_y_cargos",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789764818328,
+      "tag": "0002_pertenencia_en_unidad",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789764826146,
+      "tag": "0003_baja_rama_de_pertenencia",
+      "breakpoints": true
     }
   ]
 }

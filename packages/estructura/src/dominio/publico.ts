@@ -1,4 +1,4 @@
-import type { GrupoConRamas } from './modelos'
+import type { GrupoConUnidades } from './modelos'
 
 /** Lo que estructura le publica a los otros modulos, y nada mas.
  *
@@ -11,14 +11,17 @@ import type { GrupoConRamas } from './modelos'
  *  Vive en /dominio y no en /servidor porque /servidor es privado: son tipos
  *  puros, sin estado, que cualquiera puede leer. */
 export interface Estructura {
-  /** El grupo con sus ramas abiertas, o null si no existe o esta cerrado.
+  /** El grupo con sus unidades abiertas, o null si no existe o esta cerrado.
+   *  Las unidades y no las ramas: quien da de alta a alguien necesita saber en
+   *  cual de las dos tropas lo pone, y las ramas abiertas salen de ahi con
+   *  ramasDeLasUnidades.
    *
    *  Un grupo cerrado devuelve null igual que no aparece en listarDistritos:
    *  para los otros modulos no existe. Asi "no se puede inscribir a nadie en un
    *  grupo cerrado" sale gratis, sin una regla aparte. El dia que alguien
    *  necesite leer un grupo cerrado -el historial de quien estuvo ahi- se
    *  agrega el metodo que lo diga, con su consumidor. */
-  obtenerGrupo(grupoId: string): Promise<GrupoConRamas | null>
+  obtenerGrupo(grupoId: string): Promise<GrupoConUnidades | null>
 
   /** Los ids de los grupos que estaban abiertos el dia `fecha` (aaaa-mm-dd).
    *  Cerrado ese mismo dia todavia cuenta como abierto, igual que estaVigente

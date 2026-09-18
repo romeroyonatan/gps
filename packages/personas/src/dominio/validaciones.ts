@@ -1,5 +1,5 @@
 import { aFechaDeCalendario } from '@gps/core/fechas'
-import type { Rama } from '@gps/estructura/dominio'
+import type { Unidad } from '@gps/estructura/dominio'
 import { nombreDelCargo, type TipoDeCargo } from './cargos'
 import { normalizarNumero } from './documentos'
 import { calcularEdad, type DatosDePersona } from './modelos'
@@ -17,7 +17,7 @@ export interface Problema {
     | 'nombres'
     | 'apellidos'
     | 'fechaDeNacimiento'
-    | 'rama'
+    | 'unidad'
     | 'desde'
     | 'cargos'
   readonly mensaje: string
@@ -109,27 +109,38 @@ export function validarPersona(datos: DatosDePersona, hoy: Date): readonly Probl
  *  Devuelve la lista de problemas, vacia si esta todo bien. Acumula: no corta
  *  en el primero.
  *
- *  `ramasAbiertas` entra por parametro y no se consulta: del lado del servidor
- *  sale de estructura.obtenerGrupo(grupoId), y del lado del formulario del
- *  arbol que la pantalla ya tiene. Es lo que hace que la regla corra en los dos
- *  lados con una sola implementacion, igual que validarPersona. */
+ *  `unidadesAbiertas` entra por parametro y no se consulta: del lado del
+ *  servidor sale de estructura.obtenerGrupo(grupoId), y del lado del formulario
+ *  del arbol que la pantalla ya tiene. Es lo que hace que la regla corra en los
+ *  dos lados con una sola implementacion, igual que validarPersona.
+ *
+ *  Que la unidad este en esa lista es a la vez "existe", "esta abierta" y "es
+ *  de este grupo": las tres salen de que obtenerGrupo devuelve solo las
+ *  abiertas del grupo, asi que no hacen falta tres reglas.
+ *
+ *  Lo que no valida, a proposito, es si la persona "corresponde" a esa unidad:
+ *  a quien se pone en la tropa femenina y a quien en la masculina lo deciden
+ *  los dirigentes, y Persona ni siquiera guarda sexo. */
 export function validarIngreso(
   ingreso: DatosDeIngreso,
-  ramasAbiertas: readonly Rama[],
+  unidadesAbiertas: readonly Pick<Unidad, 'id'>[],
   hoy: Date,
 ): readonly Problema[] {
   const problemas: Problema[] = []
   const esAdherente = ingreso.categoria === 'adherente'
 
-  if (esAdherente && ingreso.rama !== null) {
+  if (esAdherente && ingreso.unidadId !== null) {
     problemas.push({
-      campo: 'rama',
-      mensaje: 'Un adherente no pertenece a ninguna rama.',
+      campo: 'unidad',
+      mensaje: 'Un adherente no pertenece a ninguna unidad.',
     })
-  } else if (!esAdherente && ingreso.rama === null) {
-    problemas.push({ campo: 'rama', mensaje: 'Elegí la rama a la que pertenece.' })
-  } else if (ingreso.rama !== null && !ramasAbiertas.includes(ingreso.rama)) {
-    problemas.push({ campo: 'rama', mensaje: 'El grupo no tiene abierta esa rama.' })
+  } else if (!esAdherente && ingreso.unidadId === null) {
+    problemas.push({ campo: 'unidad', mensaje: 'Elegí la unidad a la que pertenece.' })
+  } else if (
+    ingreso.unidadId !== null &&
+    !unidadesAbiertas.some((unidad) => unidad.id === ingreso.unidadId)
+  ) {
+    problemas.push({ campo: 'unidad', mensaje: 'El grupo no tiene abierta esa unidad.' })
   }
 
   if (!esFechaDeCalendario(ingreso.desde)) {

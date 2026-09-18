@@ -1,4 +1,3 @@
-import type { Rama } from '@gps/estructura/dominio'
 import { sql } from 'drizzle-orm'
 import { integer, sqliteTable, text, unique, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import type { TipoDeCargo } from '../dominio/cargos'
@@ -44,10 +43,15 @@ export const personas = sqliteTable(
 
 /** La pertenencia de una persona a un grupo, con su periodo.
  *
- *  `grupo_id` va sin foreign key: la tabla `grupos` es de estructura y
- *  declararla exigiria importar su tablas.ts, que es privado. La integridad la
- *  da obtenerGrupo en el alta. Es una perdida real y consciente; ver §7.4 de la
- *  spec. Contra `personas`, en cambio, la foreign key va: es del mismo modulo.
+ *  `grupo_id` y `unidad_id` van sin foreign key: las tablas `grupos` y
+ *  `unidades` son de estructura y declararlas exigiria importar su tablas.ts,
+ *  que es privado. La integridad la da obtenerGrupo en el alta. Es una perdida
+ *  real y consciente; ver §7.4 de la spec. Contra `personas`, en cambio, la
+ *  foreign key va: es del mismo modulo.
+ *
+ *  La rama no se guarda: sale de la unidad. Guardar las dos seria un dato
+ *  duplicado que puede contradecirse. `unidad_id` es null en los adherentes,
+ *  que no pertenecen a ninguna.
  *
  *  El indice parcial es "una persona pertenece a un solo grupo" puesto en la
  *  base. Funciona porque una pertenencia no tiene mandato: su `hasta` se
@@ -63,7 +67,7 @@ export const pertenencias = sqliteTable(
       .references(() => personas.id),
     grupoId: text('grupo_id').notNull(),
     categoria: text('categoria').$type<Categoria>().notNull(),
-    rama: text('rama').$type<Rama>(),
+    unidadId: text('unidad_id'),
     desde: text('desde').notNull(),
     hasta: text('hasta'),
     ...marcas,

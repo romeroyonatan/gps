@@ -190,12 +190,12 @@ a propósito es más chico que el servicio completo:
 
     // packages/estructura/src/dominio/publico.ts
     export interface Estructura {
-      /** El grupo con sus ramas abiertas, o null si no existe o esta cerrado. */
-      obtenerGrupo(grupoId: string): Promise<GrupoConRamas | null>
+      /** El grupo con sus unidades abiertas, o null si no existe o esta cerrado. */
+      obtenerGrupo(grupoId: string): Promise<GrupoConUnidades | null>
     }
 
 `ServicioDeEstructura`, en `/servidor`, extiende `Estructura` y le agrega cinco métodos
-más (crear distrito, crear grupo, abrir rama, cerrar grupo, listar distritos) que
+más (crear distrito, crear grupo, abrir y cerrar unidad, cerrar grupo, listar distritos) que
 `personas` no necesita y no puede ver. Ésa es la mitad que importa de la regla: lo que no
 se publica en `publico.ts` queda privado, aunque viva en el mismo paquete. Es la idea de
 los *package interfaces* de SAP y del modificador `global` de Salesforce — declarar la
