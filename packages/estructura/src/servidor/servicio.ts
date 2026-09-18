@@ -1,9 +1,9 @@
 import type { Core } from '@gps/core'
-import { aFechaDeCalendario } from '@gps/core/fechas'
 import { and, eq, isNull } from 'drizzle-orm'
 import type { Distrito, DistritoConGrupos, Grupo, GrupoConRamas } from '../dominio/modelos'
 import type { Estructura } from '../dominio/publico'
 import { RAMAS, type Rama } from '../dominio/ramas'
+import { grupoEstabaAbiertoEn } from '../dominio/vigencia'
 import { distritos, grupos, ramasDelGrupo } from './tablas'
 
 /** Lo que este modulo hace, que es mas que lo que publica: ver Estructura en
@@ -142,9 +142,7 @@ export function crearServicioDeEstructura(core: Core): ServicioDeEstructura {
         .from(grupos)
         .all()
       return new Set(
-        filas
-          .filter((fila) => fila.cerradoEn === null || fecha <= aFechaDeCalendario(fila.cerradoEn))
-          .map((fila) => fila.id),
+        filas.filter((fila) => grupoEstabaAbiertoEn(fecha, fila.cerradoEn)).map((fila) => fila.id),
       )
     },
   }
