@@ -27,8 +27,13 @@ Mapa de piezas en `docs/arquitectura.md`. Tutorial en prosa en `docs/crear-un-mo
 
 1. Copiar `packages/sistema/` a `packages/<nombre>/`.
 2. Cambiar `name` en el `package.json` a `@gps/<nombre>`.
-3. Escribir el dominio en `src/dominio/`: modelos, validaciones, reglas puras.
-4. Escribir el servicio, el esquema y el módulo en `src/servidor/`.
+3. Escribir el dominio en `src/dominio/`: modelos, validaciones y decisiones puras con
+   nombres del negocio. Si una regla puede decidir sólo con datos recibidos por parámetro,
+   vive acá aunque hoy la invoque únicamente el servidor.
+4. Escribir en `src/servidor/` la orquestación de efectos, persistencia, esquema y módulo.
+   `servicio.ts` declara el contrato y compone las operaciones: no es el destino automático
+   de todas las reglas. Separar casos de uso cohesivos o consultas cuando mejora la lectura,
+   pero no crear un archivo, una interfaz o un repository por cada método corto.
 5. Si otro módulo va a necesitar algo de éste, declararlo en `src/dominio/publico.ts` —
    sólo eso, no la interfaz entera del servicio.
 6. Declarar las dependencias en `dependencies` del objeto `Module`. `Module<S, D>` tipa
@@ -49,10 +54,12 @@ la receta.
 
 Ejemplo real: `afiliacion` depende de `personas` y de `estructura`
 (`dependencies: ['personas', 'estructura']`), las dos por lectura nada más —no escribe
-ni una persona ni un grupo—. Y no todo hecho de negocio necesita tabla: su calendario (el
-día de corte del período, las fechas ordinarias) es un catálogo en
-`src/dominio/config.ts`, no una tabla, porque cambia poquísimo y no hace falta
-consultarlo.
+ni una persona ni un grupo—. La selección de sus nóminas declarables es una regla pura en
+`src/dominio/nominas.ts`; `src/servidor/declaraciones.ts` obtiene los datos y persiste la
+foto, y `src/servidor/servicio.ts` compone esas operaciones con las consultas. No todo
+hecho de negocio necesita tabla: su calendario (el día de corte del período, las fechas
+ordinarias) es un catálogo en `src/dominio/config.ts`, no una tabla, porque cambia
+poquísimo y no hace falta consultarlo.
 
 ## Reglas obligatorias
 

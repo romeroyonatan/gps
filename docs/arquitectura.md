@@ -152,6 +152,24 @@ isomorfo y sin estado. Lo que un módulo le ofrece a los demás se declara en
 método, `obtenerGrupo`, mientras `ServicioDeEstructura` (en `/servidor`) tiene cinco más
 que siguen siendo privados.
 
+La frontera también ordena la lógica dentro de un módulo:
+
+    /dominio     decisiones puras y vocabulario del negocio
+    /servidor    orquestación de efectos, consultas y persistencia
+    servicio.ts  contrato y composición del servicio
+
+Una regla que puede decidir con datos recibidos por parámetro vive en `/dominio`, aunque
+su único consumidor actual sea el servidor. Por ejemplo, Afiliación arma allí las
+nóminas declarables a partir de miembros activos, grupos abiertos y grupos que ya
+declararon. El caso de uso de `/servidor` obtiene esos datos, consulta el reloj mediante
+`Core`, asigna ids y persiste declaración y nómina en una transacción.
+
+Esto no obliga a un archivo por método ni a capas de `repository`, puertos o handlers.
+Las operaciones cortas sin una decisión separable pueden seguir en `servicio.ts`, como
+las altas simples de Estructura. Cuando un módulo crece, los casos de uso cohesivos y las
+consultas se separan en archivos con nombres del negocio; `servicio.ts` queda como mapa
+del contrato y punto de composición, no como destino automático de toda regla nueva.
+
 Compartir un tipo de dominio entre módulos tiene una arista aparte cuando ese tipo es un
 enum de GraphQL: Pothos 4.13 no tiene un `enumRef` diferido, así que un enum sólo se crea
 con `builder.enumType(...)`, y crearlo dos veces con el mismo nombre aborta el esquema al
