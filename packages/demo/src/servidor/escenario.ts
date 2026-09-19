@@ -4,6 +4,7 @@
 // conocer a los otros: es literalmente su razon de ser (spec 6.1).
 import '@gps/estructura/servidor'
 import '@gps/personas/servidor'
+import '@gps/tesoreria/servidor'
 import { YaDeclaroHoy } from '@gps/afiliacion/servidor'
 import type { Context } from '@gps/core'
 import type { Rama } from '@gps/estructura/dominio'
@@ -380,5 +381,35 @@ export async function sembrarEscenario(ctx: Context): Promise<void> {
     // grupo 42 no puede declarar dos veces. El escenario queda igual de bueno
     // -esa ordinaria es la declaracion de hoy- asi que se sigue.
     if (!(error instanceof YaDeclaroHoy)) throw error
+  }
+
+  // La cuota se carga despues a proposito: ejercita la reconciliacion que
+  // recupera declaraciones emitidas cuando Tesoreria todavia no estaba lista.
+  const declaraciones = await ctx.afiliacion.listarDeclaraciones()
+  const ultima = declaraciones[0]
+  if (!ultima) return
+  await ctx.tesoreria.definirCuota(ultima.periodo, 20000)
+  await ctx.tesoreria.reconciliar()
+
+  const [cuentaParcial, cuentaConFavor] = (await ctx.tesoreria.listarCuentas()).filter(
+    (cuenta) => cuenta.saldo > 0,
+  )
+  if (cuentaParcial) {
+    await ctx.tesoreria.registrarPago({
+      grupoId: cuentaParcial.grupoId,
+      fecha: ultima.fecha,
+      importe: Math.max(1, Math.floor(cuentaParcial.saldo / 2)),
+      medioDePago: 'transferencia',
+      referencia: 'Transferencia demo',
+    })
+  }
+  if (cuentaConFavor) {
+    await ctx.tesoreria.registrarPago({
+      grupoId: cuentaConFavor.grupoId,
+      fecha: ultima.fecha,
+      importe: cuentaConFavor.saldo + 5000,
+      medioDePago: 'efectivo',
+      observacion: 'Pago adelantado demo',
+    })
   }
 }

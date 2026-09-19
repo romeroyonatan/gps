@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import type { Bd, Core } from '@gps/core'
+import { type Bd, type Core, crearBusDeEventos } from '@gps/core'
 import { crearServicioDeSistema } from '../src/servidor/servicio'
 
 function coreFalso(parcial: Partial<Core> = {}): Core {
@@ -10,6 +10,7 @@ function coreFalso(parcial: Partial<Core> = {}): Core {
     // sistema no consulta la base ni genera ids: el fake no los provee, y si
     // algun dia los usara este test explotaria, que es lo que queremos.
     bd: null as unknown as Bd,
+    eventos: crearBusDeEventos(),
     nuevoId: () => {
       throw new Error('sistema no deberia generar ids')
     },

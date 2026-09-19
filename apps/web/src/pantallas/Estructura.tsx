@@ -42,6 +42,10 @@ export function Estructura() {
 
   return (
     <>
+      <Link href="/tesoreria" className="mt-6 inline-block text-sm font-medium text-slate-700">
+        Tesorería →
+      </Link>
+
       {isPending && <p className="mt-8 text-sm text-slate-500">Consultando la estructura…</p>}
 
       {error && (

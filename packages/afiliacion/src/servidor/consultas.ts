@@ -24,7 +24,10 @@ export function crearConsultasDeAfiliacion(core: Core) {
   return {
     listarAfiliados,
 
-    async listarDeclaraciones(grupoId: string) {
+    async listarDeclaraciones(grupoId?: string) {
+      if (grupoId === undefined) {
+        return core.bd.select().from(declaraciones).orderBy(desc(declaraciones.fecha)).all()
+      }
       return core.bd
         .select()
         .from(declaraciones)

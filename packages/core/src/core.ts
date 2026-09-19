@@ -1,4 +1,5 @@
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
+import type { BusDeEventos } from './eventos'
 
 export type Entorno = 'desarrollo' | 'produccion' | 'prueba' | 'demo'
 
@@ -29,6 +30,7 @@ export interface Core {
   readonly logger: Logger
   readonly reloj: Reloj
   readonly bd: Bd
+  readonly eventos: BusDeEventos
   /** Nombres de los modulos registrados, en orden de dependencias. */
   readonly modulos: readonly string[]
   /** Identificador nuevo para una entidad, con su prefijo:

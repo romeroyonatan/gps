@@ -1,6 +1,13 @@
 import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
-import { aplicarMigraciones, type Bd, type Core, type Module, type Reloj } from '@gps/core'
+import {
+  aplicarMigraciones,
+  type Bd,
+  type Core,
+  crearBusDeEventos,
+  type Module,
+  type Reloj,
+} from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Estructura, GrupoConRamas } from '@gps/estructura/dominio'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
@@ -34,6 +41,7 @@ const GRUPO: GrupoConRamas = {
 function estructuraFalsa(grupos: readonly GrupoConRamas[] = [GRUPO]): Estructura {
   return {
     obtenerGrupo: async (id) => grupos.find((grupo) => grupo.id === id) ?? null,
+    listarGrupos: async () => grupos,
     // Personas no usa gruposAbiertosEn: se implementa solo para satisfacer la
     // interfaz. Los GrupoConRamas de este archivo tienen cerradoEn: null.
     async gruposAbiertosEn(fecha) {
@@ -65,6 +73,7 @@ function montar(
     logger: { info: () => {}, error: () => {} },
     reloj,
     bd,
+    eventos: crearBusDeEventos(),
     modulos: ['estructura', 'personas'],
     nuevoId: (prefijo) => `${prefijo}_${++contador}`,
   }

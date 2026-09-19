@@ -31,6 +31,23 @@ enum Categoria {
   beneficiario
 }
 
+type CuentaDeGrupo {
+  cerrado: Boolean!
+  grupoId: ID!
+  nombre: String!
+  numero: Int!
+
+  """
+  Positivo es deuda; negativo es saldo a favor.
+  """
+  saldo: Int!
+}
+
+type CuotaDeAfiliacion {
+  importe: Int!
+  periodo: Int!
+}
+
 """
 Un cargo en el alta. Su `desde` es el de la pertenencia.
 """
@@ -111,7 +128,33 @@ type Grupo {
   ramas: [Rama!]!
 }
 
+"""
+Cómo recibió Tesorería un pago externo.
+"""
+enum MedioDePago {
+  efectivo
+  otro
+  transferencia
+}
+
+type MovimientoDeTesoreria {
+  anulaA: ID
+  cantidad: Int
+  cuota: Int
+  declaracionId: ID
+  fecha: String!
+  id: ID!
+  importe: Int!
+  medioDePago: MedioDePago
+  observacion: String
+  periodo: Int
+  referencia: String
+  tipo: TipoDeMovimientoDeTesoreria!
+}
+
 type Mutation {
+  anularPago(pagoId: ID!): MovimientoDeTesoreria!
+
   """
   Da de alta una persona y la inscribe en un grupo.
   """
@@ -121,6 +164,16 @@ type Mutation {
   Declaración extraordinaria: fotografía al grupo con la fecha de hoy.
   """
   declararAfiliacion(grupoId: ID!): Declaracion!
+  definirCuotaDeAfiliacion(importe: Int!, periodo: Int!): CuotaDeAfiliacion!
+  generarDeudasPendientes: ResultadoDeReconciliacion!
+  registrarPago(
+    fecha: String!
+    grupoId: ID!
+    importe: Int!
+    medioDePago: MedioDePago!
+    observacion: String
+    referencia: String
+  ): MovimientoDeTesoreria!
 }
 
 """
@@ -167,16 +220,21 @@ type Query {
   Los ids, de entre los preguntados, que ya tienen afiliación ese período.
   """
   afiliadosEn(periodo: Int!, personaIds: [ID!]!): [ID!]!
+  cuentasDeGrupos: [CuentaDeGrupo!]!
+  cuotasDeAfiliacion: [CuotaDeAfiliacion!]!
 
   """
   Las declaraciones de un grupo, de la más reciente a la más vieja.
   """
   declaraciones(grupoId: ID!): [Declaracion!]!
+  deudasPendientes: ResumenDeDeudasPendientes!
 
   """
   El arbol de la diocesis: distritos, sus grupos y sus ramas.
   """
   distritos: [Distrito!]!
+  movimientosDeTesoreria(grupoId: ID!): [MovimientoDeTesoreria!]!
+  periodosConfigurablesDeAfiliacion: [Int!]!
 
   """
   Las personas de un grupo, ordenadas por apellido.
@@ -201,6 +259,17 @@ enum Rama {
   scouts
 }
 
+type ResultadoDeReconciliacion {
+  cantidad: Int!
+  creados: Int!
+  periodosSinCuota: [Int!]!
+}
+
+type ResumenDeDeudasPendientes {
+  cantidad: Int!
+  periodosSinCuota: [Int!]!
+}
+
 """
 Los cargos de un grupo scout.
 """
@@ -218,6 +287,15 @@ Tipos de documento que la asociacion acepta.
 enum TipoDeDocumento {
   dni
   pasaporte
+}
+
+"""
+La causa de un movimiento de la cuenta corriente.
+"""
+enum TipoDeMovimientoDeTesoreria {
+  anulacion_pago
+  cargo_afiliacion
+  pago
 }
 
 """

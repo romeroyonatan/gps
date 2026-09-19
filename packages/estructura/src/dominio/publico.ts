@@ -1,4 +1,4 @@
-import type { GrupoConRamas } from './modelos'
+import type { Grupo, GrupoConRamas } from './modelos'
 
 /** Lo que estructura le publica a los otros modulos, y nada mas.
  *
@@ -19,6 +19,10 @@ export interface Estructura {
    *  necesite leer un grupo cerrado -el historial de quien estuvo ahi- se
    *  agrega el metodo que lo diga, con su consumidor. */
   obtenerGrupo(grupoId: string): Promise<GrupoConRamas | null>
+
+  /** Todos los grupos conocidos, incluso los cerrados: una deuda no desaparece
+   * cuando cierra el grupo que la contrajo. */
+  listarGrupos(): Promise<readonly Grupo[]>
 
   /** Los ids de los grupos que estaban abiertos el dia `fecha` (aaaa-mm-dd).
    *  Cerrado ese mismo dia todavia cuenta como abierto, igual que estaVigente

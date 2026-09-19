@@ -2,12 +2,13 @@ import type { Core } from '@gps/core'
 import type { Estructura } from '@gps/estructura/dominio'
 import type { Personas } from '@gps/personas/dominio'
 import type { Afiliado, Declaracion } from '../dominio/modelos'
+import type { Afiliacion } from '../dominio/publico'
 import { crearConsultasDeAfiliacion } from './consultas'
 import { crearOperacionesDeDeclaracion } from './declaraciones'
 
 export { FechaInvalida, NadaQueDeclarar, YaDeclaroHoy } from './declaraciones'
 
-export interface ServicioDeAfiliacion {
+export interface ServicioDeAfiliacion extends Afiliacion {
   /** Fotografia a los miembros activos del dia `fecha`. Sin `grupoId` declara
    * todos los grupos abiertos; con `grupoId`, ese solo. */
   declarar(fecha: string, grupoId?: string): Promise<readonly Declaracion[]>
@@ -19,8 +20,9 @@ export interface ServicioDeAfiliacion {
   /** La nomina de esa declaracion, ordenada por apellido. */
   listarAfiliados(declaracionId: string): Promise<readonly Afiliado[]>
 
-  /** Las declaraciones del grupo, de la mas reciente a la mas vieja. */
-  listarDeclaraciones(grupoId: string): Promise<readonly Declaracion[]>
+  /** Las declaraciones, de la mas reciente a la mas vieja. Con grupo limita
+   * la consulta a su cuenta. */
+  listarDeclaraciones(grupoId?: string): Promise<readonly Declaracion[]>
 
   /** Los miembros de la nomina que no aparecieron antes en el mismo periodo. */
   listarACobrar(declaracionId: string): Promise<readonly Afiliado[]>

@@ -27,7 +27,7 @@ describe('esquema compuesto', () => {
   test('lista los modulos efectivamente registrados', async () => {
     const resultado = await consultar('{ version { modulos } }')
     expect(resultado.data).toEqual({
-      version: { modulos: ['sistema', 'estructura', 'personas', 'afiliacion'] },
+      version: { modulos: ['sistema', 'estructura', 'personas', 'afiliacion', 'tesoreria'] },
     })
   })
 
@@ -47,6 +47,46 @@ describe('esquema compuesto', () => {
     const tipo = resultado.data?.__type as { enumValues: { name: string }[] }
     const valores = tipo.enumValues.map((valor) => valor.name)
     expect(valores).toEqual(['adultos', 'castores', 'lobatos', 'raiders', 'rovers', 'scouts'])
+  })
+})
+
+describe('tesoreria en el esquema compuesto', () => {
+  test('expone cuentas y pendientes vacios sin datos', async () => {
+    const resultado = await consultar(
+      '{ cuentasDeGrupos { grupoId saldo } deudasPendientes { cantidad periodosSinCuota } }',
+    )
+    expect(resultado.errors).toBeUndefined()
+    expect(resultado.data).toEqual({
+      cuentasDeGrupos: [],
+      deudasPendientes: { cantidad: 0, periodosSinCuota: [] },
+    })
+  })
+
+  test('define y consulta una cuota', async () => {
+    const { esquema, contexto } = await componer(config, crearBd(':memory:'))
+    const [periodo] = await contexto.tesoreria.listarPeriodosConfigurables()
+    const mutacion = await execute({
+      schema: esquema,
+      document: parse(
+        'mutation Definir($periodo: Int!) { definirCuotaDeAfiliacion(periodo: $periodo, importe: 20000) { periodo importe } }',
+      ),
+      variableValues: { periodo },
+      contextValue: contexto,
+    })
+    const consulta = await execute({
+      schema: esquema,
+      document: parse('{ cuotasDeAfiliacion { periodo importe } }'),
+      contextValue: contexto,
+    })
+    expect(mutacion.errors).toBeUndefined()
+    expect(consulta.data).toEqual({ cuotasDeAfiliacion: [{ periodo, importe: 20000 }] })
+  })
+
+  test('traduce los datos de pago invalidos a un error de negocio', async () => {
+    const resultado = await consultar(
+      'mutation { registrarPago(grupoId: "inexistente", fecha: "2026-05-01", importe: 20000, medioDePago: efectivo) { id } }',
+    )
+    expect(resultado.errors?.[0]?.extensions.code).toBe('DatosDePagoInvalidos')
   })
 })
 

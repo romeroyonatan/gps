@@ -38,7 +38,8 @@ Las piezas marcadas con `(futuro)` están diseñadas pero no implementadas.
                                         |
                           +-------------v----------------------+
                           |    packages/<modulo>               |
-                          |  sistema, estructura, personas, ...|
+                          | sistema, estructura, personas,     |
+                          | afiliacion, tesoreria, ...          |
                           +-------------+----------------------+
                                         |
                           +-------------v--------------+
@@ -80,7 +81,7 @@ Un contenedor, un proceso, un puerto. En desarrollo y en producción es el mismo
        |
        | 1. lee y valida la configuracion del entorno
        v
-    core.ts ------------- construye ------------> Core { config, logger, reloj, bd }
+    core.ts ------------- construye ------------> Core { config, logger, reloj, bd, eventos }
        |
        | 2. toma la lista de modulos
        v
@@ -282,12 +283,12 @@ ningún otro módulo (`dependencies: []`), y quién ocupa cada cargo lo dice `pe
 `estructura.gruposAbiertosEn` para saber qué grupos existían un día dado, y
 `personas.miembrosActivos` para la nómina de ese día — ninguna de las dos alcanza sola,
 porque un grupo cerrado no debe declarar aunque su gente siga viva en las tablas de
-`personas` (ver §"Qué NO existe todavía" en `AGENT.md` sobre esa deuda). No depende de
-`permisos`: esa flecha era un error de una versión anterior de este diagrama, de cuando
-`afiliacion` era todavía especulativa.
+`personas` (ver §"Qué NO existe todavía" en `AGENT.md` sobre esa deuda).
 
-Orden de construcción que se desprende: `sistema`, `estructura` y `personas` (hechos), y
-a partir de ahí el resto. Es tentativo: cada spec de módulo puede ajustarlo.
+`tesoreria` depende de las interfaces públicas de `afiliacion` y `estructura`. De la
+primera obtiene las fotos cobrables y de la segunda todos los grupos, incluidos los
+cerrados: cerrar un grupo no borra su deuda. El orden efectivo es `sistema`, `estructura`,
+`personas`, `afiliacion`, `tesoreria`; lo resuelve el registro por dependencias.
 
 ## 8. Modo demo y offline
 
@@ -335,27 +336,31 @@ import sólo `json` es estándar). El día que exista `packages/local` va a habe
 resolverlo ahí — un transformer de Metro, o pasarle las migraciones al módulo de otra
 forma —, pero es un cambio en los módulos, no en el runner.
 
-## 9. Eventos entre módulos (futuro)
+## 9. Eventos entre módulos
 
 Los módulos no se llaman entre sí para reaccionar a cosas.
 
     afiliacion
        |
-       | emite AfiliacionDeclarada
+       | despues de guardar, emite AfiliacionDeclarada
        v
     bus de eventos (core, en proceso, sincronico, tipado)
        |
-       +--> tesoreria      genera la deuda      | misma transaccion:
-       +--> auditoria      registra el hecho    | pueden hacerla fallar
+       +--> tesoreria      genera el cargo
        |
-       +--> mensajeria     avisa al grupo       | efectos externos:
-       +--> notificaciones manda el push        | requieren bandeja de salida
+       +--> auditoria      (futuro)
+       +--> mensajeria     (futuro)
+       +--> notificaciones (futuro)
 
 Afiliación no sabe quién escucha. Ése es el punto: la deuda la genera Tesorería sin que
-Afiliación la conozca.
+Afiliación la conozca. El bus sólo tiene `suscribir` y `publicar`; no hay broker, cola ni
+serialización.
 
 El evento se llama `AfiliacionDeclarada` y no `AfiliacionAprobada`: lo que hace
 `afiliacion.declarar` es una declaración —una fotografía de quién está en cada grupo un
-día dado—, no una aprobación. No hay nada que aprobar. El bus de la primera fila sigue
-sin existir, como el resto de este diagrama: llega recién con Tesorería, su primer
-suscriptor real.
+día dado—, no una aprobación.
+
+La declaración es el hecho principal y no se revierte si un suscriptor falla. Tesorería
+compara las declaraciones cobrables con los cargos existentes y ofrece **Generar deudas
+pendientes** únicamente cuando falta alguno. Esa reconciliación idempotente recupera un
+evento perdido o una declaración emitida antes de configurar su cuota.

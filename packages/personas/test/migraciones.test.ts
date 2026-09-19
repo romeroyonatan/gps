@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite'
 import { beforeEach, describe, expect, test } from 'bun:test'
-import { aplicarMigraciones, type Bd, type Core, type Module } from '@gps/core'
+import { aplicarMigraciones, type Bd, type Core, crearBusDeEventos, type Module } from '@gps/core'
 import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migraciones } from '../src/servidor/migraciones'
@@ -13,6 +13,7 @@ function coreDePrueba(bd: Bd): Core {
     logger: { info: () => {}, error: () => {} },
     reloj: { ahora: () => HORA },
     bd,
+    eventos: crearBusDeEventos(),
     modulos: ['personas'],
     nuevoId: (prefijo) => `${prefijo}_fijo`,
   }

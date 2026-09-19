@@ -13,7 +13,8 @@
     "@gps/afiliacion": "workspace:*",
     "@gps/core": "workspace:*",
     "@gps/estructura": "workspace:*",
-    "@gps/personas": "workspace:*"
+    "@gps/personas": "workspace:*",
+    "@gps/tesoreria": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "latest",

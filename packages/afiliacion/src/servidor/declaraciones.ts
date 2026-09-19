@@ -124,6 +124,19 @@ export function crearOperacionesDeDeclaracion(
       tx.insert(afiliados).values(filas).run()
     })
 
+    for (const declaracion of nuevas) {
+      try {
+        await core.eventos.publicar('AfiliacionDeclarada', declaracion)
+      } catch (error) {
+        // La nomina es el hecho principal. Tesoreria puede reconstruir un
+        // cargo perdido desde esta foto, asi que su falla nunca la revierte.
+        core.logger.error('No se pudo procesar AfiliacionDeclarada', {
+          declaracionId: declaracion.id,
+          motivo: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+
     return nuevas
   }
 

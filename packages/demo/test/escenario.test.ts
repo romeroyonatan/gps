@@ -1,9 +1,10 @@
 import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
 import { afiliacion } from '@gps/afiliacion/servidor'
-import { aplicarMigraciones, type Bd, type Context, type Core } from '@gps/core'
+import { aplicarMigraciones, type Bd, type Context, type Core, crearBusDeEventos } from '@gps/core'
 import { estructura } from '@gps/estructura/servidor'
 import { personas } from '@gps/personas/servidor'
+import { tesoreria } from '@gps/tesoreria/servidor'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { sembrarEscenario } from '../src/servidor/escenario'
 
@@ -25,22 +26,28 @@ function montarContexto(hora = new Date('2026-08-27T12:00:00Z')): Context {
     // 00:00 UTC cae en el dia anterior al oeste de Greenwich.
     reloj: { ahora: () => hora },
     bd,
-    modulos: ['estructura', 'personas', 'afiliacion'],
+    eventos: crearBusDeEventos(),
+    modulos: ['estructura', 'personas', 'afiliacion', 'tesoreria'],
     nuevoId: (prefijo) => `${prefijo}_${++contador}`,
   }
 
-  aplicarMigraciones(core, [estructura, personas, afiliacion])
+  aplicarMigraciones(core, [estructura, personas, afiliacion, tesoreria])
   // personas depende de estructura y afiliacion de las dos, asi que se
   // construyen en ese orden: es el mismo cableado que hace crearServicios en la
   // raiz de composicion, a mano porque el test arma su propio contexto.
   const servicioDeEstructura = estructura.createServices(core, {})
   const servicioDePersonas = personas.createServices(core, { estructura: servicioDeEstructura })
+  const servicioDeAfiliacion = afiliacion.createServices(core, {
+    personas: servicioDePersonas,
+    estructura: servicioDeEstructura,
+  })
   return {
     actor: null,
     estructura: servicioDeEstructura,
     personas: servicioDePersonas,
-    afiliacion: afiliacion.createServices(core, {
-      personas: servicioDePersonas,
+    afiliacion: servicioDeAfiliacion,
+    tesoreria: tesoreria.createServices(core, {
+      afiliacion: servicioDeAfiliacion,
       estructura: servicioDeEstructura,
     }),
   } as Context
@@ -200,5 +207,15 @@ describe('sembrarEscenario: personas', () => {
     // Los dos casos, para que estaVigente tenga con que trabajar en pantalla.
     expect(cargos.some((cargo) => cargo.hasta === null)).toBe(true)
     expect(cargos.some((cargo) => cargo.hasta !== null)).toBe(true)
+  })
+
+  test('siembra cuentas con pago parcial y saldo a favor', async () => {
+    const ctx = montarContexto()
+    await sembrarEscenario(ctx)
+
+    const cuentas = await ctx.tesoreria.listarCuentas()
+    expect(cuentas.some((cuenta) => cuenta.saldo > 0)).toBe(true)
+    expect(cuentas.some((cuenta) => cuenta.saldo < 0)).toBe(true)
+    expect((await ctx.tesoreria.resumenDePendientes()).cantidad).toBe(0)
   })
 })
