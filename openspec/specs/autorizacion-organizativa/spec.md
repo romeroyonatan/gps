@@ -15,7 +15,26 @@ Cada módulo MUST negar el acceso que no declare expresamente y MUST aplicar aut
 
 #### Scenario: Registro fuera del ámbito
 - **WHEN** una función habilitada intenta leer o modificar un registro fuera de su ámbito
-- **THEN** el sistema no devuelve ni modifica ese registro
+- **THEN** el sistema no devuelve ni modifica ese registro, salvo el directorio de la asociación
+
+#### Scenario: Campo denegado dentro de una consulta permitida
+- **WHEN** una consulta pide en el mismo pedido un campo permitido y otro denegado para quien pregunta
+- **THEN** el sistema devuelve el permitido y vacía únicamente el denegado, sin anular la respuesta entera
+
+### Requirement: El directorio de la asociación es común
+El sistema SHALL mostrar a cualquier persona autenticada qué distritos y qué grupos
+existen, y quién conduce cada grupo. Saber que un grupo existe y quién lo dirige no es un
+dato de ese grupo: es lo que permite ubicarse en la asociación y saber a quién dirigirse.
+Los datos de un grupo —su gente, su cuenta corriente, sus salidas— MUST seguir limitados
+al ámbito de quien pregunta.
+
+#### Scenario: Jefatura de un grupo mirando la diócesis
+- **WHEN** un jefe de grupo consulta el árbol de distritos
+- **THEN** ve todos los distritos y todos los grupos abiertos, con el nombre de sus jefes
+
+#### Scenario: Detalle de un grupo ajeno
+- **WHEN** esa misma persona pide las personas, la cuenta corriente o las salidas de otro grupo
+- **THEN** el sistema no devuelve ninguno de esos datos
 
 ### Requirement: Acceso derivado de hechos vigentes
 El sistema MUST derivar los roles y ámbitos efectivos en cada request a partir de cargos, pertenencias a equipos y pertenencias de grupo vigentes, sin asignar permisos manuales a cada persona.

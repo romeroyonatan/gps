@@ -1,6 +1,7 @@
 import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
 import {
+  type Alcance,
   alcanceSinLimites,
   aplicarMigraciones,
   type Bd,
@@ -594,10 +595,26 @@ describe('gruposAbiertosEn', () => {
   })
 })
 
-describe('listarDistritos y el alcance', () => {
-  test('un jefe de grupo ve su grupo, con el distrito que lo contiene', async () => {
-    // Su alcance tiene el grupo pero no el distrito: sin esto el árbol le
-    // llegaría vacío y la app se vería sin nada.
+describe('listarDistritos es el directorio de la asociación', () => {
+  const alcanceDe = (grupos: string[]): Alcance => ({
+    actor: {
+      personaId: 'persona_1',
+      roles: grupos.map((id) => ({
+        rol: 'jefeDeGrupo' as const,
+        ambito: { tipo: 'grupo' as const, id },
+      })),
+      esAdministradorDesignado: false,
+      estaElevado: false,
+    },
+    gruposVisibles: grupos,
+    distritosVisibles: [],
+    esAdministrador: false,
+  })
+
+  test('un jefe de grupo ve la diócesis entera, no sólo su grupo', async () => {
+    // Saber qué distritos y qué grupos hay no revela nada de la gente de un
+    // grupo. Los datos de un grupo -sus personas, su cuenta, sus salidas- sí
+    // van por alcance, cada uno en su módulo.
     const servicio = montar()
     const norte = await servicio.crearDistrito({ numero: 1, zona: 'Norte' })
     const sur = await servicio.crearDistrito({ numero: 2, zona: 'Sur' })
@@ -605,39 +622,23 @@ describe('listarDistritos y el alcance', () => {
     await servicio.crearGrupo({ numero: 2, nombre: 'Dos', distritoId: norte.id })
     await servicio.crearGrupo({ numero: 3, nombre: 'Tres', distritoId: sur.id })
 
-    const arbol = await servicio.listarDistritos({
-      actor: {
-        personaId: 'persona_1',
-        roles: [{ rol: 'jefeDeGrupo', ambito: { tipo: 'grupo', id: suyo.id } }],
-        esAdministradorDesignado: false,
-        estaElevado: false,
-      },
-      gruposVisibles: [suyo.id],
-      distritosVisibles: [],
-      esAdministrador: false,
-    })
+    const arbol = await servicio.listarDistritos(alcanceDe([suyo.id]))
 
-    expect(arbol).toHaveLength(1)
-    expect(arbol[0]?.id).toBe(norte.id)
-    expect(arbol[0]?.grupos.map((grupo) => grupo.id)).toEqual([suyo.id])
+    expect(arbol).toHaveLength(2)
+    expect(arbol.flatMap((distrito) => distrito.grupos).map((grupo) => grupo.numero)).toEqual([
+      1, 2, 3,
+    ])
   })
 
-  test('un distrito sin grupos visibles no aparece', async () => {
+  test('un grupo cerrado sigue sin aparecer', async () => {
+    // El filtro que sí queda es el de vigencia, no el de alcance.
     const servicio = montar()
     const norte = await servicio.crearDistrito({ numero: 1, zona: 'Norte' })
-    await servicio.crearGrupo({ numero: 1, nombre: 'Uno', distritoId: norte.id })
+    const abierto = await servicio.crearGrupo({ numero: 1, nombre: 'Uno', distritoId: norte.id })
+    const cerrado = await servicio.crearGrupo({ numero: 2, nombre: 'Dos', distritoId: norte.id })
+    await servicio.cerrarGrupo(cerrado.id)
 
-    const arbol = await servicio.listarDistritos({
-      actor: {
-        personaId: 'persona_1',
-        roles: [],
-        esAdministradorDesignado: false,
-        estaElevado: false,
-      },
-      gruposVisibles: [],
-      distritosVisibles: [],
-      esAdministrador: false,
-    })
-    expect(arbol).toEqual([])
+    const arbol = await servicio.listarDistritos(alcanceDe([]))
+    expect(arbol[0]?.grupos.map((grupo) => grupo.id)).toEqual([abierto.id])
   })
 })

@@ -67,6 +67,13 @@ async function montar() {
 /** El largo de una lista que el test ya verificó que vino sin errores. */
 const cuantos = (valor: unknown) => (Array.isArray(valor) ? valor.length : -1)
 
+/** El grupo propio de quien pregunta: sale de `cuentasDeGrupos`, que sí va por
+ *  alcance. El árbol de distritos es el directorio y los trae todos. */
+const primerGrupo = (datos: unknown): string => {
+  const cuentas = (datos as { cuentasDeGrupos?: { grupoId: string }[] } | null)?.cuentasDeGrupos
+  return cuentas?.[0]?.grupoId ?? ''
+}
+
 const codigos = (resultado: { errors?: readonly { extensions?: unknown }[] }) =>
   (resultado.errors ?? []).map(
     (error) => (error.extensions as { code?: string } | undefined)?.code ?? '',
@@ -218,25 +225,22 @@ describe('invitaciones', () => {
 })
 
 describe('alcance entre grupos', () => {
-  test('la jefatura de un grupo no ve ni toca el de al lado', async () => {
+  test('la jefatura de un grupo ve el directorio pero no toca el de al lado', async () => {
     const { contexto, consultar, entrar } = await montar()
     const jefatura = await entrar('jefatura')
-    const tesoreria = await entrar('tesoreria')
 
-    // Tesorería diocesana ve todos los grupos; la jefatura, uno solo.
-    const todos = await consultar(tesoreria.secreto, '{ distritos { grupos { id } } }')
-    const idsDeTodos = (
-      todos.data?.distritos as { grupos: { id: string }[] }[] | undefined
-    )?.flatMap((distrito) => distrito.grupos.map((grupo) => grupo.id))
-    const propios = await consultar(jefatura.secreto, '{ distritos { grupos { id } } }')
-    const idsPropios = (
-      propios.data?.distritos as { grupos: { id: string }[] }[] | undefined
-    )?.flatMap((distrito) => distrito.grupos.map((grupo) => grupo.id))
+    // El árbol es el directorio de la asociación: lo ve entero, con los jefes
+    // de cada grupo. Lo que no ve son los datos de un grupo ajeno.
+    const arbol = await consultar(jefatura.secreto, '{ distritos { grupos { id } } }')
+    const ids = (arbol.data?.distritos as { grupos: { id: string }[] }[] | undefined)?.flatMap(
+      (distrito) => distrito.grupos.map((grupo) => grupo.id),
+    )
+    expect((ids ?? []).length).toBeGreaterThan(1)
 
-    expect(idsPropios).toHaveLength(1)
-    expect((idsDeTodos ?? []).length).toBeGreaterThan(1)
-
-    const ajeno = (idsDeTodos ?? []).find((id) => id !== idsPropios?.[0]) ?? ''
+    const propio = await consultar(jefatura.secreto, '{ cuentasDeGrupos { grupoId } }')
+    const suyo = primerGrupo(propio.data)
+    const ajeno = (ids ?? []).find((id) => id !== suyo) ?? ''
+    expect(ajeno).not.toBe('')
 
     // Leer el grupo ajeno: nada.
     const personasAjenas = await consultar(
@@ -301,10 +305,10 @@ describe('alcance entre grupos', () => {
     const { consultar, entrar } = await montar()
     for (const perfil of ['jefatura', 'secretaria']) {
       const sesion = await entrar(perfil)
-      const suyo = await consultar(sesion.secreto, '{ distritos { grupos { id } } }')
-      const grupo =
-        (suyo.data?.distritos as { grupos: { id: string }[] }[] | undefined)?.[0]?.grupos[0]?.id ??
-        ''
+      // Su grupo sale de `cuentasDeGrupos`, que sí va por alcance: el árbol de
+      // distritos es el directorio y los trae todos.
+      const suyo = await consultar(sesion.secreto, '{ cuentasDeGrupos { grupoId } }')
+      const grupo = primerGrupo(suyo.data)
       expect(grupo).not.toBe('')
 
       const permisos = await consultar(
@@ -330,9 +334,8 @@ describe('alcance entre grupos', () => {
     const jefatura = await entrar('jefatura')
     const tesoreria = await entrar('tesoreria')
 
-    const suyo = await consultar(jefatura.secreto, '{ distritos { grupos { id } } }')
-    const grupo =
-      (suyo.data?.distritos as { grupos: { id: string }[] }[] | undefined)?.[0]?.grupos[0]?.id ?? ''
+    const suyo = await consultar(jefatura.secreto, '{ cuentasDeGrupos { grupoId } }')
+    const grupo = primerGrupo(suyo.data)
 
     const pago = `mutation ($g: ID!) { registrarPago(grupoId: $g, fecha: "2026-05-01", importe: 1000, medioDePago: efectivo) { id } }`
     expect(codigos(await consultar(jefatura.secreto, pago, { g: grupo }))).toEqual([

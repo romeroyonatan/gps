@@ -245,6 +245,16 @@ type Invitacion {
 }
 
 """
+Quién conduce un grupo hoy, para el directorio de la asociación.
+"""
+type JefeDeGrupo {
+  apellidos: String!
+  grupoId: ID!
+  nombres: String!
+  personaId: ID!
+}
+
+"""
 Cómo recibió Tesorería un pago externo.
 """
 enum MedioDePago {
@@ -530,6 +540,11 @@ type Query {
   Mira un enlace sin consumirlo. No pide sesión: el secreto es la autorización, y quien lo tiene ya podría consumirlo.
   """
   invitacion(secreto: ID!): Invitacion!
+
+  """
+  Quiénes conducen esos grupos el día dado. No filtra por alcance: es el directorio de la asociación, no los datos de la gente de un grupo.
+  """
+  jefesDeGrupos(fecha: String!, grupoIds: [ID!]!): [JefeDeGrupo!]!
   movimientosDeTesoreria(grupoId: ID!): [MovimientoDeTesoreria!]!
 
   """

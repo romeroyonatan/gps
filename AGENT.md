@@ -133,13 +133,21 @@ pantallas grandes, nunca arreglan lo que se rompió en chicas.
    `componerEsquema` se lo cuelga a cada campo raíz que ese módulo registra. Un campo
    raíz sin módulo dueño aborta el arranque en vez de quedar publicado abierto.
 2. **Alcance.** `Alcance` es el **primer parámetro obligatorio** de todo camino de
-   consulta o escritura iniciado por un usuario. Lleva adentro al `Actor`, porque las
+   consulta o escritura iniciado por un usuario. La excepción declarada es el directorio
+   de la asociación —el árbol de distritos y grupos, y quién conduce cada grupo—, que
+   ve cualquiera con sesión: saber que un grupo existe no es un dato de ese grupo. Sus
+   datos —gente, cuenta corriente, salidas— sí van por alcance. Lleva adentro al `Actor`, porque las
    dos preguntas viajan siempre juntas: qué filas se ven y qué puede hacer quien
    pregunta. Los caminos internos —el barrido de Afiliación, el suscriptor de
    Tesorería— no lo reciben y no son alcanzables desde GraphQL.
 3. **Políticas por operación y campo** en `src/dominio/politicas.ts`. Son funciones
    puras sobre `Actor` o `Alcance`, las aplica el servidor y las usan las pantallas
    para no ofrecer lo que después se va a rechazar. La interfaz nunca es la barrera.
+
+Un campo denegado **no puede** ser no-nulable en GraphQL: uno que lanza se lleva puesta
+la respuesta entera, así que una consulta que mezcla campos de distinto permiso pierde
+también lo que sí podía ver. Un campo que se deniega por función se declara nullable y
+devuelve `null` —ver `deudasPendientes`—; las escrituras sí lanzan.
 
 `alcanceSinLimites()` existe para la siembra del demo y los tests que no prueban
 autorización. No sale de ahí: el alcance de un request se construye siempre con

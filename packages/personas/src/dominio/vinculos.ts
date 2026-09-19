@@ -102,3 +102,12 @@ export function estaVigenteParaAcceso(
 ): boolean {
   return vinculo.revocadoEn === null && estaVigente(vinculo, hoy)
 }
+
+/** Quién conduce un grupo, para el directorio de la asociación. Es lo mínimo
+ *  para nombrarlo: sin documento, sin fecha de nacimiento, sin pertenencia. */
+export interface JefeDeGrupo {
+  readonly grupoId: string
+  readonly personaId: string
+  readonly nombres: string
+  readonly apellidos: string
+}

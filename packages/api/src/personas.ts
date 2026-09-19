@@ -6,6 +6,7 @@ import {
   type CrearPersonaMutationVariables,
   IntegrarEquipoDocument,
   type IntegrarEquipoMutationVariables,
+  JefesDeGruposDocument,
   PersonasDocument,
   RevocarCargoDocument,
   RevocarIntegranteDeEquipoDocument,
@@ -22,6 +23,19 @@ export function usePersonasDelGrupo(grupoId: string) {
     // entrada de cache y el segundo mostraria las personas del primero.
     queryKey: ['personas', grupoId],
     queryFn: () => transporte.ejecutar(PersonasDocument, { grupoId }),
+  })
+}
+
+/** Quiénes conducen esos grupos hoy. Se consulta aparte del árbol de distritos
+ *  porque son dos módulos: `estructura` da el árbol y `personas` los jefes, y
+ *  la pantalla cruza por id. */
+export function useJefesDeGrupos(grupoIds: readonly string[], fecha: string) {
+  const transporte = useTransporte()
+  return useQuery({
+    queryKey: ['jefesDeGrupos', fecha, [...grupoIds].sort().join(',')],
+    queryFn: () => transporte.ejecutar(JefesDeGruposDocument, { grupoIds: [...grupoIds], fecha }),
+    // Sin grupos no hay nada que preguntar, y el árbol todavía no llegó.
+    enabled: grupoIds.length > 0,
   })
 }
 

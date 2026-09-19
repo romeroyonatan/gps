@@ -59,3 +59,12 @@ mutation IntegrarEquipo($personaId: ID!, $tipo: TipoDeEquipo!, $ambitoId: ID, $d
 mutation RevocarIntegranteDeEquipo($integranteId: ID!) {
   revocarIntegranteDeEquipo(integranteId: $integranteId)
 }
+
+query JefesDeGrupos($grupoIds: [ID!]!, $fecha: String!) {
+  jefesDeGrupos(grupoIds: $grupoIds, fecha: $fecha) {
+    grupoId
+    personaId
+    nombres
+    apellidos
+  }
+}

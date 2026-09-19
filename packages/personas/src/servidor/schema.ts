@@ -10,6 +10,7 @@ import type {
   Cargo,
   DatosDeCargo,
   DatosDeIngreso,
+  JefeDeGrupo,
   PersonaConVinculos,
   Pertenencia,
 } from '../dominio/vinculos'
@@ -241,6 +242,39 @@ export function registrarSchema(builder: Builder): void {
    *  alcance: quién puede nombrar a quién es una pregunta de función -jefatura
    *  y Secretaría en su grupo, autoridades diocesanas en la diócesis-, y la
    *  responde `personas` con sus políticas puras. */
+  const JefeRef = builder.objectRef<JefeDeGrupo>('JefeDeGrupo').implement({
+    description: 'Quién conduce un grupo hoy, para el directorio de la asociación.',
+    fields: (t) => ({
+      grupoId: t.exposeID('grupoId'),
+      personaId: t.exposeID('personaId'),
+      nombres: t.exposeString('nombres'),
+      apellidos: t.exposeString('apellidos'),
+    }),
+  })
+
+  // Consulta suelta y no un campo de Grupo porque la flecha va en esta
+  // dirección: personas conoce a estructura, no al revés. La pantalla hace las
+  // dos consultas y cruza por id, igual que con `afiliadosEn`.
+  builder.queryField('jefesDeGrupos', (t) =>
+    t.field({
+      type: [JefeRef],
+      description:
+        'Quiénes conducen esos grupos el día dado. No filtra por alcance: es el ' +
+        'directorio de la asociación, no los datos de la gente de un grupo.',
+      args: {
+        grupoIds: t.arg.idList({ required: true }),
+        fecha: t.arg.string({ required: true }),
+      },
+      resolve: async (_padre, args, contexto) => [
+        ...(await contexto.personas.jefesDeGrupos(
+          alcanceDe(contexto),
+          args.grupoIds.map(String),
+          args.fecha,
+        )),
+      ],
+    }),
+  )
+
   builder.mutationField('asignarCargo', (t) =>
     t.field({
       type: CargoRef,

@@ -27,6 +27,7 @@ export {
   useAsignarCargo,
   useCrearPersona,
   useIntegrarEquipo,
+  useJefesDeGrupos,
   usePersonasDelGrupo,
   useRevocarCargo,
   useRevocarIntegranteDeEquipo,

@@ -27,6 +27,7 @@ export type {
   Cargo,
   DatosDeCargo,
   DatosDeIngreso,
+  JefeDeGrupo,
   PersonaConVinculos,
   Pertenencia,
 } from './vinculos'

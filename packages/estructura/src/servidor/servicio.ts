@@ -8,7 +8,6 @@ import type {
   SexoDeUnidad,
   Unidad,
 } from '../dominio/modelos'
-import { puedeVerDistrito, puedeVerGrupo } from '../dominio/politicas'
 import type { Estructura } from '../dominio/publico'
 import { RAMAS, type Rama, ramaDelCatalogo } from '../dominio/ramas'
 import { grupoEstabaAbiertoEn } from '../dominio/vigencia'
@@ -28,8 +27,16 @@ export interface ServicioDeEstructura extends Estructura {
   }): Promise<Unidad>
   cerrarUnidad(unidadId: string): Promise<void>
   cerrarGrupo(grupoId: string): Promise<void>
-  /** El arbol de la diocesis filtrado por el alcance: un jefe de grupo ve su
-   *  distrito con su grupo adentro, no los demas. */
+  /** El arbol de la diocesis: distritos, grupos y unidades abiertas.
+   *
+   *  No se filtra por alcance, y es a proposito: es el directorio de la
+   *  asociacion -que distritos hay, que grupos hay- y saberlo no revela nada
+   *  de la gente de un grupo. Los datos de un grupo -sus personas, su cuenta,
+   *  sus salidas- si van por alcance, cada uno en su modulo.
+   *
+   *  Recibe `Alcance` igual porque lo inicia un usuario: la convencion vale
+   *  aunque hoy no filtre, y el dia que algo de esto se restrinja el parametro
+   *  ya esta donde tiene que estar. */
   listarDistritos(alcance: Alcance): Promise<readonly DistritoConGrupos[]>
 }
 
@@ -215,7 +222,7 @@ export function crearServicioDeEstructura(core: Core): ServicioDeEstructura {
       return core.bd.select().from(grupos).orderBy(grupos.numero).all()
     },
 
-    async listarDistritos(alcance) {
+    async listarDistritos(_alcance) {
       // Tres consultas y el arbol se arma en memoria. Con la cantidad de
       // distritos y grupos de una diocesis alcanza de sobra; si algun dia deja
       // de alcanzar, se arregla aca y en ningun otro lado.
@@ -250,18 +257,10 @@ export function crearServicioDeEstructura(core: Core): ServicioDeEstructura {
         gruposPorDistrito.set(grupo.distritoId, delDistrito)
       }
 
-      // Un distrito se ve si el alcance lo alcanza -comisionado, diocesanas- o
-      // si alguno de sus grupos se ve: un jefe de grupo no tiene el distrito en
-      // su alcance, pero su grupo cuelga de uno, y sin el distrito el árbol le
-      // llegaría vacío.
-      return filasDistritos
-        .map((distrito) => ({
-          ...distrito,
-          grupos: (gruposPorDistrito.get(distrito.id) ?? []).filter((grupo) =>
-            puedeVerGrupo(alcance, grupo.id),
-          ),
-        }))
-        .filter((distrito) => puedeVerDistrito(alcance, distrito.id) || distrito.grupos.length > 0)
+      return filasDistritos.map((distrito) => ({
+        ...distrito,
+        grupos: gruposPorDistrito.get(distrito.id) ?? [],
+      }))
     },
 
     async distritoEstaAbierto(distritoId) {

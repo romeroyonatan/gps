@@ -1,4 +1,5 @@
-import { useDistritos, useVersion } from '@gps/api'
+import { useDistritos, useJefesDeGrupos, useVersion } from '@gps/api'
+import { aFechaDeCalendario } from '@gps/core/fechas'
 import { etiquetaDeEdades, ramaDelCatalogo, type Unidad } from '@gps/estructura/dominio'
 import { Link } from 'expo-router'
 import { Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native'
@@ -22,6 +23,7 @@ function Grupo(props: {
   id: string
   numero: number
   nombre: string
+  jefes: readonly string[]
   unidades: readonly Pick<Unidad, 'id' | 'rama' | 'nombre'>[]
 }) {
   return (
@@ -30,6 +32,9 @@ function Grupo(props: {
         <Text className="text-sm font-medium text-slate-900">
           <Text className="text-slate-400">Grupo Scout Nº{props.numero} -</Text> {props.nombre}
         </Text>
+        {props.jefes.length > 0 && (
+          <Text className="mt-0.5 text-xs text-slate-500">{props.jefes.join(' · ')}</Text>
+        )}
         {props.unidades.length === 0 ? (
           <Text className="mt-1.5 text-xs text-slate-400">Todavía no abrió ninguna unidad</Text>
         ) : (
@@ -47,6 +52,19 @@ function Grupo(props: {
 export default function Pantalla() {
   const { data, isPending, error } = useDistritos()
   const version = useVersion()
+
+  // El árbol lo da `estructura` y los jefes `personas`: dos módulos, dos
+  // consultas, y la pantalla cruza por id.
+  const grupos = (data?.distritos ?? []).flatMap((distrito) =>
+    distrito.grupos.map((grupo) => grupo.id),
+  )
+  const jefes = useJefesDeGrupos(grupos, aFechaDeCalendario(new Date()))
+  const porGrupo = new Map<string, string[]>()
+  for (const jefe of jefes.data?.jefesDeGrupos ?? []) {
+    const suyos = porGrupo.get(jefe.grupoId) ?? []
+    suyos.push(`${jefe.nombres} ${jefe.apellidos}`)
+    porGrupo.set(jefe.grupoId, suyos)
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
@@ -87,6 +105,7 @@ export default function Pantalla() {
                   id={grupo.id}
                   numero={grupo.numero}
                   nombre={grupo.nombre}
+                  jefes={porGrupo.get(grupo.id) ?? []}
                   unidades={grupo.unidades}
                 />
               ))}

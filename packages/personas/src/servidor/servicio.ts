@@ -1,7 +1,7 @@
 import type { Actor, Alcance, Core, RolConAmbito } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Estructura } from '@gps/estructura/dominio'
-import { and, eq, gte, isNull, lte, or } from 'drizzle-orm'
+import { and, eq, gte, inArray, isNull, lte, or } from 'drizzle-orm'
 import { ambitoDelCargo, nombreDelCargo, type TipoDeCargo } from '../dominio/cargos'
 import { nombreDelTipo, normalizarNumero, type TipoDeDocumento } from '../dominio/documentos'
 import type { IntegranteDeEquipo, TipoDeEquipo } from '../dominio/equipos'
@@ -13,7 +13,13 @@ import {
 } from '../dominio/politicas'
 import type { Personas } from '../dominio/publico'
 import { type Problema, validarIngreso, validarPersona } from '../dominio/validaciones'
-import type { Cargo, DatosDeIngreso, PersonaConVinculos, Pertenencia } from '../dominio/vinculos'
+import type {
+  Cargo,
+  DatosDeIngreso,
+  JefeDeGrupo,
+  PersonaConVinculos,
+  Pertenencia,
+} from '../dominio/vinculos'
 import {
   equipos,
   eventosDeAutoridad,
@@ -88,6 +94,20 @@ export interface ServicioDePersonas extends Personas {
   ): Promise<PersonaConVinculos>
   /** Las personas con pertenencia vigente en ese grupo, ordenadas por apellido. */
   listarPersonas(alcance: Alcance, grupoId: string): Promise<readonly PersonaConVinculos[]>
+
+  /** Quién conduce cada grupo hoy. Es el directorio de la asociación —el
+   *  complemento del árbol de distritos— y por eso no se filtra por alcance:
+   *  saber quién es el jefe del grupo 7 no dice nada de la gente del grupo 7.
+   *  Sus datos, su cuenta y sus salidas siguen yendo por alcance.
+   *
+   *  Una consulta suelta y no un campo de `Grupo` porque la flecha va en esta
+   *  dirección: `personas` conoce a `estructura`, no al revés. Mismo motivo
+   *  que `afiliadosEn`. */
+  jefesDeGrupos(
+    alcance: Alcance,
+    grupoIds: readonly string[],
+    fecha: string,
+  ): Promise<readonly JefeDeGrupo[]>
 
   /** Le da a una persona un cargo en la entidad que corresponde a su ambito:
    *  un grupo, un distrito, o ninguna si es de la diocesis. */
@@ -631,6 +651,30 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
           })
           .run()
       })
+    },
+
+    async jefesDeGrupos(_alcance, grupoIds, fecha) {
+      if (grupoIds.length === 0) return []
+      return core.bd
+        .select({
+          grupoId: tablaDeCargos.ambitoId,
+          personaId: personas.id,
+          nombres: personas.nombres,
+          apellidos: personas.apellidos,
+        })
+        .from(tablaDeCargos)
+        .innerJoin(personas, eq(personas.id, tablaDeCargos.personaId))
+        .where(
+          and(
+            eq(tablaDeCargos.cargo, 'jefeDeGrupo'),
+            inArray(tablaDeCargos.ambitoId, [...grupoIds]),
+            isNull(tablaDeCargos.revocadoEn),
+            lte(tablaDeCargos.desde, fecha),
+            or(isNull(tablaDeCargos.hasta), gte(tablaDeCargos.hasta, fecha)),
+          ),
+        )
+        .all()
+        .flatMap((fila) => (fila.grupoId === null ? [] : [{ ...fila, grupoId: fila.grupoId }]))
     },
 
     async listarPersonas(alcance, grupoId) {
