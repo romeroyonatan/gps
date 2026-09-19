@@ -5,6 +5,7 @@ import {
   aplicarMigraciones,
   type Bd,
   type Core,
+  crearBusDeEventos,
   type Module,
   type Reloj,
 } from '@gps/core'
@@ -65,6 +66,7 @@ function estructuraFalsa(grupos: readonly GrupoConUnidades[] = [GRUPO]): Estruct
       esAdministrador: false,
     }),
     obtenerGrupo: async (id) => grupos.find((grupo) => grupo.id === id) ?? null,
+    listarGrupos: async () => grupos,
     distritoEstaAbierto: async (id) => DISTRITOS_ABIERTOS.has(id),
     // Personas no usa gruposAbiertosEn: se implementa solo para satisfacer la
     // interfaz. Los GrupoConUnidades de este archivo tienen cerradoEn: null.
@@ -97,6 +99,7 @@ function montarConBd(
     logger: { info: () => {}, error: () => {} },
     reloj,
     bd,
+    eventos: crearBusDeEventos(),
     modulos: ['estructura', 'personas'],
     // Falso pero con el comportamiento que importa: sellar y verificar cierran
     // entre si, y un dato alterado no verifica.

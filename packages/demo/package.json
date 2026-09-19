@@ -15,7 +15,8 @@
     "@gps/core": "workspace:*",
     "@gps/estructura": "workspace:*",
     "@gps/personas": "workspace:*",
-    "@gps/salidas": "workspace:*"
+    "@gps/salidas": "workspace:*",
+    "@gps/tesoreria": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "latest",

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import type { Core } from '@gps/core'
+import { type Core, crearBusDeEventos } from '@gps/core'
 import * as jose from 'jose'
 import type { ClienteHttp } from '../src/servidor/http'
 import { crearProveedorApple, crearProveedorGoogle, TokenInvalido } from '../src/servidor/oidc'
@@ -13,6 +13,7 @@ function coreFalso(): Core {
     logger: { info: () => {}, error: () => {} },
     reloj: { ahora: () => HORA },
     bd: {} as Core['bd'],
+    eventos: crearBusDeEventos(),
     modulos: [],
     sellador: { sellar: () => ({ sello: '', claveId: '' }), verificar: () => true },
     almacenamiento: {

@@ -1,5 +1,5 @@
 import type { Actor, Alcance } from '@gps/core'
-import type { GrupoConUnidades } from './modelos'
+import type { Grupo, GrupoConUnidades } from './modelos'
 
 /** Lo que estructura le publica a los otros modulos, y nada mas.
  *
@@ -32,6 +32,10 @@ export interface Estructura {
    *  necesita mas: el dia que alguien necesite leerlo, se agrega el metodo que
    *  lo devuelva, con su consumidor. */
   distritoEstaAbierto(distritoId: string): Promise<boolean>
+
+  /** Todos los grupos conocidos, incluso los cerrados: una deuda no desaparece
+   * cuando cierra el grupo que la contrajo. */
+  listarGrupos(): Promise<readonly Grupo[]>
 
   /** Los ids de los grupos que estaban abiertos el dia `fecha` (aaaa-mm-dd).
    *  Cerrado ese mismo dia todavia cuenta como abierto, igual que estaVigente

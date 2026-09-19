@@ -1,6 +1,13 @@
 import { Database } from 'bun:sqlite'
 import { autorizadores, archivos as moduloDeArchivos } from '@gps/archivos/servidor'
-import { aplicarMigraciones, type Bd, type Core, type Module, type Reloj } from '@gps/core'
+import {
+  aplicarMigraciones,
+  type Bd,
+  type Core,
+  crearBusDeEventos,
+  type Module,
+  type Reloj,
+} from '@gps/core'
 import type { Estructura, GrupoConUnidades, Unidad } from '@gps/estructura/dominio'
 import type { MiembroDelGrupo, Persona, Personas, TipoDeCargo } from '@gps/personas/dominio'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
@@ -86,6 +93,7 @@ export function montar(opciones: { reloj?: Reloj; mundo?: Mundo } = {}) {
     logger: { info: () => {}, error: () => {} },
     reloj: opciones.reloj ?? { ahora: () => HORA },
     bd,
+    eventos: crearBusDeEventos(),
     modulos: ['archivos', 'salidas'],
     // Sellador falso pero con el comportamiento que importa: cierra consigo
     // mismo y un dato alterado no verifica.
@@ -139,6 +147,7 @@ export function montar(opciones: { reloj?: Reloj; mundo?: Mundo } = {}) {
     }),
     obtenerGrupo: async (id) => mundo.grupos.find((grupo) => grupo.id === id) ?? null,
     distritoEstaAbierto: async (id) => id === DISTRITO_ID,
+    listarGrupos: async () => mundo.grupos,
     gruposAbiertosEn: async () => new Set(mundo.grupos.map((grupo) => grupo.id)),
   }
 

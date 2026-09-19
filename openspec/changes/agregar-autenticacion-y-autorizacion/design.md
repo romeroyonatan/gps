@@ -20,7 +20,7 @@ Este diseño reemplaza la suposición anterior de una tabla `usuarios`: una pers
 
 - Contraseñas, OTP o correo de recuperación.
 - Un editor genérico de permisos o roles asignados manualmente.
-- Implementar el módulo Tesorería; se fija el contrato que deberá cumplir.
+- El diseno original de este cambio no implementaba el modulo Tesoreria, sólo fijaba su contrato. `packages/tesoreria` ya existe -se integró desde otra rama, sin autenticación ni alcance todavía-; este cambio sigue siendo el que le agrega autorización real en la tarea 6.5, sin tocar su dominio funcional.
 - Sincronización offline completa, cifrado de datos de salud o auditoría general de lecturas.
 - Equipos arbitrarios creados por usuarios: esta iteración incorpora sólo Secretaría, Administración diocesana y Tesorería diocesana.
 

@@ -40,10 +40,10 @@
 ## 6. Autorización de módulos existentes
 
 - [ ] 6.1 Hacer obligatoria la declaración `accesoAlModulo` con denegación por defecto y configurar autorización Pothos por operación/campo; verificar que un módulo o campo sin política no quede publicado accidentalmente.
-- [ ] 6.2 Crear políticas puras de Estructura, Personas, Afiliación y Salidas para Jefatura, Secretaría, firmantes vigentes y elevación global, manteniendo `/health`, autenticación y versión públicas; verificar tests unitarios de la matriz permitida/denegada.
-- [ ] 6.3 Pasar `Alcance` como primer parámetro de todos los caminos de persistencia iniciados por usuario y filtrar grupos antes de leer o escribir, incluidas las descargas que Archivos delega a Salidas; verificar tests cruzados donde un actor del grupo A no observa ni modifica permisos o archivos del B.
-- [ ] 6.4 Mantener separados los casos internos como el barrido programado de Afiliación, sin exponerlos por GraphQL ni fabricar un administrador; verificar que el trabajo programado sigue cubriendo todos los grupos.
-- [ ] 6.5 Declarar en dominio el contrato futuro de Tesorería: Jefatura/Secretaría leen sólo su grupo y Tesorería diocesana registra pagos de toda la diócesis, sin crear todavía el módulo; verificar tests de las funciones puras de política.
+- [ ] 6.2 Crear políticas puras de Estructura, Personas, Afiliación, Tesorería y Salidas para Jefatura, Secretaría, Tesorería diocesana, firmantes vigentes y elevación global, manteniendo `/health`, autenticación y versión públicas; verificar tests unitarios de la matriz permitida/denegada.
+- [ ] 6.3 Pasar `Alcance` como primer parámetro de todos los caminos de persistencia iniciados por usuario y filtrar grupos antes de leer o escribir, incluidas las descargas que Archivos delega a Salidas y las cuentas/pagos de Tesorería; verificar tests cruzados donde un actor del grupo A no observa ni modifica datos del B.
+- [ ] 6.4 Mantener separados los casos internos como el barrido programado de Afiliación y el suscriptor `AfiliacionDeclarada` de Tesorería, sin exponerlos por GraphQL ni fabricar un administrador; verificar que el trabajo programado sigue cubriendo todos los grupos.
+- [ ] 6.5 Aplicar autorización real al módulo Tesorería ya existente (`packages/tesoreria`, integrado desde otra rama sin actor ni alcance): Jefatura/Secretaría leen sólo la cuenta de su grupo, sólo Tesorería diocesana o el administrador elevado registran/anulan pagos de cualquier grupo de la diócesis, y `definirCuota`/`listarPeriodosConfigurables` quedan reservados a Tesorería diocesana o Administración diocesana; verificar tests de la matriz permitida/denegada y que un actor de un grupo no lee ni escribe la cuenta de otro.
 
 ## 7. API, web y mobile
 

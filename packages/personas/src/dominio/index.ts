@@ -17,6 +17,9 @@ export { calcularEdad, nombreCompleto } from './modelos'
 export {
   puedeAdministrarEquiposDiocesanos,
   puedeAdministrarPlantelDeGrupo,
+  puedeConfigurarCuotas,
+  puedeLeerCuentaDeGrupo,
+  puedeRegistrarPagos,
 } from './politicas'
 export type { MiembroActivo, MiembroDelGrupo, Personas } from './publico'
 export type { Problema } from './validaciones'

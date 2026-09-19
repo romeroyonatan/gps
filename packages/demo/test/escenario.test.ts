@@ -2,12 +2,13 @@ import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
 import { afiliacion } from '@gps/afiliacion/servidor'
 import { archivos, autorizadores } from '@gps/archivos/servidor'
-import { aplicarMigraciones, type Bd, type Context, type Core } from '@gps/core'
+import { aplicarMigraciones, type Bd, type Context, type Core, crearBusDeEventos } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import { ramasDeLasUnidades } from '@gps/estructura/dominio'
 import { estructura } from '@gps/estructura/servidor'
 import { personas } from '@gps/personas/servidor'
 import { salidas } from '@gps/salidas/servidor'
+import { tesoreria } from '@gps/tesoreria/servidor'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { sembrarEscenario } from '../src/servidor/escenario'
 
@@ -34,7 +35,8 @@ function montarContexto(hora = HORA): Context {
     // 00:00 UTC cae en el dia anterior al oeste de Greenwich.
     reloj: { ahora: () => hora },
     bd,
-    modulos: ['estructura', 'personas', 'afiliacion', 'archivos', 'salidas'],
+    eventos: crearBusDeEventos(),
+    modulos: ['estructura', 'personas', 'afiliacion', 'tesoreria', 'archivos', 'salidas'],
     // Falso pero con el comportamiento que importa: sellar y verificar cierran
     // entre si, y un dato alterado no verifica.
     sellador: {
@@ -55,12 +57,16 @@ function montarContexto(hora = HORA): Context {
     nuevoSecreto: () => `secreto_${++contador}`,
   }
 
-  aplicarMigraciones(core, [estructura, personas, afiliacion, archivos, salidas])
+  aplicarMigraciones(core, [estructura, personas, afiliacion, tesoreria, archivos, salidas])
   // personas depende de estructura y afiliacion de las dos, asi que se
   // construyen en ese orden: es el mismo cableado que hace crearServicios en la
   // raiz de composicion, a mano porque el test arma su propio contexto.
   const servicioDeEstructura = estructura.createServices(core, {})
   const servicioDePersonas = personas.createServices(core, { estructura: servicioDeEstructura })
+  const servicioDeAfiliacion = afiliacion.createServices(core, {
+    personas: servicioDePersonas,
+    estructura: servicioDeEstructura,
+  })
   // Lo que hace la raiz de composicion: sin esto, `archivos` no entrega nada
   // porque nadie reclama los archivos de salidas.
   autorizadores.salidas = async () => true
@@ -70,8 +76,9 @@ function montarContexto(hora = HORA): Context {
     alcance: null,
     estructura: servicioDeEstructura,
     personas: servicioDePersonas,
-    afiliacion: afiliacion.createServices(core, {
-      personas: servicioDePersonas,
+    afiliacion: servicioDeAfiliacion,
+    tesoreria: tesoreria.createServices(core, {
+      afiliacion: servicioDeAfiliacion,
       estructura: servicioDeEstructura,
     }),
     archivos: servicioDeArchivos,
@@ -282,5 +289,15 @@ describe('sembrarEscenario: personas', () => {
     // Los dos casos, para que estaVigente tenga con que trabajar en pantalla.
     expect(cargos.some((cargo) => cargo.hasta === null)).toBe(true)
     expect(cargos.some((cargo) => cargo.hasta !== null)).toBe(true)
+  })
+
+  test('siembra cuentas con pago parcial y saldo a favor', async () => {
+    const ctx = montarContexto()
+    await sembrarEscenario(ctx, HORA)
+
+    const cuentas = await ctx.tesoreria.listarCuentas()
+    expect(cuentas.some((cuenta) => cuenta.saldo > 0)).toBe(true)
+    expect(cuentas.some((cuenta) => cuenta.saldo < 0)).toBe(true)
+    expect((await ctx.tesoreria.resumenDePendientes()).cantidad).toBe(0)
   })
 })

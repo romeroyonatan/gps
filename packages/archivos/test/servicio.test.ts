@@ -1,6 +1,13 @@
 import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
-import { aplicarMigraciones, type Bd, type Core, type Module, type Reloj } from '@gps/core'
+import {
+  aplicarMigraciones,
+  type Bd,
+  type Core,
+  crearBusDeEventos,
+  type Module,
+  type Reloj,
+} from '@gps/core'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migraciones } from '../src/servidor/migraciones'
 import {
@@ -33,6 +40,7 @@ function montar(opciones: { reloj?: Reloj; autorizadores?: Record<string, Autori
     logger: { info: () => {}, error: () => {} },
     reloj: opciones.reloj ?? { ahora: () => HORA },
     bd,
+    eventos: crearBusDeEventos(),
     modulos: ['archivos'],
     sellador: {
       sellar: (datos) => ({ sello: `sellado:${datos}`, claveId: 'prueba' }),

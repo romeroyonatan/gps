@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
-import { aplicarMigraciones, type Bd, type Core, type Module } from '@gps/core'
+import { aplicarMigraciones, type Bd, type Core, crearBusDeEventos, type Module } from '@gps/core'
 import type { Personas } from '@gps/personas/dominio'
 import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
@@ -40,6 +40,7 @@ function montar() {
     logger: { info: () => {}, error: () => {} },
     reloj: { ahora: () => hora },
     bd,
+    eventos: crearBusDeEventos(),
     modulos: ['auth'],
     sellador: {
       sellar: (datos: string) => ({ sello: `sellado:${datos}`, claveId: 'prueba' }),

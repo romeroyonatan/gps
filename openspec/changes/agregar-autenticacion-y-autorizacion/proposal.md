@@ -31,6 +31,6 @@ No hay especificaciones OpenSpec existentes que modificar.
 - Nuevo módulo `auth`, sus tablas, migraciones, esquema GraphQL y composición en el backend.
 - Cambios en `@gps/core` para `Actor`, `Alcance` y el contexto por request.
 - Nuevos cargos, equipos, vigencias y operaciones de plantel en `personas`, con consultas de jerarquía en `estructura`.
-- Políticas y filtrado obligatorio en los módulos actuales, incluidos Personas, Estructura, Afiliación, Salidas y las descargas de Archivos; Tesorería deberá respetar este contrato cuando se implemente.
+- Políticas y filtrado obligatorio en los módulos actuales, incluidos Personas, Estructura, Afiliación, Tesorería, Salidas y las descargas de Archivos.
 - Login, almacenamiento seguro de sesión y pantallas de invitación/recuperación en web y mobile.
 - Configuración y credenciales operativas de Google y Apple, además de un comando Bun para designar al administrador de emergencia.
