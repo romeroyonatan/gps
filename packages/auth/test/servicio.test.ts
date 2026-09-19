@@ -76,6 +76,7 @@ describe('sesiones', () => {
       personaId: 'persona_1',
       identidadId: 'identidad_1',
       estaElevada: false,
+      elevadaHasta: null,
     })
   })
 

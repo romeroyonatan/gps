@@ -4,6 +4,7 @@ query PersonaActual {
     personaId
     esAdministradorDesignado
     estaElevado
+    elevadaHasta
     roles {
       rol
       ambitoTipo

@@ -34,4 +34,7 @@ export interface SesionAutenticada {
   readonly personaId: string
   readonly identidadId: string
   readonly estaElevada: boolean
+  /** Hasta cuándo vale la elevación, para que la pantalla pueda mostrar
+   *  cuánto queda y salir sola del modo elevado. Null si no está elevada. */
+  readonly elevadaHasta: Date | null
 }

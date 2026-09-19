@@ -47,7 +47,14 @@ export async function componer(
   aplicarMigraciones(core, ordenados)
 
   const servicios = crearServicios(core, ordenados)
-  const contexto = { actor: null, alcance: null, sesionId: null, config, ...servicios } as Context
+  const contexto = {
+    actor: null,
+    alcance: null,
+    sesionId: null,
+    elevadaHasta: null,
+    config,
+    ...servicios,
+  } as Context
 
   // `archivos` no puede depender de sus dueños -seria un ciclo-, asi que los
   // dueños se registran aca, cuando sus servicios ya existen. Un archivo cuyo

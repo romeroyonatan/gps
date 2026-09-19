@@ -8,6 +8,11 @@ export interface Context {
   readonly alcance: Alcance | null
   /** La sesion de este pedido, para poder cerrarla. Null si es anonimo. */
   readonly sesionId: string | null
+  /** Hasta cuando vale la elevacion de esta sesion. Null si no esta elevada.
+   *  Va en el contexto y no en `Actor` porque es un hecho de la sesion: las
+   *  politicas deciden con `estaElevado`, que es un booleano, y esto es solo
+   *  para que la pantalla pueda mostrar la cuenta regresiva. */
+  readonly elevadaHasta: Date | null
   /** La configuracion ya validada. Un resolver que necesita el origen publico
    *  -armar un enlace de invitacion- no tiene otra forma de conocerlo: `Core`
    *  es de los servicios, no del contexto. */

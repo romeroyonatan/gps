@@ -36,6 +36,7 @@ export function crearContexto(base: Context, reloj: Reloj) {
       ...base,
       actor,
       sesionId: sesion.sesionId,
+      elevadaHasta: sesion.elevadaHasta,
       alcance: await base.estructura.expandirAlcance(actor),
     }
   }

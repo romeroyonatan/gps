@@ -755,6 +755,8 @@ export function crearServicioDeAuth(
         personaId: sesion.personaId,
         identidadId: sesion.identidadId,
         estaElevada: sesion.elevadaHasta !== null && sesion.elevadaHasta > ahora,
+        elevadaHasta:
+          sesion.elevadaHasta !== null && sesion.elevadaHasta > ahora ? sesion.elevadaHasta : null,
       }
     },
 

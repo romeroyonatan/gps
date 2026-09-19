@@ -399,6 +399,10 @@ type Persona {
 Quién está autenticado en este pedido.
 """
 type PersonaAutenticada {
+  """
+  Hasta cuándo vale la elevación, en ISO. Null si no está elevada.
+  """
+  elevadaHasta: String
   esAdministradorDesignado: Boolean!
   estaElevado: Boolean!
   personaId: ID!

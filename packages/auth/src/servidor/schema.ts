@@ -17,6 +17,7 @@ interface PersonaAutenticada {
   readonly roles: readonly { rol: Rol; ambitoTipo: AmbitoDeRol; ambitoId: string | null }[]
   readonly esAdministradorDesignado: boolean
   readonly estaElevado: boolean
+  readonly elevadaHasta: Date | null
 }
 
 export function registrarSchema(builder: Builder): void {
@@ -63,6 +64,11 @@ export function registrarSchema(builder: Builder): void {
         roles: t.field({ type: [FuncionRef], resolve: (quien) => [...quien.roles] }),
         esAdministradorDesignado: t.exposeBoolean('esAdministradorDesignado'),
         estaElevado: t.exposeBoolean('estaElevado'),
+        elevadaHasta: t.string({
+          nullable: true,
+          description: 'Hasta cuándo vale la elevación, en ISO. Null si no está elevada.',
+          resolve: (quien) => quien.elevadaHasta?.toISOString() ?? null,
+        }),
       }),
     })
 
@@ -93,6 +99,7 @@ export function registrarSchema(builder: Builder): void {
           })),
           esAdministradorDesignado: contexto.actor.esAdministradorDesignado,
           estaElevado: contexto.actor.estaElevado,
+          elevadaHasta: contexto.elevadaHasta,
         },
     }),
   )

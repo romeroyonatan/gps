@@ -13,6 +13,7 @@ import { CuentaDeGrupo } from './pantallas/CuentaDeGrupo'
 import { Estructura } from './pantallas/Estructura'
 import { Grupo } from './pantallas/Grupo'
 import { Ingreso } from './pantallas/Ingreso'
+import { ModoElevado } from './pantallas/ModoElevado'
 import { Salidas } from './pantallas/Salidas'
 import { Tesoreria } from './pantallas/Tesoreria'
 
@@ -90,6 +91,7 @@ export function App(props: { particion: ParticionDelCache }) {
         {quien && (
           <>
             <BarraDeSesion roles={quien.roles} />
+            <ModoElevado entorno={version.data?.version.entorno ?? ''} />
             <Rutas />
           </>
         )}
