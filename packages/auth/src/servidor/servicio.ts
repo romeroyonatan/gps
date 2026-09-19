@@ -573,21 +573,25 @@ export function crearServicioDeAuth(
       if (enUso) throw new ProveedorYaVinculado()
 
       const identidadId = core.nuevoId('identidad')
-      // Un doble consumo concurrente pierde la carrera del UPDATE ... WHERE
-      // consumida_en IS NULL: `Bd.run()` no expone `changes` -es unknown a
-      // proposito, para no atarse al driver-, asi que quien perdio se entera
-      // releyendo: si el valor que quedo no es el suyo, no gano la carrera.
+      // El doble consumo concurrente se resuelve adentro de la transaccion:
+      // el callback es sincrono, asi que dos llamadas que se intercalaron en
+      // el `await` del proveedor no pueden intercalarse aca. Quien llega
+      // segundo ve `consumida_en` ya escrito y se va con las manos vacias.
+      //
+      // No alcanza con comparar el valor escrito contra `ahora`: dos consumos
+      // en el mismo milisegundo leen el mismo instante, y los dos creerian
+      // haber ganado. Un timestamp no es una identidad.
       const consumida = core.bd.transaction((tx) => {
-        tx.update(invitaciones)
-          .set({ consumidaEn: ahora, actualizadoEn: ahora })
-          .where(and(eq(invitaciones.id, invitacion.id), isNull(invitaciones.consumidaEn)))
-          .run()
-        const verificacion = tx
+        const actual = tx
           .select({ consumidaEn: invitaciones.consumidaEn })
           .from(invitaciones)
           .where(eq(invitaciones.id, invitacion.id))
           .get()
-        if (verificacion?.consumidaEn?.getTime() !== ahora.getTime()) return false
+        if (!actual || actual.consumidaEn !== null) return false
+        tx.update(invitaciones)
+          .set({ consumidaEn: ahora, actualizadoEn: ahora })
+          .where(eq(invitaciones.id, invitacion.id))
+          .run()
         tx.insert(identidadesExternas)
           .values({
             id: identidadId,
@@ -662,17 +666,19 @@ export function crearServicioDeAuth(
       if (enUso) throw new ProveedorYaVinculado()
 
       const identidadId = core.nuevoId('identidad')
+      // Mismo cierre del doble consumo que en la activacion: se relee adentro
+      // de la transaccion, que es sincrona.
       const consumida = core.bd.transaction((tx) => {
-        tx.update(invitaciones)
-          .set({ consumidaEn: ahora, actualizadoEn: ahora })
-          .where(and(eq(invitaciones.id, invitacion.id), isNull(invitaciones.consumidaEn)))
-          .run()
-        const verificacion = tx
+        const actual = tx
           .select({ consumidaEn: invitaciones.consumidaEn })
           .from(invitaciones)
           .where(eq(invitaciones.id, invitacion.id))
           .get()
-        if (verificacion?.consumidaEn?.getTime() !== ahora.getTime()) return false
+        if (!actual || actual.consumidaEn !== null) return false
+        tx.update(invitaciones)
+          .set({ consumidaEn: ahora, actualizadoEn: ahora })
+          .where(eq(invitaciones.id, invitacion.id))
+          .run()
 
         // Desactivar el vinculo anterior, vincular el nuevo y revocar todas
         // las sesiones: las tres, o ninguna. Los demas proveedores de la

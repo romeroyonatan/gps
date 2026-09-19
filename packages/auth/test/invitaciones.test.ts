@@ -338,3 +338,36 @@ describe('mirarInvitacion', () => {
     })
   })
 })
+
+describe('doble consumo concurrente', () => {
+  /** Dos pedidos que se intercalan en el `await` del proveedor: los dos leen
+   *  la invitación sin consumir, y recién después escriben. El cierre está
+   *  adentro de la transacción, que es sincrónica.
+   *
+   *  No alcanza con comparar el instante escrito contra el propio: dos
+   *  consumos en el mismo milisegundo leen el mismo `ahora` y los dos creerían
+   *  haber ganado. Un timestamp no es una identidad. */
+  test('sólo uno gana, y queda una sola identidad', async () => {
+    const { bd, servicio } = montar()
+    const invitacion = await servicio.emitirInvitacion(jefeDeGrupo1, {
+      tipo: 'activacion',
+      personaId: 'persona_1',
+    })
+
+    const consumir = () =>
+      servicio.consumirActivacion(invitacion.secreto, {
+        transaccion: servicio.iniciarLogin('google', 'web', 'https://gps.test/callback')
+          .transaccion,
+        stateRecibido: 'state-real',
+        code: 'c',
+      })
+
+    const resultados = await Promise.allSettled([consumir(), consumir()])
+    expect(resultados.filter((una) => una.status === 'fulfilled')).toHaveLength(1)
+
+    const identidades = bd.all<{ id: string }>(
+      sql`SELECT id FROM identidades_externas WHERE persona_id = 'persona_1'`,
+    )
+    expect(identidades).toHaveLength(1)
+  })
+})

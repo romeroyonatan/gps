@@ -60,5 +60,5 @@
 
 - [x] 8.1 Implementar el proveedor interno `demo`, sembrar perfiles de Jefatura, Secretaría, Tesorería diocesana y administrador, y ofrecer login y reautenticación sudo de un clic; verificar que `bun run demo` crea sesiones reales con permisos distintos, que sudo sigue venciendo y auditándose, y que fuera de `ENTORNO=demo` no existe la ruta y el servicio rechaza su uso.
 - [ ] 8.2 Actualizar `docs/arquitectura.md`, la spec base y `CLAUDE.md` para reemplazar `Usuario`, documentar equipos/recuperación/sudo y retirar las notas que afirman que auth no existe; verificar que no queden contradicciones con `rg`.
-- [ ] 8.3 Ejecutar pruebas de seguridad integradas para token manipulado, replay de invitación, identidad duplicada, recuperación concurrente, sesión revocada y acceso cruzado de grupos; verificar que todas fallen cerradas.
+- [x] 8.3 Ejecutar pruebas de seguridad integradas para token manipulado, replay de invitación, identidad duplicada, recuperación concurrente, sesión revocada y acceso cruzado de grupos; verificar que todas fallen cerradas.
 - [ ] 8.4 Ejecutar `bun run schema`, codegen y `bun run check`, corregir cualquier diferencia generada y verificar que el árbol de trabajo sólo contenga cambios esperados.
