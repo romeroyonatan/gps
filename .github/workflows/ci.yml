@@ -43,6 +43,21 @@ jobs:
           # lo que se verifica es que el arranque la exija y la sepa leer.
           CLAVES_DE_SELLO: ci=clave-de-ci-que-no-firma-nada
           CLAVE_DE_SELLO_ACTIVA: ci
+          # Lo mismo para auth: en produccion las diez son obligatorias, porque
+          # un servidor sin credenciales de Google y Apple no puede autenticar a
+          # nadie. Son de mentira a proposito -no se hace ningun viaje a un
+          # proveedor en este paso-; lo que se verifica es que el arranque las
+          # exija y las valide.
+          ORIGEN_PUBLICO: https://gps.ci.invalid
+          GOOGLE_CLIENTE_WEB_ID: ci-web
+          GOOGLE_CLIENTE_IOS_ID: ci-ios
+          GOOGLE_CLIENTE_ANDROID_ID: ci-android
+          GOOGLE_CLIENTE_SECRETO: ci-secreto
+          APPLE_SERVICIO_ID: ci-servicio
+          APPLE_BUNDLE_ID: ci-bundle
+          APPLE_EQUIPO_ID: ci-equipo
+          APPLE_CLAVE_ID: ci-clave
+          APPLE_CLAVE_PRIVADA: ci-clave-privada
         run: |
           ENTORNO=produccion PUERTO=3000 bun services/backend/src/index.ts &
           for i in $(seq 1 30); do
@@ -52,20 +67,72 @@ jobs:
           curl -sf http://localhost:3000/health
           curl -sf http://localhost:3000/graphql -H 'content-type: application/json' \
             -d '{"query":"{ version { numero modulos } }"}'
-          # Es el unico lugar que ejercita una base en archivo con las
-          # migraciones aplicadas al arrancar: si no se consulta una tabla, un
-          # esquema roto pasa igual. El grep atrapa el {"errors":[...]}.
-          curl -sf http://localhost:3000/graphql -H 'content-type: application/json' \
-            -d '{"query":"{ distritos { numero zona grupos { numero unidades { nombre } } } }"}' \
-            | grep -q '"distritos"'
-          # Una tabla de cada modulo con migraciones: distritos no toca las de
-          # salidas ni las de personas, asi que una migracion rota ahi pasaba.
-          curl -sf http://localhost:3000/graphql -H 'content-type: application/json' \
-            -d '{"query":"{ permisos(grupoId: \"grupo_inexistente\") { id } }"}' \
-            | grep -q '"permisos"'
           curl -sf http://localhost:3000/ | grep -q '<div id="raiz">'
+          # Un pedido sin sesion no llega a ningun modulo protegido. Se mira el
+          # code y no el texto: el error trae "path":["distritos"], asi que un
+          # grep del nombre del campo daria verde con la respuesta denegada.
+          curl -sf http://localhost:3000/graphql -H 'content-type: application/json' \
+            -d '{"query":"{ distritos { numero } }"}' \
+            | grep -q '"code":"NO_AUTENTICADO"'
+
+      - name: Verificar que las tablas responden con una sesion de verdad
+        run: |
+          # Este paso es el unico que consulta tablas, y por eso entra con una
+          # sesion: desde que hay auth, un pedido anonimo no alcanza ningun
+          # modulo con migraciones, asi que un esquema roto pasaria igual.
+          #
+          # Entra por el proveedor demo, que recorre el mismo camino que Google
+          # -transaccion sellada, state, callback, cookie- sin salir a la red.
+          # Con el perfil de jefatura y no con el de administracion: es el que
+          # alcanza los cuatro modulos con tablas, porque salidas y personas son
+          # de grupo y una autoridad diocesana no entra.
+          ENTORNO=demo PUERTO=3002 bun services/backend/src/index.ts &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3002/health > /dev/null && break
+            sleep 1
+          done
+          destino=$(curl -sf -c /tmp/ci-cookies.txt -D- -o /dev/null \
+            'http://localhost:3002/auth/demo/iniciar?perfil=jefatura' \
+            | grep -i '^location' | tr -d '\r' | cut -d' ' -f2)
+          curl -sf -b /tmp/ci-cookies.txt -c /tmp/ci-cookies.txt -o /dev/null "$destino"
+
+          consultar() {
+            curl -sf -b /tmp/ci-cookies.txt http://localhost:3002/graphql \
+              -H 'content-type: application/json' -d "$1"
+          }
+          # Se mira "data" y no el nombre del campo, que aparece igual en el
+          # "path" de un error: con grep del nombre, una respuesta denegada
+          # daba verde.
+          consultar '{"query":"{ personaActual { personaId } }"}' | grep -q '"personaId"'
+          # Una tabla de cada modulo con migraciones: estructura, personas,
+          # salidas y tesoreria tienen las suyas, y una rota en cualquiera
+          # pasaba si solo se consultaba otra.
+          consultar '{"query":"{ distritos { numero zona grupos { numero unidades { nombre } } } }"}' \
+            | grep -q '"data":{"distritos"'
+          grupo=$(consultar '{"query":"{ cuentasDeGrupos { grupoId } }"}' \
+            | grep -o '"grupoId":"grupo_[^"]*"' | head -1 | cut -d'"' -f4)
+          test -n "$grupo"
+          consultar "{\"query\":\"{ personas(grupoId: \\\"$grupo\\\") { id cargos { cargo } equipos { id } } }\"}" \
+            | grep -q '"data":{"personas"'
+          consultar "{\"query\":\"{ permisos(grupoId: \\\"$grupo\\\") { id estado firmas { cargo } } }\"}" \
+            | grep -q '"data":{"permisos"'
+          consultar "{\"query\":\"{ movimientosDeTesoreria(grupoId: \\\"$grupo\\\") { id tipo } }\"}" \
+            | grep -q '"data":{"movimientosDeTesoreria"'
 
       - name: Verificar que en produccion no arranca sin clave de sello
+        env:
+          # Todo lo de auth puesto: lo unico que falta es la clave de sello, asi
+          # el paso falla por lo que dice que prueba y no por otra cosa.
+          ORIGEN_PUBLICO: https://gps.ci.invalid
+          GOOGLE_CLIENTE_WEB_ID: ci-web
+          GOOGLE_CLIENTE_IOS_ID: ci-ios
+          GOOGLE_CLIENTE_ANDROID_ID: ci-android
+          GOOGLE_CLIENTE_SECRETO: ci-secreto
+          APPLE_SERVICIO_ID: ci-servicio
+          APPLE_BUNDLE_ID: ci-bundle
+          APPLE_EQUIPO_ID: ci-equipo
+          APPLE_CLAVE_ID: ci-clave
+          APPLE_CLAVE_PRIVADA: ci-clave-privada
         run: |
           # Un sello hecho con una clave de desarrollo no prueba nada, y el
           # error tiene que ser al arrancar y no al primer permiso que alguien
