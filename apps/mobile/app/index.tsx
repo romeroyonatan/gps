@@ -2,6 +2,7 @@ import { useDistritos, useVersion } from '@gps/api'
 import { etiquetaDeEdades, ramaDelCatalogo, type Unidad } from '@gps/estructura/dominio'
 import { Link } from 'expo-router'
 import { Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native'
+import { BarraDeSesion } from '../src/BarraDeSesion'
 
 /** El nombre propio y, en gris, el tramo de edad de su rama. Se muestra el
  *  nombre y no la rama porque es lo que distingue dos tropas del mismo grupo. */
@@ -52,6 +53,7 @@ export default function Pantalla() {
       <ScrollView contentContainerClassName="px-4 py-10">
         <Text className="text-2xl font-semibold text-slate-900">GPS</Text>
         <Text className="mt-1 text-sm text-slate-500">Gestión para Scouts</Text>
+        <BarraDeSesion />
         <Link href="/tesoreria" className="mt-6 text-sm font-medium text-slate-700">
           Tesorería →
         </Link>

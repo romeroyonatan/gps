@@ -1,5 +1,11 @@
 export { useAfiliadosEn, useDeclaraciones, useDeclararAfiliacion } from './afiliacion'
-export { useCerrarSesion, useInvitar, usePersonaActual, useRevocarInvitacion } from './auth'
+export {
+  useCerrarSesion,
+  useInvitar,
+  usePersonaActual,
+  useRefrescarSesion,
+  useRevocarInvitacion,
+} from './auth'
 export type { AlmacenDelCache, ParticionDelCache } from './cache'
 export { almacenPorPersona, useParticionDelCache } from './cache'
 export { useDistritos } from './estructura'

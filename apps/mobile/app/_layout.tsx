@@ -4,11 +4,16 @@ import {
   ProveedorDeApi,
   transporteHttp,
   useParticionDelCache,
+  usePersonaActual,
+  useVersion,
 } from '@gps/api'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
 import Constants from 'expo-constants'
 import { Stack } from 'expo-router'
+import { Text, View } from 'react-native'
+import { Ingreso } from '../src/Ingreso'
+import { secretoDeSesion } from '../src/sesion'
 import '../global.css'
 
 const urlDeLaApi =
@@ -22,21 +27,40 @@ const particion = almacenPorPersona(AsyncStorage)
 
 const persister = createAsyncStoragePersister({ storage: particion.almacen, key: 'gps-cache' })
 
-/** Adentro del proveedor porque necesita el QueryClient y la sesión. */
-function ParticionDelCache() {
+/** El origen del backend, para armar las URL que no son GraphQL: el login y
+ *  las descargas. Sale de la misma URL de la API. */
+const origen = new URL(urlDeLaApi).origin
+
+/** El transporte manda el secreto como bearer: en mobile no hay cookie, y el
+ *  secreto vive en el llavero del sistema (ver src/sesion.ts). */
+const transporte = transporteHttp(urlDeLaApi, fetch, secretoDeSesion)
+
+/** Adentro del proveedor porque necesita el QueryClient y la sesión: hasta que
+ *  no se sabe quién es, no se dibuja ni el login ni la app. */
+function Adentro() {
   useParticionDelCache(particion)
-  return null
+  const version = useVersion()
+  const sesion = usePersonaActual()
+
+  if (sesion.isPending) {
+    return (
+      <View className="flex-1 items-center justify-center bg-slate-50">
+        <Text className="text-sm text-slate-500">Un momento…</Text>
+      </View>
+    )
+  }
+
+  if (!sesion.data?.personaActual) {
+    return <Ingreso origen={origen} entorno={version.data?.version.entorno ?? ''} />
+  }
+
+  return <Stack screenOptions={{ headerShown: false }} />
 }
 
 export default function Layout() {
   return (
-    <ProveedorDeApi
-      transporte={transporteHttp(urlDeLaApi)}
-      queryClient={crearQueryClient()}
-      persister={persister}
-    >
-      <ParticionDelCache />
-      <Stack screenOptions={{ headerShown: false }} />
+    <ProveedorDeApi transporte={transporte} queryClient={crearQueryClient()} persister={persister}>
+      <Adentro />
     </ProveedorDeApi>
   )
 }

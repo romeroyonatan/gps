@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback } from 'react'
 import {
   CerrarSesionDocument,
   InvitarDocument,
@@ -35,6 +36,17 @@ export function useCerrarSesion() {
       clienteDeQueries.clear()
     },
   })
+}
+
+/** Vuelve a preguntar todo. Lo usa mobile después de entrar, porque ahí el
+ *  login es una vuelta por el navegador del sistema y no una mutation: el
+ *  secreto nuevo ya está guardado, lo que falta es volver a preguntar quién
+ *  es. */
+export function useRefrescarSesion(): () => Promise<void> {
+  const clienteDeQueries = useQueryClient()
+  return useCallback(async () => {
+    await clienteDeQueries.invalidateQueries()
+  }, [clienteDeQueries])
 }
 
 export function useInvitar() {
