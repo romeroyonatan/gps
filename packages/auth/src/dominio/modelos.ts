@@ -6,6 +6,12 @@ export const PROVEEDORES = ['google', 'apple', 'demo'] as const
 
 export type ProveedorDeIdentidad = (typeof PROVEEDORES)[number]
 
+/** Para qué es un enlace de invitación: activar el primer proveedor de una
+ *  persona, o reemplazar uno que perdió. */
+export const TIPOS_DE_INVITACION = ['activacion', 'recuperacion'] as const
+
+export type TipoDeInvitacion = (typeof TIPOS_DE_INVITACION)[number]
+
 export interface IdentidadExterna extends Marcas {
   readonly id: string
   readonly personaId: string

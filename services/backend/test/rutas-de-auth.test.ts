@@ -54,6 +54,19 @@ describe('iniciar el login', () => {
     expect(rutaDeInicioDeLogin(contextoCon(iniciando()), pedido).status).toBe(404)
   })
 
+  test('el proveedor demo no existe fuera de demo: el servicio lo rechaza', () => {
+    // Las dos defensas del diseño §9: la interfaz no lo muestra, y acá el
+    // servicio tampoco lo conoce, así que la ruta contesta 404.
+    const sinDemo = contextoCon({
+      iniciarLogin: () => {
+        throw new Error('demo no está configurado')
+      },
+    })
+    expect(rutaDeInicioDeLogin(sinDemo, pedidoDeInicio('?perfil=jefatura', 'demo')).status).toBe(
+      404,
+    )
+  })
+
   test('un destino absoluto no convierte el login en un redirector abierto', () => {
     const respuesta = rutaDeInicioDeLogin(
       contextoCon(iniciando()),
@@ -93,11 +106,14 @@ describe('volver del proveedor', () => {
     )
     expect(respuesta.status).toBe(302)
     expect(respuesta.headers.get('location')).toBe('/grupos')
-    const cookies = respuesta.headers.get('set-cookie') ?? ''
-    expect(cookies).toContain('gps_session=sec')
-    expect(cookies).toContain('HttpOnly')
+    // Cada una en su propio header: unidas con coma el cliente no guarda
+    // ninguna y se vuelve del login igual de anonimo que antes.
+    const cookies = respuesta.headers.getSetCookie()
+    expect(cookies).toHaveLength(2)
+    expect(cookies.some((una) => una.startsWith('gps_session=sec;'))).toBe(true)
+    expect(cookies.every((una) => una.includes('HttpOnly'))).toBe(true)
     // La del viaje se borra apenas se usa.
-    expect(cookies).toContain('gps_login=; Path=/')
+    expect(cookies.some((una) => una.startsWith('gps_login=;'))).toBe(true)
   })
 
   test('mobile vuelve por deep link y no recibe cookie de sesión', async () => {
@@ -110,7 +126,9 @@ describe('volver del proveedor', () => {
       pedidoDeCallback('?code=c&state=s', pendiente({ intencion: 'login', plataforma: 'ios' })),
     )
     expect(respuesta.headers.get('location')).toBe('gps://sesion?secreto=sec')
-    expect(respuesta.headers.get('set-cookie')).not.toContain('gps_session=sec')
+    expect(respuesta.headers.getSetCookie().some((una) => una.startsWith('gps_session='))).toBe(
+      false,
+    )
   })
 
   test('sin la cookie del viaje no se completa nada', async () => {

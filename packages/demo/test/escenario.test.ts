@@ -2,6 +2,7 @@ import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
 import { afiliacion } from '@gps/afiliacion/servidor'
 import { archivos, autorizadores } from '@gps/archivos/servidor'
+import { auth } from '@gps/auth/servidor'
 import {
   alcanceSinLimites,
   aplicarMigraciones,
@@ -9,12 +10,15 @@ import {
   type Context,
   type Core,
   crearBusDeEventos,
+  type Entorno,
 } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import { ramasDeLasUnidades } from '@gps/estructura/dominio'
 import { estructura } from '@gps/estructura/servidor'
+import { puedeAdministrarPlantelDeGrupo } from '@gps/personas/dominio'
 import { personas } from '@gps/personas/servidor'
 import { salidas } from '@gps/salidas/servidor'
+import { puedeRegistrarPagos } from '@gps/tesoreria/dominio'
 import { tesoreria } from '@gps/tesoreria/servidor'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { sembrarEscenario } from '../src/servidor/escenario'
@@ -24,14 +28,14 @@ import { sembrarEscenario } from '../src/servidor/escenario'
  *  que siembra el demo. */
 const HORA = new Date('2026-08-27T12:00:00Z')
 
-function montarContexto(hora = HORA): Context {
+function montarContexto(hora: Date | (() => Date) = HORA, entorno: Entorno = 'demo'): Context {
   const base = new Database(':memory:')
   base.exec('PRAGMA foreign_keys = ON')
   const bd: Bd = drizzle(base)
 
   let contador = 0
   const core: Core = {
-    config: { version: '0.0.0', entorno: 'demo', puerto: 0, auth: null },
+    config: { version: '0.0.0', entorno, puerto: 0, auth: null },
     logger: { info: () => {}, error: () => {} },
     // El demo siembra personas con fechas de nacimiento reales, asi que el reloj
     // no puede estar en 1970: con esa hora, nacer en 2020 seria nacer en el
@@ -40,10 +44,10 @@ function montarContexto(hora = HORA): Context {
     // resultado con el paso del tiempo. Al mediodia y no a medianoche:
     // aFechaDeCalendario usa componentes locales, asi que un instante a las
     // 00:00 UTC cae en el dia anterior al oeste de Greenwich.
-    reloj: { ahora: () => hora },
+    reloj: { ahora: () => (typeof hora === 'function' ? hora() : hora) },
     bd,
     eventos: crearBusDeEventos(),
-    modulos: ['estructura', 'personas', 'afiliacion', 'tesoreria', 'archivos', 'salidas'],
+    modulos: ['estructura', 'personas', 'auth', 'afiliacion', 'tesoreria', 'archivos', 'salidas'],
     // Falso pero con el comportamiento que importa: sellar y verificar cierran
     // entre si, y un dato alterado no verifica.
     sellador: {
@@ -64,7 +68,7 @@ function montarContexto(hora = HORA): Context {
     nuevoSecreto: () => `secreto_${++contador}`,
   }
 
-  aplicarMigraciones(core, [estructura, personas, afiliacion, tesoreria, archivos, salidas])
+  aplicarMigraciones(core, [estructura, personas, auth, afiliacion, tesoreria, archivos, salidas])
   // personas depende de estructura y afiliacion de las dos, asi que se
   // construyen en ese orden: es el mismo cableado que hace crearServicios en la
   // raiz de composicion, a mano porque el test arma su propio contexto.
@@ -81,7 +85,10 @@ function montarContexto(hora = HORA): Context {
   return {
     actor: null,
     alcance: null,
+    sesionId: null,
+    config: core.config,
     estructura: servicioDeEstructura,
+    auth: auth.createServices(core, { personas: servicioDePersonas }),
     personas: servicioDePersonas,
     afiliacion: servicioDeAfiliacion,
     tesoreria: tesoreria.createServices(core, {
@@ -318,5 +325,108 @@ describe('sembrarEscenario: personas', () => {
     expect(cuentas.some((cuenta) => cuenta.saldo > 0)).toBe(true)
     expect(cuentas.some((cuenta) => cuenta.saldo < 0)).toBe(true)
     expect((await ctx.tesoreria.resumenDePendientes(alcanceSinLimites())).cantidad).toBe(0)
+  })
+})
+
+describe('perfiles del proveedor demo', () => {
+  /** Lo que hace la ruta `/auth/demo/iniciar` + `/callback`: un clic. */
+  async function entrarComo(contexto: Context, perfil: string) {
+    const redirectUri = `http://demo.invalido/auth/demo/callback?perfil=${perfil}`
+    const inicio = contexto.auth.iniciarLogin('demo', 'web', redirectUri)
+    return await contexto.auth.completarLogin({
+      transaccion: inicio.transaccion,
+      stateRecibido: new URL(inicio.url).searchParams.get('state') ?? '',
+      code: 'demo',
+    })
+  }
+
+  /** La misma derivación que hace `crearContexto` por request. */
+  async function alcanceDe(contexto: Context, secreto: string) {
+    const sesion = await contexto.auth.resolverSesion(secreto)
+    if (!sesion) throw new Error('La sesión demo no resolvió.')
+    const actor = {
+      personaId: sesion.personaId,
+      roles: await contexto.personas.funcionesVigentes(sesion.personaId, aFechaDeCalendario(HORA)),
+      esAdministradorDesignado: await contexto.auth.esAdministradorDesignado(sesion.personaId),
+      estaElevado: sesion.estaElevada,
+    }
+    return { sesion, alcance: await contexto.estructura.expandirAlcance(actor) }
+  }
+
+  test('los cuatro perfiles entran de un clic y con permisos distintos', async () => {
+    const contexto = montarContexto()
+    await sembrarEscenario(contexto, HORA)
+
+    const jefatura = await alcanceDe(contexto, (await entrarComo(contexto, 'jefatura')).secreto)
+    const tesoreria = await alcanceDe(contexto, (await entrarComo(contexto, 'tesoreria')).secreto)
+
+    // La jefatura ve su grupo; Tesorería no administra ninguno pero cobra.
+    expect(jefatura.alcance.gruposVisibles).toHaveLength(1)
+    expect(puedeRegistrarPagos(jefatura.alcance.actor)).toBe(false)
+    expect(puedeRegistrarPagos(tesoreria.alcance.actor)).toBe(true)
+
+    const secretaria = await alcanceDe(contexto, (await entrarComo(contexto, 'secretaria')).secreto)
+    expect(
+      puedeAdministrarPlantelDeGrupo(
+        secretaria.alcance.actor,
+        secretaria.alcance.gruposVisibles[0] ?? '',
+      ),
+    ).toBe(true)
+  })
+
+  test('el administrador entra sin alcance global y se eleva con otro clic', async () => {
+    const contexto = montarContexto()
+    await sembrarEscenario(contexto, HORA)
+
+    const entrada = await entrarComo(contexto, 'administrador')
+    const ordinaria = await alcanceDe(contexto, entrada.secreto)
+    expect(ordinaria.alcance.actor.esAdministradorDesignado).toBe(true)
+    expect(ordinaria.alcance.esAdministrador).toBe(false)
+
+    // La reautenticación es otro viaje completo por el proveedor, igual que
+    // con Google: la sesión sola no alcanza.
+    const redirectUri = 'http://demo.invalido/auth/demo/callback?perfil=administrador'
+    const inicio = contexto.auth.iniciarLogin('demo', 'web', redirectUri)
+    await contexto.auth.elevarSesion(entrada.sesionId, {
+      transaccion: inicio.transaccion,
+      stateRecibido: new URL(inicio.url).searchParams.get('state') ?? '',
+      code: 'demo',
+    })
+
+    const elevada = await alcanceDe(contexto, entrada.secreto)
+    expect(elevada.alcance.esAdministrador).toBe(true)
+  })
+
+  test('la elevación vence a los diez minutos y la sesión sobrevive', async () => {
+    let ahora = HORA
+    const contexto = montarContexto(() => ahora)
+    await sembrarEscenario(contexto, HORA)
+    const entrada = await entrarComo(contexto, 'administrador')
+    const redirectUri = 'http://demo.invalido/auth/demo/callback?perfil=administrador'
+    const inicio = contexto.auth.iniciarLogin('demo', 'web', redirectUri)
+    await contexto.auth.elevarSesion(entrada.sesionId, {
+      transaccion: inicio.transaccion,
+      stateRecibido: new URL(inicio.url).searchParams.get('state') ?? '',
+      code: 'demo',
+    })
+    expect((await contexto.auth.resolverSesion(entrada.secreto))?.estaElevada).toBe(true)
+
+    // Once minutos despues la elevacion ya no vale, pero la sesion sigue
+    // abierta: elevarse es temporal, entrar no.
+    ahora = new Date(HORA.getTime() + 11 * 60 * 1000)
+    const vencida = await contexto.auth.resolverSesion(entrada.secreto)
+    expect(vencida).not.toBeNull()
+    expect(vencida?.estaElevada).toBe(false)
+  })
+
+  test('fuera de demo el proveedor no existe', async () => {
+    const contexto = montarContexto(HORA, 'produccion')
+    expect(() =>
+      contexto.auth.iniciarLogin(
+        'demo',
+        'web',
+        'http://gps.test/auth/demo/callback?perfil=jefatura',
+      ),
+    ).toThrow()
   })
 })

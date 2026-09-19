@@ -84,7 +84,13 @@ export function rutaDeInicioDeLogin(
 
   const plataforma = (url.searchParams.get('plataforma') ?? 'web') as Plataforma
   const origen = contexto.config.auth?.origenPublico ?? url.origin
-  const redirectUri = `${origen}/auth/${proveedor}/callback`
+  // El perfil del proveedor demo viaja en el redirectUri porque es lo unico
+  // que el proveedor recibe en las dos mitades del viaje. Para Google y Apple
+  // no existe: el subject lo pone el proveedor de verdad.
+  const perfil = proveedor === 'demo' ? url.searchParams.get('perfil') : null
+  const redirectUri = perfil
+    ? `${origen}/auth/demo/callback?perfil=${encodeURIComponent(perfil)}`
+    : `${origen}/auth/${proveedor}/callback`
 
   let inicio: { url: string; transaccion: string }
   try {
@@ -200,31 +206,30 @@ function abrirSesion(
   cookies: readonly string[],
 ): Response {
   if (pendiente.plataforma !== 'web') {
-    return new Response(null, {
-      status: 302,
-      headers: {
-        location: `gps://sesion?secreto=${encodeURIComponent(sesion.secreto)}`,
-        'set-cookie': cookies.join(', '),
-      },
-    })
+    const deepLink = `gps://sesion?secreto=${encodeURIComponent(sesion.secreto)}`
+    return new Response(null, { status: 302, headers: cabeceras(deepLink, cookies) })
   }
   return new Response(null, {
     status: 302,
-    headers: {
-      location: pendiente.destino,
-      'set-cookie': [
-        ...cookies,
-        ponerCookie(COOKIE_DE_SESION, sesion.secreto, TREINTA_DIAS, seguro),
-      ].join(', '),
-    },
+    headers: cabeceras(pendiente.destino, [
+      ...cookies,
+      ponerCookie(COOKIE_DE_SESION, sesion.secreto, TREINTA_DIAS, seguro),
+    ]),
   })
 }
 
 function volver(destino: string, cookies: readonly string[]): Response {
-  return new Response(null, {
-    status: 302,
-    headers: { location: destino, 'set-cookie': cookies.join(', ') },
-  })
+  return new Response(null, { status: 302, headers: cabeceras(destino, cookies) })
+}
+
+/** Cada cookie va en su propio `Set-Cookie`. Unirlas con coma en un solo
+ *  header las deja invalidas -el cliente lee una cookie sola con basura
+ *  adentro y la sesion no se guarda-, y como el header sigue ahi el bug no se
+ *  ve desde el servidor: se ve al entrar y seguir anonimo. */
+function cabeceras(destino: string, cookies: readonly string[]): Headers {
+  const headers = new Headers({ location: destino })
+  for (const galletita of cookies) headers.append('set-cookie', galletita)
+  return headers
 }
 
 /** Sólo una ruta de esta misma app. Una URL absoluta -o una que empiece con

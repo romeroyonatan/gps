@@ -1,7 +1,12 @@
-import { alcanceDe } from '@gps/core'
-import type { Builder } from '@gps/core/graphql'
+import { AMBITOS, type AmbitoDeRol, alcanceDe, ROLES, type Rol } from '@gps/core'
+import { type Builder, enumCompartido } from '@gps/core/graphql'
 import { GraphQLError } from 'graphql'
-import { PROVEEDORES, type ProveedorDeIdentidad } from '../dominio/modelos'
+import {
+  PROVEEDORES,
+  type ProveedorDeIdentidad,
+  TIPOS_DE_INVITACION,
+  type TipoDeInvitacion,
+} from '../dominio/modelos'
 import { AutoridadInsuficiente, InvitacionInvalida } from './servicio'
 
 /** Lo que el cliente necesita saber de quien tiene la sesión abierta. Los
@@ -9,7 +14,7 @@ import { AutoridadInsuficiente, InvitacionInvalida } from './servicio'
  *  esconder acciones con las mismas políticas puras que aplica el servidor. */
 interface PersonaAutenticada {
   readonly personaId: string
-  readonly roles: readonly { rol: string; ambitoTipo: string; ambitoId: string | null }[]
+  readonly roles: readonly { rol: Rol; ambitoTipo: AmbitoDeRol; ambitoId: string | null }[]
   readonly esAdministradorDesignado: boolean
   readonly estaElevado: boolean
 }
@@ -20,13 +25,31 @@ export function registrarSchema(builder: Builder): void {
     values: PROVEEDORES as unknown as readonly ProveedorDeIdentidad[],
   })
 
+  const TipoDeInvitacionRef = builder.enumType('TipoDeInvitacion', {
+    description: 'Para qué es un enlace: activar el acceso, o recuperarlo.',
+    values: TIPOS_DE_INVITACION as unknown as readonly TipoDeInvitacion[],
+  })
+
+  const RolRef = enumCompartido(
+    builder,
+    'Rol',
+    ROLES,
+    'La función que un cargo o un equipo vigente concede.',
+  )
+  const AmbitoRef = enumCompartido(
+    builder,
+    'AmbitoDeRol',
+    AMBITOS,
+    'Contra qué entidad apunta una función.',
+  )
+
   const FuncionRef = builder
     .objectRef<PersonaAutenticada['roles'][number]>('FuncionVigente')
     .implement({
       description: 'Un cargo o equipo vigente, con el ámbito donde lo ejerce.',
       fields: (t) => ({
-        rol: t.exposeString('rol'),
-        ambitoTipo: t.exposeString('ambitoTipo'),
+        rol: t.field({ type: RolRef, resolve: (funcion) => funcion.rol }),
+        ambitoTipo: t.field({ type: AmbitoRef, resolve: (funcion) => funcion.ambitoTipo }),
         ambitoId: t.exposeID('ambitoId', { nullable: true }),
       }),
     })
@@ -92,16 +115,11 @@ export function registrarSchema(builder: Builder): void {
         'Emite un enlace de activación o de recuperación para una persona del propio ámbito.',
       args: {
         personaId: t.arg.id({ required: true }),
-        tipo: t.arg.string({ required: true }),
+        tipo: t.arg({ type: TipoDeInvitacionRef, required: true }),
         proveedorAReemplazar: t.arg({ type: ProveedorRef }),
       },
       resolve: async (_padre, args, contexto) => {
         const alcance = alcanceDe(contexto)
-        if (args.tipo !== 'activacion' && args.tipo !== 'recuperacion') {
-          throw new GraphQLError('El tipo de invitación tiene que ser activación o recuperación.', {
-            extensions: { code: 'InvitacionInvalida' },
-          })
-        }
         try {
           const emitida = await contexto.auth.emitirInvitacion(alcance.actor, {
             tipo: args.tipo,

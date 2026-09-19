@@ -6,6 +6,7 @@ import '@gps/estructura/servidor'
 import '@gps/personas/servidor'
 import '@gps/tesoreria/servidor'
 import '@gps/salidas/servidor'
+import '@gps/auth/servidor'
 import { YaDeclaroHoy } from '@gps/afiliacion/servidor'
 import { type Alcance, alcanceSinLimites, type Context } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
@@ -14,7 +15,9 @@ import {
   ambitoDelCargo,
   type Categoria,
   type DatosDePersona,
+  normalizarNumero,
   type TipoDeCargo,
+  type TipoDeEquipo,
 } from '@gps/personas/dominio'
 
 /** La diocesis de la demostracion. Los grupos abren conjuntos distintos de
@@ -490,7 +493,87 @@ export async function sembrarEscenario(ctx: Context, ahora: Date): Promise<void>
   }
 
   await sembrarSalidas(ctx, grupoDeLaExtraordinaria, ahora)
+  await sembrarPerfilesDemo(ctx, [...gruposPorNumero.values()])
 }
+
+/** Los perfiles del proveedor `demo`: cuatro identidades sintéticas que entran
+ *  de un clic y recorren la misma autorización que una de Google.
+ *
+ *  Cada uno es una persona ya sembrada con sus cargos, más -para Secretaría y
+ *  Tesorería- la pertenencia al equipo que le da sus permisos. La identidad
+ *  se vincula por el mismo camino que la de una persona real: una invitación
+ *  de activación emitida y consumida acá mismo, con el proveedor demo del otro
+ *  lado. Ese `subject` es el que la pantalla manda como `?perfil=`.
+ *
+ *  El administrador queda designado pero **no elevado**: para tener alcance
+ *  global tiene que volver a autenticarse con otro clic, igual que uno real. */
+const PERFILES_DEMO = [
+  // Jefatura de grupo: administra su grupo y lee su cuenta, nada del vecino.
+  { subject: 'jefatura', documento: '33.207.415', equipo: null },
+  // Secretaría: los mismos permisos de grupo que la jefatura, pero salen del
+  // equipo y no de un cargo estatutario.
+  { subject: 'secretaria', documento: '20.447.195', equipo: 'secretaria' },
+  // Tesorería diocesana: la única que registra pagos, de cualquier grupo.
+  { subject: 'tesoreria', documento: '36.114.780', equipo: 'tesoreriaDiocesana' },
+  // La persona administradora. Entra con lo que le dan sus cargos -es jefe
+  // scout diocesano- y para el alcance global tiene que elevarse con otro
+  // clic, igual que una real.
+  { subject: 'administrador', documento: '35.208.774', equipo: null },
+] as const satisfies readonly {
+  subject: string
+  documento: string
+  equipo: TipoDeEquipo | null
+}[]
+
+async function sembrarPerfilesDemo(ctx: Context, grupos: readonly { id: string }[]): Promise<void> {
+  const elevado = alcanceSinLimites()
+  const gente = (
+    await Promise.all(grupos.map((grupo) => ctx.personas.listarPersonas(elevado, grupo.id)))
+  ).flat()
+
+  for (const perfil of PERFILES_DEMO) {
+    // El documento es la unica forma estable de encontrar a la persona: los
+    // ids los pone core.nuevoId al sembrar.
+    const persona = gente.find(
+      (una) => normalizarNumero(una.numeroDeDocumento) === normalizarNumero(perfil.documento),
+    )
+    if (!persona) throw new Error(`El escenario no tiene la persona ${perfil.documento}.`)
+
+    if (perfil.equipo) {
+      const esDeGrupo = perfil.equipo === 'secretaria'
+      await ctx.personas.integrarEquipo(elevado.actor, {
+        personaId: persona.id,
+        tipo: perfil.equipo,
+        ambitoTipo: esDeGrupo ? 'grupo' : 'diocesis',
+        ambitoId: esDeGrupo ? persona.pertenencia.grupoId : null,
+        desde: persona.pertenencia.desde,
+      })
+    }
+
+    const invitacion = await ctx.auth.emitirInvitacion(elevado.actor, {
+      tipo: 'activacion',
+      personaId: persona.id,
+    })
+    const inicio = ctx.auth.iniciarLogin('demo', 'web', enlaceDelPerfil(perfil.subject))
+    await ctx.auth.consumirActivacion(invitacion.secreto, {
+      transaccion: inicio.transaccion,
+      stateRecibido: stateDe(inicio.url),
+      code: 'demo',
+    })
+
+    if (perfil.subject === 'administrador') {
+      await ctx.auth.asignarAdministrador(persona.id)
+    }
+  }
+}
+
+/** El proveedor demo lee el perfil del `redirectUri`, que es lo unico que
+ *  recibe en las dos mitades del viaje. Al sembrar no hay request, asi que se
+ *  arma uno igual al que armaria la ruta. */
+const enlaceDelPerfil = (subject: string) =>
+  `http://demo.invalido/auth/demo/callback?perfil=${encodeURIComponent(subject)}`
+
+const stateDe = (url: string) => new URL(url).searchParams.get('state') ?? ''
 
 /** Tres permisos del grupo 42, uno por estado que la pantalla tiene que saber
  *  dibujar: un borrador a medio armar, uno emitido con una sola firma, y uno

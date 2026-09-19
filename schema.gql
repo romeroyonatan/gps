@@ -25,6 +25,15 @@ type Afiliado {
 }
 
 """
+Contra qué entidad apunta una función.
+"""
+enum AmbitoDeRol {
+  diocesis
+  distrito
+  grupo
+}
+
+"""
 Un cargo de una persona en su grupo, con su periodo.
 """
 type Cargo {
@@ -185,8 +194,8 @@ Un cargo o equipo vigente, con el ámbito donde lo ejerce.
 """
 type FuncionVigente {
   ambitoId: ID
-  ambitoTipo: String!
-  rol: String!
+  ambitoTipo: AmbitoDeRol!
+  rol: Rol!
 }
 
 """
@@ -280,7 +289,7 @@ type Mutation {
   invitar(
     personaId: ID!
     proveedorAReemplazar: ProveedorDeIdentidad
-    tipo: String!
+    tipo: TipoDeInvitacion!
   ): EnlaceDeInvitacion!
 
   """
@@ -489,6 +498,21 @@ type ResumenDeDeudasPendientes {
 }
 
 """
+La función que un cargo o un equipo vigente concede.
+"""
+enum Rol {
+  administracionDiocesana
+  autoridadDeDistrito
+  comisionadoDeDistrito
+  directorDeGrupo
+  dirigente
+  jefeDeGrupo
+  jefeScoutDiocesano
+  secretariaDeGrupo
+  tesoreriaDiocesana
+}
+
+"""
 Como esta compuesta una unidad. Es un hecho del grupo, no de sus personas.
 """
 enum SexoDeUnidad {
@@ -532,6 +556,14 @@ Tipos de documento que la asociacion acepta.
 enum TipoDeDocumento {
   dni
   pasaporte
+}
+
+"""
+Para qué es un enlace: activar el acceso, o recuperarlo.
+"""
+enum TipoDeInvitacion {
+  activacion
+  recuperacion
 }
 
 """

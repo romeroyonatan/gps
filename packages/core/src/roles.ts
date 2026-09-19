@@ -1,4 +1,4 @@
-import type { Actor, Rol } from './actor'
+import type { Actor, AmbitoDeRol, Rol } from './actor'
 
 /** Si el actor ejerce alguna de esas funciones en ese ámbito concreto.
  *
@@ -8,7 +8,7 @@ import type { Actor, Rol } from './actor'
 export function tieneRol(
   actor: Actor,
   roles: readonly Rol[],
-  tipo: 'grupo' | 'distrito' | 'diocesis',
+  tipo: AmbitoDeRol,
   id: string | null,
 ): boolean {
   return actor.roles.some(
