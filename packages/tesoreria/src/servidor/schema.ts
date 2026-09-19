@@ -7,6 +7,8 @@ import {
   MEDIOS_DE_PAGO,
   type MedioDePago,
   type MovimientoDeTesoreria,
+  puedeConfigurarCuotas,
+  puedeVerTesoreriaDeLaDiocesis,
   type ResultadoDeReconciliacion,
   type ResumenDePendientes,
   type TipoDeMovimiento,
@@ -93,11 +95,23 @@ export function registrarSchema(builder: Builder): void {
       resolve: async (_padre, _args, contexto) => [...(await contexto.tesoreria.listarCuotas())],
     }),
   )
+  // Los dos campos diocesanos devuelven null a quien no le corresponde, en vez
+  // de lanzar.
+  //
+  // En GraphQL un campo no-nulable que lanza se lleva puesta la respuesta
+  // entera: la jefatura pedía su cuenta y estos dos campos en la misma query, y
+  // perdía todo -incluida su cuenta, que sí puede ver-. Un campo denegado no
+  // tiene por qué tirar abajo a sus hermanos, y el que decide es la misma
+  // política pura que aplica el servicio.
   builder.queryField('periodosConfigurablesDeAfiliacion', (t) =>
     t.intList({
-      resolve: async (_padre, _args, contexto) => [
-        ...(await contexto.tesoreria.listarPeriodosConfigurables(alcanceDe(contexto))),
-      ],
+      nullable: true,
+      description: 'Null si quien pregunta no es autoridad diocesana de Tesorería.',
+      resolve: async (_padre, _args, contexto) => {
+        const alcance = alcanceDe(contexto)
+        if (!puedeConfigurarCuotas(alcance.actor)) return null
+        return [...(await contexto.tesoreria.listarPeriodosConfigurables(alcance))]
+      },
     }),
   )
   builder.queryField('cuentasDeGrupos', (t) =>
@@ -120,8 +134,13 @@ export function registrarSchema(builder: Builder): void {
   builder.queryField('deudasPendientes', (t) =>
     t.field({
       type: PendientesRef,
-      resolve: (_padre, _args, contexto) =>
-        contexto.tesoreria.resumenDePendientes(alcanceDe(contexto)),
+      nullable: true,
+      description: 'Null si quien pregunta no es autoridad diocesana de Tesorería.',
+      resolve: (_padre, _args, contexto) => {
+        const alcance = alcanceDe(contexto)
+        if (!puedeVerTesoreriaDeLaDiocesis(alcance.actor)) return null
+        return contexto.tesoreria.resumenDePendientes(alcance)
+      },
     }),
   )
 

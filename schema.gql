@@ -515,7 +515,11 @@ type Query {
   Las declaraciones de un grupo, de la más reciente a la más vieja.
   """
   declaraciones(grupoId: ID!): [Declaracion!]!
-  deudasPendientes: ResumenDeDeudasPendientes!
+
+  """
+  Null si quien pregunta no es autoridad diocesana de Tesorería.
+  """
+  deudasPendientes: ResumenDeDeudasPendientes
 
   """
   El arbol de la diocesis: distritos, sus grupos y sus unidades.
@@ -527,7 +531,11 @@ type Query {
   """
   invitacion(secreto: ID!): Invitacion!
   movimientosDeTesoreria(grupoId: ID!): [MovimientoDeTesoreria!]!
-  periodosConfigurablesDeAfiliacion: [Int!]!
+
+  """
+  Null si quien pregunta no es autoridad diocesana de Tesorería.
+  """
+  periodosConfigurablesDeAfiliacion: [Int!]
   permiso(id: ID!): Permiso
 
   """

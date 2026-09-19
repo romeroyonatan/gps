@@ -263,6 +263,65 @@ describe('alcance entre grupos', () => {
     expect(codigos(nombramiento)).toEqual(['CambioDeAutoridadDenegado'])
   })
 
+  test('un campo denegado no se lleva puesta la respuesta entera', async () => {
+    // La pantalla de Tesorería pide la cuenta del grupo y el panorama de la
+    // diócesis en la misma query. Cuando los campos diocesanos lanzaban, el
+    // error se propagaba a la raíz -son no-nulables- y la jefatura perdía
+    // también su propia cuenta, que sí puede ver.
+    const { consultar, entrar } = await montar()
+    const jefatura = await entrar('jefatura')
+
+    const resultado = await consultar(
+      jefatura.secreto,
+      '{ cuentasDeGrupos { numero saldo } deudasPendientes { cantidad } periodosConfigurablesDeAfiliacion }',
+    )
+
+    expect(resultado.errors).toBeUndefined()
+    expect((resultado.data?.cuentasDeGrupos as unknown[]).length).toBe(1)
+    expect(resultado.data?.deudasPendientes).toBeNull()
+    expect(resultado.data?.periodosConfigurablesDeAfiliacion).toBeNull()
+  })
+
+  test('Tesorería diocesana sí recibe los dos campos', async () => {
+    const { consultar, entrar } = await montar()
+    const tesoreria = await entrar('tesoreria')
+    const resultado = await consultar(
+      tesoreria.secreto,
+      '{ deudasPendientes { cantidad } periodosConfigurablesDeAfiliacion }',
+    )
+    expect(resultado.errors).toBeUndefined()
+    expect(resultado.data?.deudasPendientes).not.toBeNull()
+    expect(resultado.data?.periodosConfigurablesDeAfiliacion).not.toBeNull()
+  })
+
+  test('la jefatura ve las salidas y la cuenta de su propio grupo', async () => {
+    const { consultar, entrar } = await montar()
+    for (const perfil of ['jefatura', 'secretaria']) {
+      const sesion = await entrar(perfil)
+      const suyo = await consultar(sesion.secreto, '{ distritos { grupos { id } } }')
+      const grupo =
+        (suyo.data?.distritos as { grupos: { id: string }[] }[] | undefined)?.[0]?.grupos[0]?.id ??
+        ''
+      expect(grupo).not.toBe('')
+
+      const permisos = await consultar(
+        sesion.secreto,
+        'query ($g: ID!) { permisos(grupoId: $g) { id } }',
+        { g: grupo },
+      )
+      expect(permisos.errors).toBeUndefined()
+      expect((permisos.data?.permisos as unknown[]).length).toBeGreaterThan(0)
+
+      const cuenta = await consultar(
+        sesion.secreto,
+        'query ($g: ID!) { movimientosDeTesoreria(grupoId: $g) { id } }',
+        { g: grupo },
+      )
+      expect(cuenta.errors).toBeUndefined()
+      expect((cuenta.data?.movimientosDeTesoreria as unknown[]).length).toBeGreaterThan(0)
+    }
+  })
+
   test('sólo Tesorería diocesana registra un pago', async () => {
     const { consultar, entrar } = await montar()
     const jefatura = await entrar('jefatura')

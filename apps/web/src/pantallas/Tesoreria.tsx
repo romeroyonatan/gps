@@ -21,6 +21,9 @@ export function Tesoreria() {
     return true
   })
   const pendientes = consulta.data?.deudasPendientes
+  // Null quiere decir "esto no es para vos": el enlace a configurar cuotas no
+  // se muestra si no se van a poder configurar.
+  const configura = consulta.data?.periodosConfigurablesDeAfiliacion != null
 
   return (
     <>
@@ -29,9 +32,11 @@ export function Tesoreria() {
       </Link>
       <div className="mt-1 flex items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Tesorería</h2>
-        <Link href="/tesoreria/configuracion" className="text-sm text-slate-600">
-          Configurar cuotas
-        </Link>
+        {configura && (
+          <Link href="/tesoreria/configuracion" className="text-sm text-slate-600">
+            Configurar cuotas
+          </Link>
+        )}
       </div>
 
       {consulta.isPending && <p className="mt-8 text-sm text-slate-500">Consultando cuentas…</p>}
