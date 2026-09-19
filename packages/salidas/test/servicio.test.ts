@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'bun:test'
-import type { Reloj } from '@gps/core'
+import { alcanceSinLimites, type Reloj } from '@gps/core'
 import { sql } from 'drizzle-orm'
 import { PermisoInvalido, PermisoNoEditable } from '../src/servidor/borradores'
 import { FirmaInvalida } from '../src/servidor/firmas'
 import {
+  alcanceDelFirmante,
   GRUPO_ID,
   MANADA,
   montar,
@@ -19,7 +20,10 @@ const datos = { lugar: 'Estancia La Paz', desde: '1970-03-01', hasta: '1970-03-0
 describe('crear y editar un borrador', () => {
   test('nace en borrador con sus datos', async () => {
     const { servicio } = montar()
-    const permiso = await servicio.crearPermiso(GRUPO_ID, { ...datos, comoSeViaja: 'Micro' })
+    const permiso = await servicio.crearPermiso(alcanceSinLimites(), GRUPO_ID, {
+      ...datos,
+      comoSeViaja: 'Micro',
+    })
     expect(permiso).toMatchObject({
       estado: 'borrador',
       lugar: 'Estancia La Paz',
@@ -30,20 +34,25 @@ describe('crear y editar un borrador', () => {
 
   test('fechas invertidas se rechazan', async () => {
     const { servicio } = montar()
-    expect(servicio.crearPermiso(GRUPO_ID, { ...datos, hasta: '1970-02-28' })).rejects.toThrow(
-      PermisoInvalido,
-    )
+    expect(
+      servicio.crearPermiso(alcanceSinLimites(), GRUPO_ID, { ...datos, hasta: '1970-02-28' }),
+    ).rejects.toThrow(PermisoInvalido)
   })
 
   test('un grupo que no existe o esta cerrado se rechaza', async () => {
     const { servicio } = montar()
-    expect(servicio.crearPermiso('grupo_inexistente', datos)).rejects.toThrow(PermisoNoEditable)
+    expect(servicio.crearPermiso(alcanceSinLimites(), 'grupo_inexistente', datos)).rejects.toThrow(
+      PermisoNoEditable,
+    )
   })
 
   test('editar un borrador cambia los datos', async () => {
     const { servicio } = montar()
-    const permiso = await servicio.crearPermiso(GRUPO_ID, datos)
-    const editado = await servicio.editarPermiso(permiso.id, { ...datos, lugar: 'Otro lado' })
+    const permiso = await servicio.crearPermiso(alcanceSinLimites(), GRUPO_ID, datos)
+    const editado = await servicio.editarPermiso(alcanceSinLimites(), permiso.id, {
+      ...datos,
+      lugar: 'Otro lado',
+    })
     expect(editado.lugar).toBe('Otro lado')
   })
 })
@@ -51,25 +60,27 @@ describe('crear y editar un borrador', () => {
 describe('unidades que participan', () => {
   test('quedan registradas las elegidas y no las otras', async () => {
     const { servicio } = montar()
-    const permiso = await servicio.crearPermiso(GRUPO_ID, datos)
-    await servicio.elegirUnidades(permiso.id, [TROPA])
+    const permiso = await servicio.crearPermiso(alcanceSinLimites(), GRUPO_ID, datos)
+    await servicio.elegirUnidades(alcanceSinLimites(), permiso.id, [TROPA])
     expect(servicio.unidadesElegidas(permiso.id)).toEqual([TROPA])
   })
 
   test('una unidad de otro grupo se rechaza', async () => {
     const { servicio } = montar()
-    const permiso = await servicio.crearPermiso(GRUPO_ID, datos)
-    expect(servicio.elegirUnidades(permiso.id, ['unidad_ajena'])).rejects.toThrow(PermisoInvalido)
+    const permiso = await servicio.crearPermiso(alcanceSinLimites(), GRUPO_ID, datos)
+    expect(
+      servicio.elegirUnidades(alcanceSinLimites(), permiso.id, ['unidad_ajena']),
+    ).rejects.toThrow(PermisoInvalido)
   })
 
   test('desmarcar una unidad saca a su gente de la lista', async () => {
     // Si no, el PDF diria algo que la pantalla no muestra.
     const { servicio } = montar()
-    const permiso = await servicio.crearPermiso(GRUPO_ID, datos)
-    await servicio.elegirUnidades(permiso.id, [TROPA, MANADA])
-    await servicio.agregarParticipante(permiso.id, 'persona_lobato')
-    await servicio.elegirUnidades(permiso.id, [TROPA])
-    expect(await servicio.listarParticipantes(permiso.id)).toEqual([])
+    const permiso = await servicio.crearPermiso(alcanceSinLimites(), GRUPO_ID, datos)
+    await servicio.elegirUnidades(alcanceSinLimites(), permiso.id, [TROPA, MANADA])
+    await servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_lobato')
+    await servicio.elegirUnidades(alcanceSinLimites(), permiso.id, [TROPA])
+    expect(await servicio.listarParticipantes(alcanceSinLimites(), permiso.id)).toEqual([])
   })
 })
 
@@ -77,7 +88,7 @@ describe('participantes', () => {
   test('se agregan con la marca que da su categoria', async () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
-    const puestos = await servicio.listarParticipantes(permiso.id)
+    const puestos = await servicio.listarParticipantes(alcanceSinLimites(), permiso.id)
     expect(puestos.map((uno) => [uno.personaId, uno.marca]).sort()).toEqual([
       ['persona_chico', 'beneficiario'],
       ['persona_jefe', 'dirigente'],
@@ -87,17 +98,17 @@ describe('participantes', () => {
   test('alguien de una unidad que no va se rechaza', async () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
-    expect(servicio.agregarParticipante(permiso.id, 'persona_lobato')).rejects.toThrow(
-      PermisoInvalido,
-    )
+    expect(
+      servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_lobato'),
+    ).rejects.toThrow(PermisoInvalido)
   })
 
   test('alguien de otro grupo se rechaza', async () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
-    expect(servicio.agregarParticipante(permiso.id, 'persona_ajena')).rejects.toThrow(
-      PermisoInvalido,
-    )
+    expect(
+      servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_ajena'),
+    ).rejects.toThrow(PermisoInvalido)
   })
 
   test('la cocinera entra aunque no tenga unidad', async () => {
@@ -105,21 +116,23 @@ describe('participantes', () => {
     // igual: dejarla afuera seria una regla que no existe.
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
-    await servicio.agregarParticipante(permiso.id, 'persona_cocinera')
-    expect((await servicio.listarParticipantes(permiso.id)).length).toBe(3)
+    await servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_cocinera')
+    expect((await servicio.listarParticipantes(alcanceSinLimites(), permiso.id)).length).toBe(3)
   })
 
   test('la misma persona dos veces se rechaza', async () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
-    expect(servicio.agregarParticipante(permiso.id, 'persona_chico')).rejects.toThrow()
+    expect(
+      servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_chico'),
+    ).rejects.toThrow()
   })
 
   test('quitar saca de la lista', async () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
-    await servicio.quitarParticipante(permiso.id, 'persona_chico')
-    expect((await servicio.listarParticipantes(permiso.id)).length).toBe(1)
+    await servicio.quitarParticipante(alcanceSinLimites(), permiso.id, 'persona_chico')
+    expect((await servicio.listarParticipantes(alcanceSinLimites(), permiso.id)).length).toBe(1)
   })
 })
 
@@ -127,7 +140,7 @@ describe('emitir', () => {
   test('congela los datos, guarda el PDF y pasa a emitido', async () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
-    const { permiso: emitido } = await servicio.emitir(permiso.id)
+    const { permiso: emitido } = await servicio.emitir(alcanceSinLimites(), permiso.id)
     expect(emitido.estado).toBe('emitido')
     expect(emitido.pdfId).not.toBeNull()
     expect(emitido.hashDelPdf).not.toBeNull()
@@ -135,20 +148,22 @@ describe('emitir', () => {
 
   test('sin ningun dirigente no se emite', async () => {
     const { servicio } = montar()
-    const permiso = await servicio.crearPermiso(GRUPO_ID, datos)
-    await servicio.elegirUnidades(permiso.id, [TROPA])
-    await servicio.agregarParticipante(permiso.id, 'persona_chico')
-    expect(servicio.emitir(permiso.id)).rejects.toThrow(PermisoInvalido)
+    const permiso = await servicio.crearPermiso(alcanceSinLimites(), GRUPO_ID, datos)
+    await servicio.elegirUnidades(alcanceSinLimites(), permiso.id, [TROPA])
+    await servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_chico')
+    expect(servicio.emitir(alcanceSinLimites(), permiso.id)).rejects.toThrow(PermisoInvalido)
   })
 
   test('un emitido no se edita', async () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
-    await servicio.emitir(permiso.id)
-    expect(servicio.editarPermiso(permiso.id, datos)).rejects.toThrow(PermisoNoEditable)
-    expect(servicio.agregarParticipante(permiso.id, 'persona_cocinera')).rejects.toThrow(
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
+    expect(servicio.editarPermiso(alcanceSinLimites(), permiso.id, datos)).rejects.toThrow(
       PermisoNoEditable,
     )
+    expect(
+      servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_cocinera'),
+    ).rejects.toThrow(PermisoNoEditable)
   })
 
   test('la fotografia no cambia aunque cambien los datos de la persona', async () => {
@@ -156,7 +171,7 @@ describe('emitir', () => {
     const mundo = mundoPorDefecto()
     const { servicio } = montar({ mundo })
     const permiso = await permisoConGente(servicio)
-    await servicio.emitir(permiso.id)
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
 
     const chico = mundo.miembros.find((uno) => uno.persona.id === 'persona_chico')
     if (chico)
@@ -165,16 +180,16 @@ describe('emitir', () => {
         persona: { ...chico.persona, apellidos: 'Corregido' },
       }
 
-    const emitidos = await servicio.listarParticipantesEmitidos(permiso.id)
+    const emitidos = await servicio.listarParticipantesEmitidos(alcanceSinLimites(), permiso.id)
     expect(emitidos.find((uno) => uno.personaId === 'persona_chico')?.apellidos).toBe('Alvarez')
   })
 
   test('guarda la unidad de cada uno, y una raya para los que no tienen', async () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
-    await servicio.agregarParticipante(permiso.id, 'persona_cocinera')
-    await servicio.emitir(permiso.id)
-    const emitidos = await servicio.listarParticipantesEmitidos(permiso.id)
+    await servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_cocinera')
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
+    const emitidos = await servicio.listarParticipantesEmitidos(alcanceSinLimites(), permiso.id)
     expect(emitidos.find((uno) => uno.personaId === 'persona_chico')?.unidad).toContain('San Jorge')
     expect(emitidos.find((uno) => uno.personaId === 'persona_cocinera')?.unidad).toBe('-')
   })
@@ -186,7 +201,7 @@ describe('aviso de anticipacion', () => {
   test('emitir tarde avisa pero emite igual', async () => {
     const { servicio } = montar({ reloj: relojEn('1970-02-25') })
     const permiso = await permisoConGente(servicio)
-    const resultado = await servicio.emitir(permiso.id)
+    const resultado = await servicio.emitir(alcanceSinLimites(), permiso.id)
     expect(resultado.permiso.estado).toBe('emitido')
     expect(resultado.avisos.length).toBe(1)
   })
@@ -194,7 +209,7 @@ describe('aviso de anticipacion', () => {
   test('emitir a tiempo no avisa', async () => {
     const { servicio } = montar({ reloj: relojEn('1970-01-01') })
     const permiso = await permisoConGente(servicio)
-    expect((await servicio.emitir(permiso.id)).avisos).toEqual([])
+    expect((await servicio.emitir(alcanceSinLimites(), permiso.id)).avisos).toEqual([])
   })
 })
 
@@ -204,13 +219,13 @@ describe('firmas', () => {
   async function emitido() {
     const montado = montar()
     const permiso = await permisoConGente(montado.servicio)
-    await montado.servicio.emitir(permiso.id)
+    await montado.servicio.emitir(alcanceSinLimites(), permiso.id)
     return { ...montado, permisoId: permiso.id }
   }
 
   test('un permiso emitido muestra tres firmas pendientes con quien las tiene que poner', async () => {
     const { servicio, permisoId } = await emitido()
-    const estados = await servicio.estadoDeLasFirmas(permisoId)
+    const estados = await servicio.estadoDeLasFirmas(alcanceSinLimites(), permisoId)
     expect(estados.map((uno) => uno.cargo)).toEqual([
       'jefeDeGrupo',
       'director',
@@ -222,23 +237,27 @@ describe('firmas', () => {
 
   test('firmar en la app deja la firma con su sello, y verifica', async () => {
     const { servicio, permisoId } = await emitido()
-    await servicio.firmarEnApp(permisoId, 'jefeDeGrupo', trazos)
-    const estado = (await servicio.estadoDeLasFirmas(permisoId))[0]
+    await servicio.firmarEnApp(alcanceDelFirmante('jefeDeGrupo'), permisoId, 'jefeDeGrupo', trazos)
+    const estado = (await servicio.estadoDeLasFirmas(alcanceSinLimites(), permisoId))[0]
     expect(estado?.firma?.modo).toBe('app')
     expect(estado?.verificada).toBe(true)
   })
 
   test('el mismo cargo no firma dos veces', async () => {
     const { servicio, permisoId } = await emitido()
-    await servicio.firmarEnApp(permisoId, 'jefeDeGrupo', trazos)
-    expect(servicio.firmarEnApp(permisoId, 'jefeDeGrupo', trazos)).rejects.toThrow(FirmaInvalida)
+    await servicio.firmarEnApp(alcanceDelFirmante('jefeDeGrupo'), permisoId, 'jefeDeGrupo', trazos)
+    expect(
+      servicio.firmarEnApp(alcanceDelFirmante('jefeDeGrupo'), permisoId, 'jefeDeGrupo', trazos),
+    ).rejects.toThrow(FirmaInvalida)
   })
 
   test('un dibujo vacio no es una firma', async () => {
     const { servicio, permisoId } = await emitido()
-    expect(servicio.firmarEnApp(permisoId, 'jefeDeGrupo', { trazos: [[]] })).rejects.toThrow(
-      FirmaInvalida,
-    )
+    expect(
+      servicio.firmarEnApp(alcanceDelFirmante('jefeDeGrupo'), permisoId, 'jefeDeGrupo', {
+        trazos: [[]],
+      }),
+    ).rejects.toThrow(FirmaInvalida)
   })
 
   test('un cargo vacante no puede firmar', async () => {
@@ -246,21 +265,30 @@ describe('firmas', () => {
     mundo.cargos.delete('comisionadoDeDistrito|distrito_1')
     const { servicio } = montar({ mundo })
     const permiso = await permisoConGente(servicio)
-    await servicio.emitir(permiso.id)
-    expect(servicio.firmarEnApp(permiso.id, 'comisionadoDeDistrito', trazos)).rejects.toThrow(
-      FirmaInvalida,
-    )
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
+    expect(
+      servicio.firmarEnApp(
+        alcanceDelFirmante('comisionadoDeDistrito'),
+        permiso.id,
+        'comisionadoDeDistrito',
+        trazos,
+      ),
+    ).rejects.toThrow(FirmaInvalida)
   })
 
   test('un cargo que no firma permisos se rechaza', async () => {
     const { servicio, permisoId } = await emitido()
-    expect(servicio.firmarEnApp(permisoId, 'capellan', trazos)).rejects.toThrow(FirmaInvalida)
+    expect(
+      servicio.firmarEnApp(alcanceDelFirmante('capellan'), permisoId, 'capellan', trazos),
+    ).rejects.toThrow(FirmaInvalida)
   })
 
   test('un borrador no se firma', async () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
-    expect(servicio.firmarEnApp(permiso.id, 'jefeDeGrupo', trazos)).rejects.toThrow(FirmaInvalida)
+    expect(
+      servicio.firmarEnApp(alcanceDelFirmante('jefeDeGrupo'), permiso.id, 'jefeDeGrupo', trazos),
+    ).rejects.toThrow(FirmaInvalida)
   })
 
   test('firma a nombre de quien ocupa el cargo el dia que firma, no el de la emision', async () => {
@@ -268,10 +296,15 @@ describe('firmas', () => {
     const mundo = mundoPorDefecto()
     const { servicio } = montar({ mundo })
     const permiso = await permisoConGente(servicio)
-    await servicio.emitir(permiso.id)
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
 
     mundo.cargos.set('comisionadoDeDistrito|distrito_1', [persona('persona_nueva', 'Nueva')])
-    const firma = await servicio.firmarEnApp(permiso.id, 'comisionadoDeDistrito', trazos)
+    const firma = await servicio.firmarEnApp(
+      alcanceDelFirmante('comisionadoDeDistrito'),
+      permiso.id,
+      'comisionadoDeDistrito',
+      trazos,
+    )
     expect(firma.apellidos).toBe('Nueva')
   })
 })
@@ -282,22 +315,24 @@ describe('verificacion de sellos', () => {
   test('alterar los trazos en la base rompe el sello', async () => {
     const { servicio, bd } = montar()
     const permiso = await permisoConGente(servicio)
-    await servicio.emitir(permiso.id)
-    await servicio.firmarEnApp(permiso.id, 'jefeDeGrupo', trazos)
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
+    await servicio.firmarEnApp(alcanceDelFirmante('jefeDeGrupo'), permiso.id, 'jefeDeGrupo', trazos)
 
     // Se altera la base por debajo, que es justo el ataque que el sello ataja.
     bd.run(sql`UPDATE firmas SET trazos = '[[[0.9,0.9]]]'`)
-    expect((await servicio.estadoDeLasFirmas(permiso.id))[0]?.verificada).toBe(false)
+    expect((await servicio.estadoDeLasFirmas(alcanceSinLimites(), permiso.id))[0]?.verificada).toBe(
+      false,
+    )
   })
 
   test('una firma en papel no tiene sello, asi que no dice ni si ni no', async () => {
     const { servicio, archivos } = montar()
     const permiso = await permisoConGente(servicio)
-    await servicio.emitir(permiso.id)
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
     const escaneoId = await subirEscaneo(archivos, permiso.id)
-    await servicio.firmarEnPapel(permiso.id, ['director'], escaneoId)
+    await servicio.firmarEnPapel(alcanceSinLimites(), permiso.id, ['director'], escaneoId)
 
-    const estado = (await servicio.estadoDeLasFirmas(permiso.id)).find(
+    const estado = (await servicio.estadoDeLasFirmas(alcanceSinLimites(), permiso.id)).find(
       (uno) => uno.cargo === 'director',
     )
     expect(estado?.verificada).toBeNull()
@@ -310,10 +345,15 @@ describe('firma en papel y permiso firmado', () => {
   test('un escaneo puede respaldar dos firmas', async () => {
     const { servicio, archivos } = montar()
     const permiso = await permisoConGente(servicio)
-    await servicio.emitir(permiso.id)
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
     const escaneoId = await subirEscaneo(archivos, permiso.id)
 
-    const puestas = await servicio.firmarEnPapel(permiso.id, ['jefeDeGrupo', 'director'], escaneoId)
+    const puestas = await servicio.firmarEnPapel(
+      alcanceSinLimites(),
+      permiso.id,
+      ['jefeDeGrupo', 'director'],
+      escaneoId,
+    )
     expect(puestas.map((uno) => uno.escaneoId)).toEqual([escaneoId, escaneoId])
   })
 
@@ -321,7 +361,7 @@ describe('firma en papel y permiso firmado', () => {
     // Se puede adjuntar al permiso -eso es otra cosa- pero no se anexa al PDF.
     const { servicio, archivos } = montar()
     const permiso = await permisoConGente(servicio)
-    await servicio.emitir(permiso.id)
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
 
     const bytes = new Uint8Array([1, 2, 3])
     const subida = await archivos.solicitarSubida({
@@ -335,38 +375,45 @@ describe('firma en papel y permiso firmado', () => {
     await archivos.recibirBytes(subida.id, token, bytes)
     await archivos.confirmarSubida(subida.id)
 
-    expect(servicio.firmarEnPapel(permiso.id, ['director'], subida.id)).rejects.toThrow(
-      FirmaInvalida,
-    )
+    expect(
+      servicio.firmarEnPapel(alcanceSinLimites(), permiso.id, ['director'], subida.id),
+    ).rejects.toThrow(FirmaInvalida)
   })
 
   test('un escaneo de otro permiso no sirve', async () => {
     const { servicio, archivos } = montar()
     const permiso = await permisoConGente(servicio)
-    await servicio.emitir(permiso.id)
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
     const ajeno = await subirEscaneo(archivos, 'permiso_ajeno')
-    expect(servicio.firmarEnPapel(permiso.id, ['director'], ajeno)).rejects.toThrow(FirmaInvalida)
+    expect(
+      servicio.firmarEnPapel(alcanceSinLimites(), permiso.id, ['director'], ajeno),
+    ).rejects.toThrow(FirmaInvalida)
   })
 
   test('con las tres firmas el permiso queda firmado', async () => {
     const { servicio, archivos } = montar()
     const permiso = await permisoConGente(servicio)
-    await servicio.emitir(permiso.id)
-    await servicio.firmarEnApp(permiso.id, 'jefeDeGrupo', trazos)
-    await servicio.firmarEnApp(permiso.id, 'comisionadoDeDistrito', trazos)
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
+    await servicio.firmarEnApp(alcanceDelFirmante('jefeDeGrupo'), permiso.id, 'jefeDeGrupo', trazos)
+    await servicio.firmarEnApp(
+      alcanceDelFirmante('comisionadoDeDistrito'),
+      permiso.id,
+      'comisionadoDeDistrito',
+      trazos,
+    )
     const escaneoId = await subirEscaneo(archivos, permiso.id)
-    await servicio.firmarEnPapel(permiso.id, ['director'], escaneoId)
+    await servicio.firmarEnPapel(alcanceSinLimites(), permiso.id, ['director'], escaneoId)
 
-    expect((await servicio.obtenerPermiso(permiso.id))?.estado).toBe('firmado')
+    expect((await servicio.obtenerPermiso(alcanceSinLimites(), permiso.id))?.estado).toBe('firmado')
   })
 
   test('con dos todavia no', async () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
-    await servicio.emitir(permiso.id)
-    await servicio.firmarEnApp(permiso.id, 'jefeDeGrupo', trazos)
-    await servicio.firmarEnApp(permiso.id, 'director', trazos)
-    expect((await servicio.obtenerPermiso(permiso.id))?.estado).toBe('emitido')
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
+    await servicio.firmarEnApp(alcanceDelFirmante('jefeDeGrupo'), permiso.id, 'jefeDeGrupo', trazos)
+    await servicio.firmarEnApp(alcanceDelFirmante('director'), permiso.id, 'director', trazos)
+    expect((await servicio.obtenerPermiso(alcanceSinLimites(), permiso.id))?.estado).toBe('emitido')
   })
 })
 
@@ -374,39 +421,41 @@ describe('anular y re-emitir', () => {
   test('un emitido se anula', async () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
-    await servicio.emitir(permiso.id)
-    expect((await servicio.anular(permiso.id)).estado).toBe('anulado')
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
+    expect((await servicio.anular(alcanceSinLimites(), permiso.id)).estado).toBe('anulado')
   })
 
   test('un anulado no admite mas firmas', async () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
-    await servicio.emitir(permiso.id)
-    await servicio.anular(permiso.id)
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
+    await servicio.anular(alcanceSinLimites(), permiso.id)
     expect(
-      servicio.firmarEnApp(permiso.id, 'jefeDeGrupo', { trazos: [[[0.1, 0.2] as const]] }),
+      servicio.firmarEnApp(alcanceDelFirmante('jefeDeGrupo'), permiso.id, 'jefeDeGrupo', {
+        trazos: [[[0.1, 0.2] as const]],
+      }),
     ).rejects.toThrow(FirmaInvalida)
   })
 
   test('un borrador no se anula', async () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
-    expect(servicio.anular(permiso.id)).rejects.toThrow(PermisoNoEditable)
+    expect(servicio.anular(alcanceSinLimites(), permiso.id)).rejects.toThrow(PermisoNoEditable)
   })
 
   test('re-emitir copia datos, unidades y participantes en un borrador nuevo', async () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
-    await servicio.emitir(permiso.id)
-    await servicio.anular(permiso.id)
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
+    await servicio.anular(alcanceSinLimites(), permiso.id)
 
-    const nuevo = await servicio.reEmitir(permiso.id)
+    const nuevo = await servicio.reEmitir(alcanceSinLimites(), permiso.id)
     expect(nuevo.estado).toBe('borrador')
     expect(nuevo.id).not.toBe(permiso.id)
     expect(nuevo.reemplazaA).toBe(permiso.id)
     expect(nuevo.lugar).toBe(permiso.lugar)
     expect(servicio.unidadesElegidas(nuevo.id)).toEqual([TROPA])
-    expect((await servicio.listarParticipantes(nuevo.id)).length).toBe(2)
+    expect((await servicio.listarParticipantes(alcanceSinLimites(), nuevo.id)).length).toBe(2)
     // Sin firmas ni PDF: es un borrador de verdad.
     expect(nuevo.pdfId).toBeNull()
   })
@@ -414,7 +463,7 @@ describe('anular y re-emitir', () => {
   test('solo se re-emite lo anulado', async () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
-    expect(servicio.reEmitir(permiso.id)).rejects.toThrow(PermisoNoEditable)
+    expect(servicio.reEmitir(alcanceSinLimites(), permiso.id)).rejects.toThrow(PermisoNoEditable)
   })
 })
 
@@ -436,35 +485,39 @@ describe('adjuntos', () => {
     const token = new URL(subida.url, 'http://x').searchParams.get('token') ?? ''
     await archivos.recibirBytes(subida.id, token, bytes)
     await archivos.confirmarSubida(subida.id)
-    await servicio.adjuntar(permiso.id, subida.id)
+    await servicio.adjuntar(alcanceSinLimites(), permiso.id, subida.id)
 
-    expect((await servicio.listarAdjuntos(permiso.id)).length).toBe(1)
+    expect((await servicio.listarAdjuntos(alcanceSinLimites(), permiso.id)).length).toBe(1)
   })
 
   test('se puede adjuntar a un permiso firmado sin romper las firmas', async () => {
     const { servicio, archivos } = montar()
     const permiso = await permisoConGente(servicio)
-    await servicio.emitir(permiso.id)
-    await servicio.firmarEnApp(permiso.id, 'jefeDeGrupo', { trazos: [[[0.1, 0.2] as const]] })
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
+    await servicio.firmarEnApp(alcanceDelFirmante('jefeDeGrupo'), permiso.id, 'jefeDeGrupo', {
+      trazos: [[[0.1, 0.2] as const]],
+    })
 
     const archivoId = await subirEscaneo(archivos, permiso.id)
-    await servicio.adjuntar(permiso.id, archivoId)
+    await servicio.adjuntar(alcanceSinLimites(), permiso.id, archivoId)
 
-    expect((await servicio.listarAdjuntos(permiso.id)).length).toBe(1)
-    expect((await servicio.estadoDeLasFirmas(permiso.id))[0]?.verificada).toBe(true)
+    expect((await servicio.listarAdjuntos(alcanceSinLimites(), permiso.id)).length).toBe(1)
+    expect((await servicio.estadoDeLasFirmas(alcanceSinLimites(), permiso.id))[0]?.verificada).toBe(
+      true,
+    )
   })
 
   test('quitar un adjunto lo saca de la lista y borra el archivo', async () => {
     const { servicio, archivos } = montar()
     const permiso = await permisoConGente(servicio)
     const archivoId = await subirEscaneo(archivos, permiso.id)
-    await servicio.adjuntar(permiso.id, archivoId)
+    await servicio.adjuntar(alcanceSinLimites(), permiso.id, archivoId)
 
-    const [adjunto] = await servicio.listarAdjuntos(permiso.id)
+    const [adjunto] = await servicio.listarAdjuntos(alcanceSinLimites(), permiso.id)
     if (!adjunto) throw new Error('no se adjunto')
-    await servicio.quitarAdjunto(permiso.id, adjunto.id)
+    await servicio.quitarAdjunto(alcanceSinLimites(), permiso.id, adjunto.id)
 
-    expect(await servicio.listarAdjuntos(permiso.id)).toEqual([])
+    expect(await servicio.listarAdjuntos(alcanceSinLimites(), permiso.id)).toEqual([])
     // El archivo tambien: si no, queda basura que nadie puede alcanzar.
     expect(await archivos.obtener(archivoId)).toBeNull()
   })
@@ -473,28 +526,34 @@ describe('adjuntos', () => {
     // Un adjunto no entra en el PDF ni en el hash que sellan las firmas.
     const { servicio, archivos } = montar()
     const permiso = await permisoConGente(servicio)
-    await servicio.emitir(permiso.id)
-    await servicio.firmarEnApp(permiso.id, 'jefeDeGrupo', { trazos: [[[0.1, 0.2] as const]] })
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
+    await servicio.firmarEnApp(alcanceDelFirmante('jefeDeGrupo'), permiso.id, 'jefeDeGrupo', {
+      trazos: [[[0.1, 0.2] as const]],
+    })
 
     const archivoId = await subirEscaneo(archivos, permiso.id)
-    await servicio.adjuntar(permiso.id, archivoId)
-    const [adjunto] = await servicio.listarAdjuntos(permiso.id)
+    await servicio.adjuntar(alcanceSinLimites(), permiso.id, archivoId)
+    const [adjunto] = await servicio.listarAdjuntos(alcanceSinLimites(), permiso.id)
     if (!adjunto) throw new Error('no se adjunto')
-    await servicio.quitarAdjunto(permiso.id, adjunto.id)
+    await servicio.quitarAdjunto(alcanceSinLimites(), permiso.id, adjunto.id)
 
-    expect((await servicio.estadoDeLasFirmas(permiso.id))[0]?.verificada).toBe(true)
+    expect((await servicio.estadoDeLasFirmas(alcanceSinLimites(), permiso.id))[0]?.verificada).toBe(
+      true,
+    )
   })
 
   test('quitar un adjunto de otro permiso se rechaza', async () => {
     const { servicio, archivos } = montar()
     const uno = await permisoConGente(servicio)
-    const otro = await servicio.crearPermiso(GRUPO_ID, datos)
+    const otro = await servicio.crearPermiso(alcanceSinLimites(), GRUPO_ID, datos)
     const archivoId = await subirEscaneo(archivos, uno.id)
-    await servicio.adjuntar(uno.id, archivoId)
-    const [adjunto] = await servicio.listarAdjuntos(uno.id)
+    await servicio.adjuntar(alcanceSinLimites(), uno.id, archivoId)
+    const [adjunto] = await servicio.listarAdjuntos(alcanceSinLimites(), uno.id)
     if (!adjunto) throw new Error('no se adjunto')
 
-    expect(servicio.quitarAdjunto(otro.id, adjunto.id)).rejects.toThrow(PermisoNoEditable)
+    expect(servicio.quitarAdjunto(alcanceSinLimites(), otro.id, adjunto.id)).rejects.toThrow(
+      PermisoNoEditable,
+    )
   })
 
   test('quitar un adjunto no borra el escaneo de una firma', async () => {
@@ -502,15 +561,15 @@ describe('adjuntos', () => {
     // no se toca por aca.
     const { servicio, archivos } = montar()
     const permiso = await permisoConGente(servicio)
-    await servicio.emitir(permiso.id)
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
     const escaneoId = await subirEscaneo(archivos, permiso.id)
-    await servicio.firmarEnPapel(permiso.id, ['director'], escaneoId)
+    await servicio.firmarEnPapel(alcanceSinLimites(), permiso.id, ['director'], escaneoId)
 
     const adjuntoId = await subirEscaneo(archivos, permiso.id)
-    await servicio.adjuntar(permiso.id, adjuntoId)
-    const [adjunto] = await servicio.listarAdjuntos(permiso.id)
+    await servicio.adjuntar(alcanceSinLimites(), permiso.id, adjuntoId)
+    const [adjunto] = await servicio.listarAdjuntos(alcanceSinLimites(), permiso.id)
     if (!adjunto) throw new Error('no se adjunto')
-    await servicio.quitarAdjunto(permiso.id, adjunto.id)
+    await servicio.quitarAdjunto(alcanceSinLimites(), permiso.id, adjunto.id)
 
     expect(await archivos.obtener(escaneoId)).not.toBeNull()
   })
@@ -519,28 +578,40 @@ describe('adjuntos', () => {
     const { servicio, archivos } = montar()
     const permiso = await permisoConGente(servicio)
     const ajeno = await subirEscaneo(archivos, 'permiso_ajeno')
-    expect(servicio.adjuntar(permiso.id, ajeno)).rejects.toThrow(PermisoNoEditable)
+    expect(servicio.adjuntar(alcanceSinLimites(), permiso.id, ajeno)).rejects.toThrow(
+      PermisoNoEditable,
+    )
   })
 })
 
 describe('listar', () => {
   test('los del grupo, del mas proximo al mas viejo', async () => {
     const { servicio } = montar()
-    await servicio.crearPermiso(GRUPO_ID, { ...datos, desde: '1970-03-01', hasta: '1970-03-02' })
-    await servicio.crearPermiso(GRUPO_ID, { ...datos, desde: '1970-05-01', hasta: '1970-05-02' })
-    await servicio.crearPermiso(GRUPO_ID, { ...datos, desde: '1970-04-01', hasta: '1970-04-02' })
+    await servicio.crearPermiso(alcanceSinLimites(), GRUPO_ID, {
+      ...datos,
+      desde: '1970-03-01',
+      hasta: '1970-03-02',
+    })
+    await servicio.crearPermiso(alcanceSinLimites(), GRUPO_ID, {
+      ...datos,
+      desde: '1970-05-01',
+      hasta: '1970-05-02',
+    })
+    await servicio.crearPermiso(alcanceSinLimites(), GRUPO_ID, {
+      ...datos,
+      desde: '1970-04-01',
+      hasta: '1970-04-02',
+    })
 
-    expect((await servicio.listarPermisos(GRUPO_ID)).map((uno) => uno.desde)).toEqual([
-      '1970-05-01',
-      '1970-04-01',
-      '1970-03-01',
-    ])
+    expect(
+      (await servicio.listarPermisos(alcanceSinLimites(), GRUPO_ID)).map((uno) => uno.desde),
+    ).toEqual(['1970-05-01', '1970-04-01', '1970-03-01'])
   })
 
   test('los de otro grupo no se mezclan', async () => {
     const { servicio } = montar()
-    await servicio.crearPermiso(GRUPO_ID, datos)
-    expect(await servicio.listarPermisos('grupo_otro')).toEqual([])
+    await servicio.crearPermiso(alcanceSinLimites(), GRUPO_ID, datos)
+    expect(await servicio.listarPermisos(alcanceSinLimites(), 'grupo_otro')).toEqual([])
   })
 })
 
@@ -548,30 +619,34 @@ describe('pdf del permiso', () => {
   test('un borrador todavia no tiene PDF', async () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
-    expect(servicio.pdfDelPermiso(permiso.id)).rejects.toThrow(PermisoNoEditable)
+    expect(servicio.pdfDelPermiso(alcanceSinLimites(), permiso.id)).rejects.toThrow(
+      PermisoNoEditable,
+    )
   })
 
   test('el emitido se puede descargar y cambia al registrar una firma', async () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
-    await servicio.emitir(permiso.id)
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
 
-    const sinFirmas = await servicio.pdfDelPermiso(permiso.id)
+    const sinFirmas = await servicio.pdfDelPermiso(alcanceSinLimites(), permiso.id)
     expect(new TextDecoder().decode(sinFirmas.slice(0, 5))).toBe('%PDF-')
 
-    await servicio.firmarEnApp(permiso.id, 'jefeDeGrupo', { trazos: [[[0.1, 0.2] as const]] })
-    expect(await servicio.pdfDelPermiso(permiso.id)).not.toEqual(sinFirmas)
+    await servicio.firmarEnApp(alcanceDelFirmante('jefeDeGrupo'), permiso.id, 'jefeDeGrupo', {
+      trazos: [[[0.1, 0.2] as const]],
+    })
+    expect(await servicio.pdfDelPermiso(alcanceSinLimites(), permiso.id)).not.toEqual(sinFirmas)
   })
 
   test('el firmado anexa el escaneo del papel', async () => {
     const { servicio, archivos } = montar()
     const permiso = await permisoConGente(servicio)
-    await servicio.emitir(permiso.id)
-    const sinAnexo = await servicio.pdfDelPermiso(permiso.id)
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
+    const sinAnexo = await servicio.pdfDelPermiso(alcanceSinLimites(), permiso.id)
 
     const escaneoId = await subirEscaneo(archivos, permiso.id)
-    await servicio.firmarEnPapel(permiso.id, ['director'], escaneoId)
-    const conAnexo = await servicio.pdfDelPermiso(permiso.id)
+    await servicio.firmarEnPapel(alcanceSinLimites(), permiso.id, ['director'], escaneoId)
+    const conAnexo = await servicio.pdfDelPermiso(alcanceSinLimites(), permiso.id)
 
     expect(conAnexo.length).toBeGreaterThan(sinAnexo.length)
   })

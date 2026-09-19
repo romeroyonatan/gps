@@ -44,6 +44,7 @@ function moduloFalso(name: string, migraciones: Migracion[]): Module<object> {
     dependencies: [],
     migraciones,
     createServices: () => ({}),
+    accesoAlModulo: { porDefecto: 'denegado', permitidos: [] },
     registerSchema: () => {},
   }
 }

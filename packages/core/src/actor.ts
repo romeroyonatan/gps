@@ -28,9 +28,16 @@ export interface Actor {
 }
 
 /** Lo que el actor puede alcanzar, ya expandido. Lo deriva el modulo
- *  estructura, que conoce la jerarquia. Los repositorios lo reciben como
- *  primer parametro obligatorio. */
+ *  estructura, que conoce la jerarquia. Todo camino de consulta o escritura
+ *  iniciado por un usuario lo recibe como primer parametro obligatorio: una
+ *  consulta que se olvide de filtrar no compila.
+ *
+ *  Lleva adentro al actor porque las dos preguntas viajan siempre juntas: que
+ *  filas se ven -gruposVisibles- y que puede hacer quien pregunta -las
+ *  politicas por operacion, que son puras sobre Actor-. Separarlas obligaria a
+ *  dos parametros en cada firma y a que alguna se olvidara. */
 export interface Alcance {
+  readonly actor: Actor
   readonly gruposVisibles: readonly string[]
   readonly distritosVisibles: readonly string[]
   readonly esAdministrador: boolean

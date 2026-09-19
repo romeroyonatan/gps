@@ -1,3 +1,4 @@
+import { alcanceDe } from '@gps/core'
 import type { Builder } from '@gps/core/graphql'
 import { GraphQLError } from 'graphql'
 import {
@@ -10,7 +11,7 @@ import {
   type ResumenDePendientes,
   type TipoDeMovimiento,
 } from '../dominio'
-import { CuotaUtilizada, DatosDePagoInvalidos, PagoNoAnulable } from './servicio'
+import { CuotaUtilizada, DatosDePagoInvalidos, OperacionDenegada, PagoNoAnulable } from './servicio'
 
 export function registrarSchema(builder: Builder): void {
   const MedioDePagoRef = builder.enumType('MedioDePago', {
@@ -95,14 +96,16 @@ export function registrarSchema(builder: Builder): void {
   builder.queryField('periodosConfigurablesDeAfiliacion', (t) =>
     t.intList({
       resolve: async (_padre, _args, contexto) => [
-        ...(await contexto.tesoreria.listarPeriodosConfigurables()),
+        ...(await contexto.tesoreria.listarPeriodosConfigurables(alcanceDe(contexto))),
       ],
     }),
   )
   builder.queryField('cuentasDeGrupos', (t) =>
     t.field({
       type: [CuentaRef],
-      resolve: async (_padre, _args, contexto) => [...(await contexto.tesoreria.listarCuentas())],
+      resolve: async (_padre, _args, contexto) => [
+        ...(await contexto.tesoreria.listarCuentas(alcanceDe(contexto))),
+      ],
     }),
   )
   builder.queryField('movimientosDeTesoreria', (t) =>
@@ -110,14 +113,15 @@ export function registrarSchema(builder: Builder): void {
       type: [MovimientoRef],
       args: { grupoId: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) => [
-        ...(await contexto.tesoreria.listarMovimientos(String(args.grupoId))),
+        ...(await contexto.tesoreria.listarMovimientos(alcanceDe(contexto), String(args.grupoId))),
       ],
     }),
   )
   builder.queryField('deudasPendientes', (t) =>
     t.field({
       type: PendientesRef,
-      resolve: (_padre, _args, contexto) => contexto.tesoreria.resumenDePendientes(),
+      resolve: (_padre, _args, contexto) =>
+        contexto.tesoreria.resumenDePendientes(alcanceDe(contexto)),
     }),
   )
 
@@ -125,7 +129,8 @@ export function registrarSchema(builder: Builder): void {
     if (
       error instanceof DatosDePagoInvalidos ||
       error instanceof CuotaUtilizada ||
-      error instanceof PagoNoAnulable
+      error instanceof PagoNoAnulable ||
+      error instanceof OperacionDenegada
     ) {
       throw new GraphQLError(error.message, { extensions: { code: error.name } })
     }
@@ -138,7 +143,11 @@ export function registrarSchema(builder: Builder): void {
       args: { periodo: t.arg.int({ required: true }), importe: t.arg.int({ required: true }) },
       resolve: async (_padre, args, contexto) => {
         try {
-          return await contexto.tesoreria.definirCuota(args.periodo, args.importe)
+          return await contexto.tesoreria.definirCuota(
+            alcanceDe(contexto),
+            args.periodo,
+            args.importe,
+          )
         } catch (error) {
           return traducir(error)
         }
@@ -158,7 +167,7 @@ export function registrarSchema(builder: Builder): void {
       },
       resolve: async (_padre, args, contexto) => {
         try {
-          return await contexto.tesoreria.registrarPago({
+          return await contexto.tesoreria.registrarPago(alcanceDe(contexto), {
             grupoId: String(args.grupoId),
             fecha: args.fecha,
             importe: args.importe,
@@ -178,7 +187,7 @@ export function registrarSchema(builder: Builder): void {
       args: { pagoId: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) => {
         try {
-          return await contexto.tesoreria.anularPago(String(args.pagoId))
+          return await contexto.tesoreria.anularPago(alcanceDe(contexto), String(args.pagoId))
         } catch (error) {
           return traducir(error)
         }
@@ -188,7 +197,7 @@ export function registrarSchema(builder: Builder): void {
   builder.mutationField('generarDeudasPendientes', (t) =>
     t.field({
       type: ResultadoRef,
-      resolve: (_padre, _args, contexto) => contexto.tesoreria.reconciliar(),
+      resolve: (_padre, _args, contexto) => contexto.tesoreria.reconciliar(alcanceDe(contexto)),
     }),
   )
 }

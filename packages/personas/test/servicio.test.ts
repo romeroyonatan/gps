@@ -2,6 +2,8 @@ import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
 import {
   type Actor,
+  type Alcance,
+  alcanceSinLimites,
   aplicarMigraciones,
   type Bd,
   type Core,
@@ -60,7 +62,8 @@ const DISTRITOS_ABIERTOS = new Set(['distrito_1'])
 
 function estructuraFalsa(grupos: readonly GrupoConUnidades[] = [GRUPO]): Estructura {
   return {
-    expandirAlcance: async () => ({
+    expandirAlcance: async (actor) => ({
+      actor,
       gruposVisibles: grupos.map(({ id }) => id),
       distritosVisibles: [],
       esAdministrador: false,
@@ -126,6 +129,7 @@ function montarConBd(
     dependencies: [],
     migraciones,
     createServices: () => ({}),
+    accesoAlModulo: { porDefecto: 'denegado', permitidos: [] },
     registerSchema: () => {},
   }
   aplicarMigraciones(core, [modulo])
@@ -164,6 +168,15 @@ const actorDiocesano = (rol: 'jefeScoutDiocesano' | 'administracionDiocesana' | 
   estaElevado: rol === null,
 })
 
+/** El alcance que arma el contexto para ese actor: ve los grupos donde ejerce
+ *  una funcion, y ninguno mas. */
+const alcanceDe = (quien: Actor, grupos: readonly string[]): Alcance => ({
+  actor: quien,
+  gruposVisibles: [...grupos],
+  distritosVisibles: [],
+  esAdministrador: false,
+})
+
 const ingreso: DatosDeIngreso = {
   grupoId: 'grupo_1',
   categoria: 'beneficiario',
@@ -175,7 +188,7 @@ const ingreso: DatosDeIngreso = {
 describe('crearPersona con ingreso', () => {
   test('devuelve la persona con su pertenencia y sus cargos', async () => {
     const servicio = montar()
-    const persona = await servicio.crearPersona(valida, {
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, {
       ...ingreso,
       cargos: [{ cargo: 'jefeDeRama', hasta: '1973-03-01' }],
     })
@@ -212,7 +225,9 @@ describe('crearPersona con ingreso', () => {
     const servicio = montar(undefined, estructuraFalsa([]))
     // `await` obligatorio: sin el, la asercion no se espera, el test pasa aunque
     // la promesa se resuelva bien, y ademas queda un rechazo sin manejar.
-    await expect(servicio.crearPersona(valida, ingreso)).rejects.toThrow(GrupoInexistente)
+    await expect(servicio.crearPersona(alcanceSinLimites(), valida, ingreso)).rejects.toThrow(
+      GrupoInexistente,
+    )
   })
 
   test('falla si la unidad no esta abierta en ese grupo', async () => {
@@ -220,7 +235,10 @@ describe('crearPersona con ingreso', () => {
     // pudiera alcanzar al otro.
     const servicio = montar()
     await expect(
-      servicio.crearPersona(valida, { ...ingreso, unidadId: 'unidad_de_otro_lado' }),
+      servicio.crearPersona(alcanceSinLimites(), valida, {
+        ...ingreso,
+        unidadId: 'unidad_de_otro_lado',
+      }),
     ).rejects.toThrow(DatosInvalidos)
   })
 
@@ -229,9 +247,12 @@ describe('crearPersona con ingreso', () => {
     // no aparece en ninguna pantalla, porque la unica query filtra por grupo.
     const servicio = montar()
     await expect(
-      servicio.crearPersona(valida, { ...ingreso, unidadId: 'unidad_de_otro_lado' }),
+      servicio.crearPersona(alcanceSinLimites(), valida, {
+        ...ingreso,
+        unidadId: 'unidad_de_otro_lado',
+      }),
     ).rejects.toThrow()
-    expect(await servicio.listarPersonas('grupo_1')).toEqual([])
+    expect(await servicio.listarPersonas(alcanceSinLimites(), 'grupo_1')).toEqual([])
   })
 })
 
@@ -244,54 +265,55 @@ describe('listarPersonas', () => {
       unidades: [unidadDe('unidad_otra', 'lobatos', 'Manada')],
     }
     const servicio = montar(undefined, estructuraFalsa([GRUPO, otroGrupo]))
-    await servicio.crearPersona(valida, ingreso)
+    await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
     await servicio.crearPersona(
+      alcanceSinLimites(),
       { ...valida, numeroDeDocumento: '30111223' },
       { ...ingreso, grupoId: 'grupo_2', unidadId: 'unidad_otra' },
     )
 
-    const delPrimero = await servicio.listarPersonas('grupo_1')
+    const delPrimero = await servicio.listarPersonas(alcanceSinLimites(), 'grupo_1')
     expect(delPrimero.map((persona) => persona.numeroDeDocumento)).toEqual(['30111222'])
   })
 
   test('ordena por apellido con el alfabeto castellano', async () => {
     const servicio = montar()
-    await servicio.crearPersona({ ...valida, apellidos: 'Zaballa' }, ingreso)
+    await servicio.crearPersona(alcanceSinLimites(), { ...valida, apellidos: 'Zaballa' }, ingreso)
     await servicio.crearPersona(
+      alcanceSinLimites(),
       { ...valida, numeroDeDocumento: '30111223', apellidos: 'Ávila' },
       ingreso,
     )
     // Con un ORDER BY de SQLite, que compara bytes, "Ávila" caeria despues de
     // "Zaballa".
-    expect((await servicio.listarPersonas('grupo_1')).map((p) => p.apellidos)).toEqual([
-      'Ávila',
-      'Zaballa',
-    ])
+    expect(
+      (await servicio.listarPersonas(alcanceSinLimites(), 'grupo_1')).map((p) => p.apellidos),
+    ).toEqual(['Ávila', 'Zaballa'])
   })
 
   test('trae los cargos de cada persona, tambien los vencidos', async () => {
     // El servidor no filtra por vigencia: manda las filas con sus fechas y la
     // pantalla aplica su propio almanaque con estaVigente.
     const servicio = montar()
-    await servicio.crearPersona(valida, {
+    await servicio.crearPersona(alcanceSinLimites(), valida, {
       ...ingreso,
       cargos: [
         { cargo: 'jefeDeGrupo', hasta: '1969-12-31' },
         { cargo: 'jefeDeRama', hasta: null },
       ],
     })
-    const [persona] = await servicio.listarPersonas('grupo_1')
+    const [persona] = await servicio.listarPersonas(alcanceSinLimites(), 'grupo_1')
     expect(persona?.cargos.map((cargo) => cargo.cargo)).toEqual(['jefeDeGrupo', 'jefeDeRama'])
   })
 
   test('un grupo sin nadie devuelve la lista vacia', async () => {
-    expect(await montar().listarPersonas('grupo_1')).toEqual([])
+    expect(await montar().listarPersonas(alcanceSinLimites(), 'grupo_1')).toEqual([])
   })
 })
 
 describe('crearPersona', () => {
   test('devuelve la persona con el id y las marcas que da Core', async () => {
-    const persona = await montar().crearPersona(valida, ingreso)
+    const persona = await montar().crearPersona(alcanceSinLimites(), valida, ingreso)
     expect(persona).toMatchObject({
       id: 'persona_1',
       tipoDeDocumento: 'dni',
@@ -309,6 +331,7 @@ describe('crearPersona', () => {
     // personas distintas.
     const servicio = montar()
     const persona = await servicio.crearPersona(
+      alcanceSinLimites(),
       { ...valida, numeroDeDocumento: '30.111.222' },
       ingreso,
     )
@@ -317,6 +340,7 @@ describe('crearPersona', () => {
 
   test('recorta los espacios de nombres y apellidos', async () => {
     const persona = await montar().crearPersona(
+      alcanceSinLimites(),
       { ...valida, nombres: '  Ana  ', apellidos: '  Pérez  ' },
       ingreso,
     )
@@ -326,14 +350,18 @@ describe('crearPersona', () => {
 
   test('rechaza datos invalidos con los problemas adentro', async () => {
     const servicio = montar()
-    expect(servicio.crearPersona({ ...valida, nombres: '' }, ingreso)).rejects.toBeInstanceOf(
-      DatosInvalidos,
-    )
+    expect(
+      servicio.crearPersona(alcanceSinLimites(), { ...valida, nombres: '' }, ingreso),
+    ).rejects.toBeInstanceOf(DatosInvalidos)
 
     // El servicio corre las mismas validaciones que el formulario: es la
     // garantia, no la experiencia de uso.
     try {
-      await servicio.crearPersona({ ...valida, nombres: '', numeroDeDocumento: '1' }, ingreso)
+      await servicio.crearPersona(
+        alcanceSinLimites(),
+        { ...valida, nombres: '', numeroDeDocumento: '1' },
+        ingreso,
+      )
       throw new Error('tendria que haber fallado')
     } catch (error) {
       expect(error).toBeInstanceOf(DatosInvalidos)
@@ -346,9 +374,11 @@ describe('crearPersona', () => {
 
   test('nada invalido llega a la base', async () => {
     const servicio = montar()
-    await servicio.crearPersona(valida, ingreso).catch(() => {})
-    await servicio.crearPersona({ ...valida, nombres: '' }, ingreso).catch(() => {})
-    expect(await servicio.listarPersonas('grupo_1')).toHaveLength(1)
+    await servicio.crearPersona(alcanceSinLimites(), valida, ingreso).catch(() => {})
+    await servicio
+      .crearPersona(alcanceSinLimites(), { ...valida, nombres: '' }, ingreso)
+      .catch(() => {})
+    expect(await servicio.listarPersonas(alcanceSinLimites(), 'grupo_1')).toHaveLength(1)
   })
 
   test('el mismo documento dos veces falla con un mensaje que se puede mostrar', async () => {
@@ -356,9 +386,9 @@ describe('crearPersona', () => {
     // para que el formulario tenga algo legible que mostrar en vez del texto
     // crudo de SQLite.
     const servicio = montar()
-    await servicio.crearPersona(valida, ingreso)
+    await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
     try {
-      await servicio.crearPersona({ ...valida, nombres: 'Otra' }, ingreso)
+      await servicio.crearPersona(alcanceSinLimites(), { ...valida, nombres: 'Otra' }, ingreso)
       throw new Error('tendria que haber fallado')
     } catch (error) {
       expect(error).toBeInstanceOf(DocumentoDuplicado)
@@ -368,17 +398,22 @@ describe('crearPersona', () => {
 
   test('el duplicado se detecta aunque el numero venga escrito distinto', async () => {
     const servicio = montar()
-    await servicio.crearPersona(valida, ingreso)
+    await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
     expect(
-      servicio.crearPersona({ ...valida, numeroDeDocumento: '30.111.222' }, ingreso),
+      servicio.crearPersona(
+        alcanceSinLimites(),
+        { ...valida, numeroDeDocumento: '30.111.222' },
+        ingreso,
+      ),
     ).rejects.toBeInstanceOf(DocumentoDuplicado)
   })
 
   test('un pasaporte con el mismo numero que un DNI si se puede cargar', async () => {
     const servicio = montar()
-    await servicio.crearPersona(valida, ingreso)
+    await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
     expect(
       servicio.crearPersona(
+        alcanceSinLimites(),
         { ...valida, tipoDeDocumento: 'pasaporte', numeroDeDocumento: '30111222' },
         ingreso,
       ),
@@ -389,7 +424,11 @@ describe('crearPersona', () => {
     // Con el reloj en 1970, una persona nacida en 2010 es del futuro. Si este
     // test pasa, es que el servicio se colgo la hora real.
     expect(
-      montar().crearPersona({ ...valida, fechaDeNacimiento: '2010-05-01' }, ingreso),
+      montar().crearPersona(
+        alcanceSinLimites(),
+        { ...valida, fechaDeNacimiento: '2010-05-01' },
+        ingreso,
+      ),
     ).rejects.toBeInstanceOf(DatosInvalidos)
   })
 })
@@ -398,6 +437,7 @@ describe('miembrosActivos', () => {
   test('incluye a quien ya habia entrado y todavia no se fue', async () => {
     const servicio = montar()
     await servicio.crearPersona(
+      alcanceSinLimites(),
       { ...valida, numeroDeDocumento: '30111222' },
       { ...ingreso, desde: '1969-03-01' },
     )
@@ -411,6 +451,7 @@ describe('miembrosActivos', () => {
   test('no incluye a quien entro despues', async () => {
     const servicio = montar()
     await servicio.crearPersona(
+      alcanceSinLimites(),
       { ...valida, numeroDeDocumento: '30111222' },
       { ...ingreso, desde: '1969-07-01' },
     )
@@ -420,6 +461,7 @@ describe('miembrosActivos', () => {
   test('las dos puntas son inclusivas, igual que estaVigente', async () => {
     const servicio = montar()
     await servicio.crearPersona(
+      alcanceSinLimites(),
       { ...valida, numeroDeDocumento: '30111222' },
       { ...ingreso, desde: '1969-05-01' },
     )
@@ -430,7 +472,7 @@ describe('miembrosActivos', () => {
 describe('funcionesVigentes', () => {
   test('deriva pertenencia, cargo y equipo sin confiar en roles almacenados', async () => {
     const { servicio, bd } = montarConBd()
-    await servicio.crearPersona(valida, {
+    await servicio.crearPersona(alcanceSinLimites(), valida, {
       ...ingreso,
       categoria: 'activo',
       unidadId: 'unidad_lob',
@@ -454,7 +496,7 @@ describe('funcionesVigentes', () => {
 
   test('la revocacion corta el acceso sin borrar la historia', async () => {
     const { servicio, bd } = montarConBd()
-    await servicio.crearPersona(valida, {
+    await servicio.crearPersona(alcanceSinLimites(), valida, {
       ...ingreso,
       cargos: [{ cargo: 'director', hasta: null }],
     })
@@ -470,8 +512,9 @@ describe('funcionesVigentes', () => {
 describe('administración de autoridades', () => {
   test('Jefatura agrega varios secretarios de su grupo y cualquiera puede nombrar jefatura', async () => {
     const servicio = montar()
-    const una = await servicio.crearPersona(valida, ingreso)
+    const una = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
     const otra = await servicio.crearPersona(
+      alcanceSinLimites(),
       { ...valida, numeroDeDocumento: '30111223', nombres: 'Ana' },
       ingreso,
     )
@@ -501,7 +544,7 @@ describe('administración de autoridades', () => {
 
   test('falla cerrado fuera del grupo y la revocación quita acceso inmediatamente', async () => {
     const servicio = montar()
-    const persona = await servicio.crearPersona(valida, ingreso)
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
     await expect(
       servicio.integrarEquipo(actor('jefeDeGrupo', 'grupo_2'), {
         personaId: persona.id,
@@ -528,7 +571,7 @@ describe('administración de autoridades', () => {
 
   test('se puede remover a la última jefatura', async () => {
     const servicio = montar()
-    const persona = await servicio.crearPersona(valida, ingreso)
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
     const cargo = await servicio.asignarCargoComo(actor('secretariaDeGrupo'), {
       personaId: persona.id,
       cargo: 'jefeDeGrupo',
@@ -541,7 +584,7 @@ describe('administración de autoridades', () => {
 
   test('cada cambio de autoridad queda auditado con actor, objetivo, ambito e instante', async () => {
     const { servicio, bd } = montarConBd()
-    const persona = await servicio.crearPersona(valida, ingreso)
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
     const cargo = await servicio.asignarCargoComo(actor('secretariaDeGrupo'), {
       personaId: persona.id,
       cargo: 'jefeDeGrupo',
@@ -571,7 +614,7 @@ describe('administración de autoridades', () => {
 describe('administración de equipos diocesanos', () => {
   test('jefatura scout y administración diocesana pueden nombrarse y remover Tesorería entre sí', async () => {
     const servicio = montar()
-    const persona = await servicio.crearPersona(valida, ingreso)
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
 
     await servicio.integrarEquipo(actorDiocesano('jefeScoutDiocesano'), {
       personaId: persona.id,
@@ -601,7 +644,7 @@ describe('administración de equipos diocesanos', () => {
 
   test('una autoridad diocesana vacante se recupera con elevación', async () => {
     const servicio = montar()
-    const persona = await servicio.crearPersona(valida, ingreso)
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
     await expect(
       servicio.integrarEquipo(actorDiocesano(null), {
         personaId: persona.id,
@@ -617,7 +660,7 @@ describe('administración de equipos diocesanos', () => {
 describe('asignarCargo', () => {
   const montarConPersona = async () => {
     const servicio = montar()
-    const persona = await servicio.crearPersona(valida, ingreso)
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
     return { servicio, persona }
   }
 
@@ -713,7 +756,7 @@ describe('asignarCargo', () => {
 describe('ocupantesDelCargo', () => {
   const montarConDirector = async () => {
     const servicio = montar()
-    const persona = await servicio.crearPersona(valida, {
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, {
       ...ingreso,
       cargos: [{ cargo: 'director', hasta: '1972-03-01' }],
     })
@@ -763,5 +806,31 @@ describe('ocupantesDelCargo', () => {
     })
     const ocupantes = await servicio.ocupantesDelCargo('jefeScoutDiocesano', null, '1970-06-15')
     expect(ocupantes.map((uno) => uno.id)).toEqual([persona.id])
+  })
+})
+
+describe('alcance entre grupos', () => {
+  test('la jefatura del grupo A no lee las personas del grupo B', async () => {
+    const servicio = montar(undefined, estructuraFalsa([GRUPO, { ...GRUPO, id: 'grupo_2' }]))
+    await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
+
+    const delUno = alcanceDe(actor('jefeDeGrupo', 'grupo_1'), ['grupo_1'])
+    const delDos = alcanceDe(actor('jefeDeGrupo', 'grupo_2'), ['grupo_2'])
+    expect(await servicio.listarPersonas(delUno, 'grupo_1')).toHaveLength(1)
+    expect(await servicio.listarPersonas(delDos, 'grupo_1')).toEqual([])
+  })
+
+  test('la jefatura del grupo A no da de alta en el grupo B', async () => {
+    const servicio = montar(undefined, estructuraFalsa([GRUPO, { ...GRUPO, id: 'grupo_2' }]))
+    const delDos = alcanceDe(actor('jefeDeGrupo', 'grupo_2'), ['grupo_2'])
+    await expect(servicio.crearPersona(delDos, valida, ingreso)).rejects.toThrow()
+    expect(await servicio.listarPersonas(alcanceSinLimites(), 'grupo_1')).toEqual([])
+  })
+
+  test('la secretaria del propio grupo si da de alta', async () => {
+    const servicio = montar()
+    const secretaria = alcanceDe(actor('secretariaDeGrupo', 'grupo_1'), ['grupo_1'])
+    const persona = await servicio.crearPersona(secretaria, valida, ingreso)
+    expect(persona.pertenencia.grupoId).toBe('grupo_1')
   })
 })

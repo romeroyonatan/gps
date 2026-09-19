@@ -71,6 +71,7 @@ function montar(opciones: { reloj?: Reloj; autorizadores?: Record<string, Autori
     dependencies: [],
     migraciones,
     createServices: () => ({}),
+    accesoAlModulo: { porDefecto: 'denegado', permitidos: [] },
     registerSchema: () => {},
   }
   aplicarMigraciones(core, [modulo])

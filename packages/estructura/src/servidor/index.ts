@@ -1,4 +1,5 @@
 import type { Module } from '@gps/core'
+import { accesoAlModulo } from '../dominio'
 import { migraciones } from './migraciones'
 import { registrarSchema } from './schema'
 import { crearServicioDeEstructura, type ServicioDeEstructura } from './servicio'
@@ -13,6 +14,7 @@ declare module '@gps/core' {
 
 export const estructura: Module<ServicioDeEstructura> = {
   name: 'estructura',
+  accesoAlModulo,
   dependencies: [],
   migraciones,
   createServices: (core) => crearServicioDeEstructura(core),

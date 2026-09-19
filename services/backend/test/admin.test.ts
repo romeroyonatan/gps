@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { alcanceSinLimites } from '@gps/core'
 import { main } from '../scripts/admin'
 import { crearAlmacenamientoEnMemoria } from '../src/almacenamiento'
 import { crearBd } from '../src/bd'
@@ -71,6 +72,7 @@ describe('bun run admin asignar', () => {
         crearConversorDeImagenes(),
       )
       const persona = await siembra.personas.crearPersona(
+        alcanceSinLimites(),
         {
           tipoDeDocumento: 'dni',
           numeroDeDocumento: '30111222',

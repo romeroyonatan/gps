@@ -8,4 +8,11 @@ export {
   type ResumenDePendientes,
   type TipoDeMovimiento,
 } from './modelos'
+export {
+  accesoAlModulo,
+  puedeConfigurarCuotas,
+  puedeLeerCuentaDeGrupo,
+  puedeRegistrarPagos,
+  puedeVerTesoreriaDeLaDiocesis,
+} from './politicas'
 export { fechaValida, importeEnPesosValido, saldoDe } from './reglas'

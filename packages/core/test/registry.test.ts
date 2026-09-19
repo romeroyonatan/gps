@@ -19,6 +19,7 @@ function moduloFalso(
     name,
     dependencies,
     createServices: () => ({}),
+    accesoAlModulo: { porDefecto: 'denegado', permitidos: [] },
     registerSchema: () => {},
   }
 }
@@ -92,12 +93,14 @@ describe('crearServicios', () => {
       name: 'estructura',
       dependencies: [],
       createServices: () => ({ ramas: ['lobatos'] }),
+      accesoAlModulo: { porDefecto: 'denegado', permitidos: [] },
       registerSchema: () => {},
     }
     const personas: Module<{ vistas: string[] }, { estructura: { ramas: string[] } }> = {
       name: 'personas',
       dependencies: ['estructura'],
       createServices: (_core, deps) => ({ vistas: deps.estructura.ramas }),
+      accesoAlModulo: { porDefecto: 'denegado', permitidos: [] },
       registerSchema: () => {},
     }
 
@@ -111,6 +114,7 @@ describe('crearServicios', () => {
       name: 'solo',
       dependencies: [],
       createServices: (_core, deps) => ({ ok: Object.keys(deps).length === 0 }),
+      accesoAlModulo: { porDefecto: 'denegado', permitidos: [] },
       registerSchema: () => {},
     }
     expect(crearServicios(core, [solo]).solo).toEqual({ ok: true })

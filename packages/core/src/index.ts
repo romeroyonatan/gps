@@ -1,4 +1,12 @@
 export type { Actor, Alcance, Rol, RolConAmbito } from './actor'
+export type { AccesoAlModulo } from './autorizacion'
+export {
+  alcanceDe,
+  alcanceSinLimites,
+  CampoSinModulo,
+  componerEsquema,
+  permiteElModulo,
+} from './autorizacion'
 export type { Context } from './context'
 export type {
   Almacenamiento,

@@ -45,6 +45,7 @@ function montar() {
     dependencies: [],
     migraciones,
     createServices: () => ({}),
+    accesoAlModulo: { porDefecto: 'denegado', permitidos: [] },
     registerSchema: () => {},
   }
   aplicarMigraciones(core, [modulo])

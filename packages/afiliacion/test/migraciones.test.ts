@@ -41,6 +41,7 @@ const moduloFalso: Module<object> = {
   dependencies: [],
   migraciones,
   createServices: () => ({}),
+  accesoAlModulo: { porDefecto: 'denegado', permitidos: [] },
   registerSchema: () => {},
 }
 

@@ -1,4 +1,4 @@
-import type { Actor, Core, RolConAmbito } from '@gps/core'
+import type { Actor, Alcance, Core, RolConAmbito } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Estructura } from '@gps/estructura/dominio'
 import { and, eq, gte, isNull, lte, or } from 'drizzle-orm'
@@ -9,6 +9,7 @@ import type { DatosDePersona } from '../dominio/modelos'
 import {
   puedeAdministrarEquiposDiocesanos,
   puedeAdministrarPlantelDeGrupo,
+  puedeVerPersonasDelGrupo,
 } from '../dominio/politicas'
 import type { Personas } from '../dominio/publico'
 import { type Problema, validarIngreso, validarPersona } from '../dominio/validaciones'
@@ -80,9 +81,13 @@ export interface DatosDeAsignacionDeCargo {
 }
 
 export interface ServicioDePersonas extends Personas {
-  crearPersona(datos: DatosDePersona, ingreso: DatosDeIngreso): Promise<PersonaConVinculos>
+  crearPersona(
+    alcance: Alcance,
+    datos: DatosDePersona,
+    ingreso: DatosDeIngreso,
+  ): Promise<PersonaConVinculos>
   /** Las personas con pertenencia vigente en ese grupo, ordenadas por apellido. */
-  listarPersonas(grupoId: string): Promise<readonly PersonaConVinculos[]>
+  listarPersonas(alcance: Alcance, grupoId: string): Promise<readonly PersonaConVinculos[]>
 
   /** Le da a una persona un cargo en la entidad que corresponde a su ambito:
    *  un grupo, un distrito, o ninguna si es de la diocesis. */
@@ -413,7 +418,10 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
       })
     },
 
-    async crearPersona(datos, ingreso) {
+    async crearPersona(alcance, datos, ingreso) {
+      if (!puedeAdministrarPlantelDeGrupo(alcance.actor, ingreso.grupoId)) {
+        throw new CambioDeAutoridadDenegado()
+      }
       // Primero el grupo: sin el no se pueden validar ni la unidad ni la
       // existencia del destino, y no tiene sentido validar lo demas.
       const grupo = await estructura.obtenerGrupo(ingreso.grupoId)
@@ -614,7 +622,8 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
       })
     },
 
-    async listarPersonas(grupoId) {
+    async listarPersonas(alcance, grupoId) {
+      if (!puedeVerPersonasDelGrupo(alcance, grupoId)) return []
       // Dos consultas y el armado en memoria, el mismo criterio que
       // listarDistritos: con la cantidad de personas de un grupo alcanza de
       // sobra, y si algun dia deja de alcanzar se arregla en un solo lugar.

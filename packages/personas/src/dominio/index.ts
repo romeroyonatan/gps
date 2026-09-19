@@ -15,11 +15,10 @@ export { TIPOS_DE_EQUIPO } from './equipos'
 export type { DatosDePersona, Persona } from './modelos'
 export { calcularEdad, nombreCompleto } from './modelos'
 export {
+  accesoAlModulo,
   puedeAdministrarEquiposDiocesanos,
   puedeAdministrarPlantelDeGrupo,
-  puedeConfigurarCuotas,
-  puedeLeerCuentaDeGrupo,
-  puedeRegistrarPagos,
+  puedeVerPersonasDelGrupo,
 } from './politicas'
 export type { MiembroActivo, MiembroDelGrupo, Personas } from './publico'
 export type { Problema } from './validaciones'

@@ -1,6 +1,7 @@
-import type { Core } from '@gps/core'
+import type { Alcance, Core } from '@gps/core'
 import { and, desc, eq, inArray, lt } from 'drizzle-orm'
 import type { Afiliado } from '../dominio/modelos'
+import { puedeVerAfiliacionDelGrupo } from '../dominio/politicas'
 import { afiliados, declaraciones } from './tablas'
 
 /** SQLite compara bytes; Intl mantiene el mismo orden alfabetico en español
@@ -23,6 +24,18 @@ export function crearConsultasDeAfiliacion(core: Core) {
 
   return {
     listarAfiliados,
+
+    /** Lo mismo que listarDeclaraciones, pero pedido por un usuario: el grupo
+     *  tiene que estar en su alcance o no hay nada que mostrar. */
+    async listarDeclaracionesDelGrupo(alcance: Alcance, grupoId: string) {
+      if (!puedeVerAfiliacionDelGrupo(alcance, grupoId)) return []
+      return core.bd
+        .select()
+        .from(declaraciones)
+        .where(eq(declaraciones.grupoId, grupoId))
+        .orderBy(desc(declaraciones.fecha))
+        .all()
+    },
 
     async listarDeclaraciones(grupoId?: string) {
       if (grupoId === undefined) {
@@ -65,17 +78,27 @@ export function crearConsultasDeAfiliacion(core: Core) {
     },
 
     async afiliadosEn(
+      alcance: Alcance,
       periodo: number,
       personaIds: readonly string[],
     ): Promise<ReadonlySet<string>> {
       if (personaIds.length === 0) return new Set<string>()
+      // Sin este filtro la consulta contesta por cualquier persona de la
+      // diocesis: alcanza con pasarle ids ajenos.
+      if (!alcance.esAdministrador && alcance.gruposVisibles.length === 0) return new Set<string>()
 
       const filas = core.bd
         .select({ personaId: afiliados.personaId })
         .from(afiliados)
         .innerJoin(declaraciones, eq(declaraciones.id, afiliados.declaracionId))
         .where(
-          and(eq(declaraciones.periodo, periodo), inArray(afiliados.personaId, [...personaIds])),
+          and(
+            eq(declaraciones.periodo, periodo),
+            inArray(afiliados.personaId, [...personaIds]),
+            alcance.esAdministrador
+              ? undefined
+              : inArray(declaraciones.grupoId, [...alcance.gruposVisibles]),
+          ),
         )
         .all()
 

@@ -2,6 +2,7 @@ import type { Archivos } from '@gps/archivos/dominio'
 import type { Module } from '@gps/core'
 import type { Estructura } from '@gps/estructura/dominio'
 import type { Personas } from '@gps/personas/dominio'
+import { accesoAlModulo } from '../dominio'
 import { migraciones } from './migraciones'
 import { registrarSchema } from './schema'
 import { crearServicioDeSalidas, type ServicioDeSalidas } from './servicio'
@@ -22,6 +23,7 @@ interface Dependencias {
 
 export const salidas: Module<ServicioDeSalidas, Dependencias> = {
   name: 'salidas',
+  accesoAlModulo,
   // personas por los participantes y los firmantes; estructura por el grupo y
   // su distrito; archivos por el PDF, los escaneos y los adjuntos.
   dependencies: ['personas', 'estructura', 'archivos'],
@@ -37,4 +39,9 @@ export const salidas: Module<ServicioDeSalidas, Dependencias> = {
 }
 
 export type { ServicioDeSalidas } from './servicio'
-export { FirmaInvalida, PermisoInvalido, PermisoNoEditable } from './servicio'
+export {
+  FirmaInvalida,
+  PermisoFueraDeAlcance,
+  PermisoInvalido,
+  PermisoNoEditable,
+} from './servicio'

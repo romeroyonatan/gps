@@ -1,3 +1,4 @@
+import { alcanceDe } from '@gps/core'
 import { type Builder, enumCompartido } from '@gps/core/graphql'
 import { GraphQLError } from 'graphql'
 import { TIPOS_DE_CARGO } from '../dominio/cargos'
@@ -144,7 +145,7 @@ export function registrarSchema(builder: Builder): void {
       description: 'Las personas de un grupo, ordenadas por apellido.',
       args: { grupoId: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) => [
-        ...(await contexto.personas.listarPersonas(String(args.grupoId))),
+        ...(await contexto.personas.listarPersonas(alcanceDe(contexto), String(args.grupoId))),
       ],
     }),
   )
@@ -172,7 +173,7 @@ export function registrarSchema(builder: Builder): void {
               hasta: cargo.hasta ?? null,
             })),
           }
-          return await contexto.personas.crearPersona(args.datos, ingreso)
+          return await contexto.personas.crearPersona(alcanceDe(contexto), args.datos, ingreso)
         } catch (error) {
           // Yoga enmascara todo lo que no sea un GraphQLError: sin esta
           // traduccion, el formulario recibe "Unexpected error." en vez del

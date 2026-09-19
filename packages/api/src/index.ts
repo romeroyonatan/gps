@@ -34,6 +34,6 @@ export {
   useRegistrarPago,
   useTesoreria,
 } from './tesoreria'
-export type { Transporte } from './transporte'
+export type { SecretoDeSesion, Transporte } from './transporte'
 export { ErrorDeApi, transporteHttp } from './transporte'
 export { useVersion } from './version'

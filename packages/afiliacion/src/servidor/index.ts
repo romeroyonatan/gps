@@ -1,6 +1,7 @@
 import type { Module } from '@gps/core'
 import type { Estructura } from '@gps/estructura/dominio'
 import type { Personas } from '@gps/personas/dominio'
+import { accesoAlModulo } from '../dominio'
 import { migraciones } from './migraciones'
 import { registrarSchema } from './schema'
 import { crearServicioDeAfiliacion, type ServicioDeAfiliacion } from './servicio'
@@ -18,6 +19,7 @@ export const afiliacion: Module<
   { personas: Personas; estructura: Estructura }
 > = {
   name: 'afiliacion',
+  accesoAlModulo,
   // Las dos por lectura y ninguna por escritura: este modulo no toca ni una
   // persona ni un grupo.
   dependencies: ['personas', 'estructura'],
@@ -28,4 +30,9 @@ export const afiliacion: Module<
 }
 
 export type { ServicioDeAfiliacion } from './servicio'
-export { FechaInvalida, NadaQueDeclarar, YaDeclaroHoy } from './servicio'
+export {
+  DeclaracionDenegada,
+  FechaInvalida,
+  NadaQueDeclarar,
+  YaDeclaroHoy,
+} from './servicio'

@@ -1,4 +1,4 @@
-import type { Core } from '@gps/core'
+import type { Alcance, Core } from '@gps/core'
 import type { Estructura } from '@gps/estructura/dominio'
 import type { Personas } from '@gps/personas/dominio'
 import type { Afiliado, Declaracion } from '../dominio/modelos'
@@ -6,7 +6,12 @@ import type { Afiliacion } from '../dominio/publico'
 import { crearConsultasDeAfiliacion } from './consultas'
 import { crearOperacionesDeDeclaracion } from './declaraciones'
 
-export { FechaInvalida, NadaQueDeclarar, YaDeclaroHoy } from './declaraciones'
+export {
+  DeclaracionDenegada,
+  FechaInvalida,
+  NadaQueDeclarar,
+  YaDeclaroHoy,
+} from './declaraciones'
 
 export interface ServicioDeAfiliacion extends Afiliacion {
   /** Fotografia a los miembros activos del dia `fecha`. Sin `grupoId` declara
@@ -15,7 +20,7 @@ export interface ServicioDeAfiliacion extends Afiliacion {
 
   /** Fotografia ese grupo con la fecha de hoy, luego de completar las
    * declaraciones ordinarias pendientes. */
-  declararExtraordinaria(grupoId: string): Promise<Declaracion>
+  declararExtraordinaria(alcance: Alcance, grupoId: string): Promise<Declaracion>
 
   /** La nomina de esa declaracion, ordenada por apellido. */
   listarAfiliados(declaracionId: string): Promise<readonly Afiliado[]>
@@ -24,11 +29,18 @@ export interface ServicioDeAfiliacion extends Afiliacion {
    * la consulta a su cuenta. */
   listarDeclaraciones(grupoId?: string): Promise<readonly Declaracion[]>
 
+  /** Lo mismo, pero iniciado por un usuario: filtra por su alcance. */
+  listarDeclaracionesDelGrupo(alcance: Alcance, grupoId: string): Promise<readonly Declaracion[]>
+
   /** Los miembros de la nomina que no aparecieron antes en el mismo periodo. */
   listarACobrar(declaracionId: string): Promise<readonly Afiliado[]>
 
   /** El subconjunto que ya tiene afiliacion en ese periodo. */
-  afiliadosEn(periodo: number, personaIds: readonly string[]): Promise<ReadonlySet<string>>
+  afiliadosEn(
+    alcance: Alcance,
+    periodo: number,
+    personaIds: readonly string[],
+  ): Promise<ReadonlySet<string>>
 
   /** Declara las fechas ordinarias vencidas que cada grupo aun no emitio. */
   declararPendientes(): Promise<readonly Declaracion[]>

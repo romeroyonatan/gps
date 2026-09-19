@@ -1,12 +1,15 @@
 import { Database } from 'bun:sqlite'
 import { autorizadores, archivos as moduloDeArchivos } from '@gps/archivos/servidor'
 import {
+  type Alcance,
+  alcanceSinLimites,
   aplicarMigraciones,
   type Bd,
   type Core,
   crearBusDeEventos,
   type Module,
   type Reloj,
+  type RolConAmbito,
 } from '@gps/core'
 import type { Estructura, GrupoConUnidades, Unidad } from '@gps/estructura/dominio'
 import type { MiembroDelGrupo, Persona, Personas, TipoDeCargo } from '@gps/personas/dominio'
@@ -59,6 +62,27 @@ export interface Mundo {
   miembros: MiembroDelGrupo[]
   cargos: Map<string, Persona[]>
   grupos: GrupoConUnidades[]
+}
+
+/** El alcance de quien ocupa un cargo firmante: firmar en la app no lo puede
+ *  hacer ni la jefatura elevada, solo el ocupante vigente del cargo. */
+export function alcanceDelFirmante(cargo: TipoDeCargo): Alcance {
+  const rol = cargo === 'director' ? 'directorDeGrupo' : cargo
+  const ambito =
+    cargo === 'comisionadoDeDistrito'
+      ? ({ tipo: 'distrito', id: DISTRITO_ID } as const)
+      : ({ tipo: 'grupo', id: GRUPO_ID } as const)
+  return {
+    actor: {
+      personaId: 'persona_firmante',
+      roles: [{ rol, ambito } as RolConAmbito],
+      esAdministradorDesignado: false,
+      estaElevado: false,
+    },
+    gruposVisibles: [GRUPO_ID],
+    distritosVisibles: [DISTRITO_ID],
+    esAdministrador: false,
+  }
 }
 
 export function mundoPorDefecto(): Mundo {
@@ -125,6 +149,7 @@ export function montar(opciones: { reloj?: Reloj; mundo?: Mundo } = {}) {
     dependencies: [],
     migraciones: suyas,
     createServices: () => ({}),
+    accesoAlModulo: { porDefecto: 'denegado', permitidos: [] },
     registerSchema: () => {},
   })
   // El modulo de archivos de verdad, no un falso: lo que se prueba incluye que
@@ -140,7 +165,8 @@ export function montar(opciones: { reloj?: Reloj; mundo?: Mundo } = {}) {
   const archivos = moduloDeArchivos.createServices(core, {})
 
   const estructura: Estructura = {
-    expandirAlcance: async () => ({
+    expandirAlcance: async (actor) => ({
+      actor,
       gruposVisibles: mundo.grupos.map(({ id }) => id),
       distritosVisibles: [DISTRITO_ID],
       esAdministrador: false,
@@ -169,15 +195,15 @@ export function montar(opciones: { reloj?: Reloj; mundo?: Mundo } = {}) {
 
 /** Un permiso con las dos unidades, un dirigente y un chico: el caso normal. */
 export async function permisoConGente(servicio: ServicioDeSalidas) {
-  const permiso = await servicio.crearPermiso(GRUPO_ID, {
+  const permiso = await servicio.crearPermiso(alcanceSinLimites(), GRUPO_ID, {
     lugar: 'Estancia La Paz',
     desde: '1970-03-01',
     hasta: '1970-03-03',
     comoSeViaja: 'Micro contratado',
   })
-  await servicio.elegirUnidades(permiso.id, [TROPA])
-  await servicio.agregarParticipante(permiso.id, 'persona_jefe')
-  await servicio.agregarParticipante(permiso.id, 'persona_chico')
+  await servicio.elegirUnidades(alcanceSinLimites(), permiso.id, [TROPA])
+  await servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_jefe')
+  await servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_chico')
   return permiso
 }
 

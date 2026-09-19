@@ -33,22 +33,22 @@
 
 ## 5. Sudo y recuperación operativa
 
-- [ ] 5.1 Implementar designación de una única persona administradora y elevación de diez minutos tras reautenticar una identidad ya vinculada; verificar que la sesión ordinaria no sea global y que una persona ajena no pueda elevarse.
-- [ ] 5.2 Incorporar un interceptor de GraphQL que audite toda escritura ejecutada con alcance global, sin habilitar sudo en el transporte local; verificar mutation elevada, mutation ordinaria e intento offline.
-- [ ] 5.3 Implementar `bun run admin asignar --persona <id>` fuera de la API para reemplazar al administrador y registrar el evento; verificar persona inexistente, reasignación correcta y ausencia de mutation equivalente.
+- [x] 5.1 Implementar designación de una única persona administradora y elevación de diez minutos tras reautenticar una identidad ya vinculada; verificar que la sesión ordinaria no sea global y que una persona ajena no pueda elevarse.
+- [x] 5.2 Incorporar un interceptor de GraphQL que audite toda escritura ejecutada con alcance global, sin habilitar sudo en el transporte local; verificar mutation elevada, mutation ordinaria e intento offline.
+- [x] 5.3 Implementar `bun run admin asignar --persona <id>` fuera de la API para reemplazar al administrador y registrar el evento; verificar persona inexistente, reasignación correcta y ausencia de mutation equivalente.
 
 ## 6. Autorización de módulos existentes
 
-- [ ] 6.1 Hacer obligatoria la declaración `accesoAlModulo` con denegación por defecto y configurar autorización Pothos por operación/campo; verificar que un módulo o campo sin política no quede publicado accidentalmente.
-- [ ] 6.2 Crear políticas puras de Estructura, Personas, Afiliación, Tesorería y Salidas para Jefatura, Secretaría, Tesorería diocesana, firmantes vigentes y elevación global, manteniendo `/health`, autenticación y versión públicas; verificar tests unitarios de la matriz permitida/denegada.
-- [ ] 6.3 Pasar `Alcance` como primer parámetro de todos los caminos de persistencia iniciados por usuario y filtrar grupos antes de leer o escribir, incluidas las descargas que Archivos delega a Salidas y las cuentas/pagos de Tesorería; verificar tests cruzados donde un actor del grupo A no observa ni modifica datos del B.
-- [ ] 6.4 Mantener separados los casos internos como el barrido programado de Afiliación y el suscriptor `AfiliacionDeclarada` de Tesorería, sin exponerlos por GraphQL ni fabricar un administrador; verificar que el trabajo programado sigue cubriendo todos los grupos.
-- [ ] 6.5 Aplicar autorización real al módulo Tesorería ya existente (`packages/tesoreria`, integrado desde otra rama sin actor ni alcance): Jefatura/Secretaría leen sólo la cuenta de su grupo, sólo Tesorería diocesana o el administrador elevado registran/anulan pagos de cualquier grupo de la diócesis, y `definirCuota`/`listarPeriodosConfigurables` quedan reservados a Tesorería diocesana o Administración diocesana; verificar tests de la matriz permitida/denegada y que un actor de un grupo no lee ni escribe la cuenta de otro.
+- [x] 6.1 Hacer obligatoria la declaración `accesoAlModulo` con denegación por defecto y configurar autorización Pothos por operación/campo; verificar que un módulo o campo sin política no quede publicado accidentalmente.
+- [x] 6.2 Crear políticas puras de Estructura, Personas, Afiliación, Tesorería y Salidas para Jefatura, Secretaría, Tesorería diocesana, firmantes vigentes y elevación global, manteniendo `/health`, autenticación y versión públicas; verificar tests unitarios de la matriz permitida/denegada.
+- [x] 6.3 Pasar `Alcance` como primer parámetro de todos los caminos de persistencia iniciados por usuario y filtrar grupos antes de leer o escribir, incluidas las descargas que Archivos delega a Salidas y las cuentas/pagos de Tesorería; verificar tests cruzados donde un actor del grupo A no observa ni modifica datos del B.
+- [x] 6.4 Mantener separados los casos internos como el barrido programado de Afiliación y el suscriptor `AfiliacionDeclarada` de Tesorería, sin exponerlos por GraphQL ni fabricar un administrador; verificar que el trabajo programado sigue cubriendo todos los grupos.
+- [x] 6.5 Aplicar autorización real al módulo Tesorería ya existente (`packages/tesoreria`, integrado desde otra rama sin actor ni alcance): Jefatura/Secretaría leen sólo la cuenta de su grupo, sólo Tesorería diocesana o el administrador elevado registran/anulan pagos de cualquier grupo de la diócesis, y `definirCuota`/`listarPeriodosConfigurables` quedan reservados a Tesorería diocesana o Administración diocesana; verificar tests de la matriz permitida/denegada y que un actor de un grupo no lee ni escribe la cuenta de otro.
 
 ## 7. API, web y mobile
 
-- [ ] 7.1 Exponer operaciones/rutas mínimas para iniciar y completar OAuth, consultar la persona actual, cerrar sesión, vincular proveedor, elevarse, invitar y recuperar; regenerar `schema.gql` y el cliente con `bun run schema` y `bun run --filter @gps/api codegen`.
-- [ ] 7.2 Adaptar `Transporte` para cookie web y bearer mobile, y manejar errores distinguibles de no autenticado/sin permiso; verificar tests HTTP de headers, credenciales y mensajes.
+- [x] 7.1 Exponer operaciones/rutas mínimas para iniciar y completar OAuth, consultar la persona actual, cerrar sesión, vincular proveedor, elevarse, invitar y recuperar; regenerar `schema.gql` y el cliente con `bun run schema` y `bun run --filter @gps/api codegen`.
+- [x] 7.2 Adaptar `Transporte` para cookie web y bearer mobile, y manejar errores distinguibles de no autenticado/sin permiso; verificar tests HTTP de headers, credenciales y mensajes.
 - [ ] 7.3 Implementar login web con Google/Apple y cookie HttpOnly, más cierre de sesión y retorno al destino original; verificar manualmente el flujo con proveedor falso/local.
 - [ ] 7.4 Implementar login mobile con navegador del sistema, deep link y sesión en `expo-secure-store`, nunca AsyncStorage; verificar retorno exitoso, cancelación y reinicio de la app.
 - [ ] 7.5 Particionar el cache persistido por `personaId` y purgarlo al cerrar sesión, recuperar identidad o cambiar de persona; verificar que dos sesiones consecutivas no compartan datos cacheados.

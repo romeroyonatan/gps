@@ -2,7 +2,14 @@ import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
 import { afiliacion } from '@gps/afiliacion/servidor'
 import { archivos, autorizadores } from '@gps/archivos/servidor'
-import { aplicarMigraciones, type Bd, type Context, type Core, crearBusDeEventos } from '@gps/core'
+import {
+  alcanceSinLimites,
+  aplicarMigraciones,
+  type Bd,
+  type Context,
+  type Core,
+  crearBusDeEventos,
+} from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import { ramasDeLasUnidades } from '@gps/estructura/dominio'
 import { estructura } from '@gps/estructura/servidor'
@@ -98,7 +105,7 @@ describe('sembrarEscenario', () => {
     const contexto = montarContexto()
     await sembrarEscenario(contexto, HORA)
 
-    const arbol = await contexto.estructura.listarDistritos()
+    const arbol = await contexto.estructura.listarDistritos(alcanceSinLimites())
     expect(arbol).toHaveLength(4)
     expect(arbol.flatMap((distrito) => distrito.grupos)).toHaveLength(12)
   })
@@ -109,7 +116,9 @@ describe('sembrarEscenario', () => {
     const contexto = montarContexto()
     await sembrarEscenario(contexto, HORA)
 
-    const todos = (await contexto.estructura.listarDistritos()).flatMap((d) => d.grupos)
+    const todos = (await contexto.estructura.listarDistritos(alcanceSinLimites())).flatMap(
+      (d) => d.grupos,
+    )
     expect(todos.some((grupo) => ramasDeLasUnidades(grupo.unidades).length === 6)).toBe(true)
     expect(todos.some((grupo) => grupo.unidades.length === 0)).toBe(true)
   })
@@ -118,7 +127,9 @@ describe('sembrarEscenario', () => {
     const contexto = montarContexto()
     await sembrarEscenario(contexto, HORA)
 
-    const todos = (await contexto.estructura.listarDistritos()).flatMap((d) => d.grupos)
+    const todos = (await contexto.estructura.listarDistritos(alcanceSinLimites())).flatMap(
+      (d) => d.grupos,
+    )
     const scouts = todos
       .find((grupo) => grupo.numero === 42)
       ?.unidades.filter((unidad) => unidad.rama === 'scouts')
@@ -131,7 +142,7 @@ describe('sembrarEscenario', () => {
     const contexto = montarContexto()
     await sembrarEscenario(contexto, HORA)
 
-    const grupos = (await contexto.estructura.listarDistritos()).flatMap((d) =>
+    const grupos = (await contexto.estructura.listarDistritos(alcanceSinLimites())).flatMap((d) =>
       d.grupos.map((grupo) => ({ ...grupo, distritoId: d.id })),
     )
     const g42 = grupos.find((grupo) => grupo.numero === 42)
@@ -165,7 +176,9 @@ describe('sembrarEscenario', () => {
     const contexto = montarContexto()
     await sembrarEscenario(contexto, HORA)
 
-    const todos = (await contexto.estructura.listarDistritos()).flatMap((d) => d.grupos)
+    const todos = (await contexto.estructura.listarDistritos(alcanceSinLimites())).flatMap(
+      (d) => d.grupos,
+    )
     expect(todos.some((grupo) => grupo.numero === 19)).toBe(false)
   })
 
@@ -173,7 +186,7 @@ describe('sembrarEscenario', () => {
     const contexto = montarContexto()
     await sembrarEscenario(contexto, HORA)
 
-    const grupos = (await contexto.estructura.listarDistritos()).flatMap(
+    const grupos = (await contexto.estructura.listarDistritos(alcanceSinLimites())).flatMap(
       (distrito) => distrito.grupos,
     )
     const grupo42 = grupos.find((grupo) => grupo.numero === 42)
@@ -206,7 +219,7 @@ describe('sembrarEscenario', () => {
     const contexto = montarContexto(new Date('2026-05-01T12:00:00Z'))
     await sembrarEscenario(contexto, HORA)
 
-    const grupos = (await contexto.estructura.listarDistritos()).flatMap(
+    const grupos = (await contexto.estructura.listarDistritos(alcanceSinLimites())).flatMap(
       (distrito) => distrito.grupos,
     )
     const grupo42 = grupos.find((grupo) => grupo.numero === 42)
@@ -219,9 +232,11 @@ describe('sembrarEscenario: personas', () => {
   test('siembra las doce personas del grupo 42, el que tiene las seis ramas', async () => {
     const contexto = montarContexto()
     await sembrarEscenario(contexto, HORA)
-    const distritos = await contexto.estructura.listarDistritos()
+    const distritos = await contexto.estructura.listarDistritos(alcanceSinLimites())
     const grupo42 = distritos.flatMap((d) => d.grupos).find((g) => g.numero === 42)
-    expect(await contexto.personas.listarPersonas(grupo42?.id ?? '')).toHaveLength(12)
+    expect(
+      await contexto.personas.listarPersonas(alcanceSinLimites(), grupo42?.id ?? ''),
+    ).toHaveLength(12)
   })
 
   test('las edades cubren el rango entero, de castores a adulto mayor', async () => {
@@ -230,11 +245,11 @@ describe('sembrarEscenario: personas', () => {
     const contexto = montarContexto()
     await sembrarEscenario(contexto, HORA)
 
-    const distritos = await contexto.estructura.listarDistritos()
+    const distritos = await contexto.estructura.listarDistritos(alcanceSinLimites())
     const grupo42 = distritos.flatMap((d) => d.grupos).find((g) => g.numero === 42)
-    const anios = (await contexto.personas.listarPersonas(grupo42?.id ?? '')).map((persona) =>
-      Number(persona.fechaDeNacimiento.slice(0, 4)),
-    )
+    const anios = (
+      await contexto.personas.listarPersonas(alcanceSinLimites(), grupo42?.id ?? '')
+    ).map((persona) => Number(persona.fechaDeNacimiento.slice(0, 4)))
     expect(Math.min(...anios)).toBeLessThan(1970)
     expect(Math.max(...anios)).toBeGreaterThan(2018)
   })
@@ -243,11 +258,11 @@ describe('sembrarEscenario: personas', () => {
     const contexto = montarContexto()
     await sembrarEscenario(contexto, HORA)
 
-    const distritos = await contexto.estructura.listarDistritos()
+    const distritos = await contexto.estructura.listarDistritos(alcanceSinLimites())
     const grupo42 = distritos.flatMap((d) => d.grupos).find((g) => g.numero === 42)
-    const tipos = (await contexto.personas.listarPersonas(grupo42?.id ?? '')).map(
-      (persona) => persona.tipoDeDocumento,
-    )
+    const tipos = (
+      await contexto.personas.listarPersonas(alcanceSinLimites(), grupo42?.id ?? '')
+    ).map((persona) => persona.tipoDeDocumento)
     expect(tipos).toContain('pasaporte')
     expect(tipos).toContain('dni')
   })
@@ -258,9 +273,9 @@ describe('sembrarEscenario: personas', () => {
     const contexto = montarContexto()
     await sembrarEscenario(contexto, HORA)
 
-    const distritos = await contexto.estructura.listarDistritos()
+    const distritos = await contexto.estructura.listarDistritos(alcanceSinLimites())
     const grupo42 = distritos.flatMap((d) => d.grupos).find((g) => g.numero === 42)
-    const listadas = await contexto.personas.listarPersonas(grupo42?.id ?? '')
+    const listadas = await contexto.personas.listarPersonas(alcanceSinLimites(), grupo42?.id ?? '')
     expect(listadas[0]?.apellidos).toBe('Ávila')
     expect(listadas.at(-1)?.apellidos).toBe('Zaballa')
   })
@@ -268,23 +283,27 @@ describe('sembrarEscenario: personas', () => {
   test('reparte las personas en grupos, con un grupo lleno y uno vacio', async () => {
     const ctx = montarContexto()
     await sembrarEscenario(ctx, HORA)
-    const distritos = await ctx.estructura.listarDistritos()
+    const distritos = await ctx.estructura.listarDistritos(alcanceSinLimites())
     const grupo42 = distritos.flatMap((d) => d.grupos).find((g) => g.numero === 42)
     const grupo88 = distritos.flatMap((d) => d.grupos).find((g) => g.numero === 88)
 
     // El 42 tiene las seis ramas abiertas: es el que ejercita la pantalla llena.
-    expect((await ctx.personas.listarPersonas(grupo42?.id ?? '')).length).toBeGreaterThan(8)
+    expect(
+      (await ctx.personas.listarPersonas(alcanceSinLimites(), grupo42?.id ?? '')).length,
+    ).toBeGreaterThan(8)
     // El 88 no abrio ninguna rama: la pantalla tiene que resolver "no hay ramas"
     // y "no hay personas" a la vez.
-    expect(await ctx.personas.listarPersonas(grupo88?.id ?? '')).toEqual([])
+    expect(await ctx.personas.listarPersonas(alcanceSinLimites(), grupo88?.id ?? '')).toEqual([])
   })
 
   test('siembra un cargo vigente y uno vencido', async () => {
     const ctx = montarContexto()
     await sembrarEscenario(ctx, HORA)
-    const distritos = await ctx.estructura.listarDistritos()
+    const distritos = await ctx.estructura.listarDistritos(alcanceSinLimites())
     const grupo42 = distritos.flatMap((d) => d.grupos).find((g) => g.numero === 42)
-    const cargos = (await ctx.personas.listarPersonas(grupo42?.id ?? '')).flatMap((p) => p.cargos)
+    const cargos = (
+      await ctx.personas.listarPersonas(alcanceSinLimites(), grupo42?.id ?? '')
+    ).flatMap((p) => p.cargos)
 
     // Los dos casos, para que estaVigente tenga con que trabajar en pantalla.
     expect(cargos.some((cargo) => cargo.hasta === null)).toBe(true)
@@ -295,9 +314,9 @@ describe('sembrarEscenario: personas', () => {
     const ctx = montarContexto()
     await sembrarEscenario(ctx, HORA)
 
-    const cuentas = await ctx.tesoreria.listarCuentas()
+    const cuentas = await ctx.tesoreria.listarCuentas(alcanceSinLimites())
     expect(cuentas.some((cuenta) => cuenta.saldo > 0)).toBe(true)
     expect(cuentas.some((cuenta) => cuenta.saldo < 0)).toBe(true)
-    expect((await ctx.tesoreria.resumenDePendientes()).cantidad).toBe(0)
+    expect((await ctx.tesoreria.resumenDePendientes(alcanceSinLimites())).cantidad).toBe(0)
   })
 })

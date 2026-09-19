@@ -1,4 +1,4 @@
-import type { Core } from '@gps/core'
+import type { Alcance, Core } from '@gps/core'
 import { and, eq, isNull } from 'drizzle-orm'
 import type {
   Distrito,
@@ -8,6 +8,7 @@ import type {
   SexoDeUnidad,
   Unidad,
 } from '../dominio/modelos'
+import { puedeVerDistrito, puedeVerGrupo } from '../dominio/politicas'
 import type { Estructura } from '../dominio/publico'
 import { RAMAS, type Rama, ramaDelCatalogo } from '../dominio/ramas'
 import { grupoEstabaAbiertoEn } from '../dominio/vigencia'
@@ -27,7 +28,9 @@ export interface ServicioDeEstructura extends Estructura {
   }): Promise<Unidad>
   cerrarUnidad(unidadId: string): Promise<void>
   cerrarGrupo(grupoId: string): Promise<void>
-  listarDistritos(): Promise<readonly DistritoConGrupos[]>
+  /** El arbol de la diocesis filtrado por el alcance: un jefe de grupo ve su
+   *  distrito con su grupo adentro, no los demas. */
+  listarDistritos(alcance: Alcance): Promise<readonly DistritoConGrupos[]>
 }
 
 /** De menor a mayor edad y, dentro de una rama, por nombre: como las muestra
@@ -82,6 +85,7 @@ export function crearServicioDeEstructura(core: Core): ServicioDeEstructura {
 
       if (actor.estaElevado) {
         return {
+          actor,
           distritosVisibles: todosLosDistritos(),
           gruposVisibles: todosLosGrupos(),
           esAdministrador: true,
@@ -109,6 +113,7 @@ export function crearServicioDeEstructura(core: Core): ServicioDeEstructura {
         }
       }
       return {
+        actor,
         distritosVisibles: [...distritosVisibles],
         gruposVisibles: [...gruposVisibles],
         esAdministrador: false,
@@ -210,7 +215,7 @@ export function crearServicioDeEstructura(core: Core): ServicioDeEstructura {
       return core.bd.select().from(grupos).orderBy(grupos.numero).all()
     },
 
-    async listarDistritos() {
+    async listarDistritos(alcance) {
       // Tres consultas y el arbol se arma en memoria. Con la cantidad de
       // distritos y grupos de una diocesis alcanza de sobra; si algun dia deja
       // de alcanzar, se arregla aca y en ningun otro lado.
@@ -245,10 +250,14 @@ export function crearServicioDeEstructura(core: Core): ServicioDeEstructura {
         gruposPorDistrito.set(grupo.distritoId, delDistrito)
       }
 
-      return filasDistritos.map((distrito) => ({
-        ...distrito,
-        grupos: gruposPorDistrito.get(distrito.id) ?? [],
-      }))
+      return filasDistritos
+        .filter((distrito) => puedeVerDistrito(alcance, distrito.id))
+        .map((distrito) => ({
+          ...distrito,
+          grupos: (gruposPorDistrito.get(distrito.id) ?? []).filter((grupo) =>
+            puedeVerGrupo(alcance, grupo.id),
+          ),
+        }))
     },
 
     async distritoEstaAbierto(distritoId) {

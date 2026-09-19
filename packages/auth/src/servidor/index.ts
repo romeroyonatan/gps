@@ -1,8 +1,10 @@
 import type { Module } from '@gps/core'
 import type { Personas } from '@gps/personas/dominio'
+import { accesoAlModulo } from '../dominio'
 import { crearClienteHttp } from './http'
 import { migraciones } from './migraciones'
 import { crearProveedorApple, crearProveedorGoogle, type ProveedorOidc } from './oidc'
+import { registrarSchema } from './schema'
 import { crearServicioDeAuth, type ServicioDeAuth } from './servicio'
 
 declare module '@gps/core' {
@@ -13,6 +15,7 @@ declare module '@gps/core' {
 
 export const auth: Module<ServicioDeAuth, { personas: Personas }> = {
   name: 'auth',
+  accesoAlModulo,
   dependencies: ['personas'],
   migraciones,
   createServices: (core, dependencias) => {
@@ -25,7 +28,7 @@ export const auth: Module<ServicioDeAuth, { personas: Personas }> = {
     }
     return crearServicioDeAuth(core, dependencias.personas, proveedores)
   },
-  registerSchema: () => {},
+  registerSchema: registrarSchema,
 }
 
 export type { Plataforma, ProveedorOidc } from './oidc'

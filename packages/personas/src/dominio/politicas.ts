@@ -1,15 +1,27 @@
-import type { Actor } from '@gps/core'
+import type { AccesoAlModulo, Actor, Alcance } from '@gps/core'
+import { tieneRol } from '@gps/core/roles'
 
-function tieneRol(
-  actor: Actor,
-  roles: readonly string[],
-  tipo: 'grupo' | 'diocesis',
-  id: string | null,
-) {
-  return actor.roles.some(
-    (funcion) =>
-      roles.includes(funcion.rol) && funcion.ambito.tipo === tipo && funcion.ambito.id === id,
-  )
+/** Los datos de las personas son el nucleo sensible del sistema: solo las
+ *  funciones que administran un grupo o la diocesis alcanzan el modulo. Un
+ *  dirigente sin cargo no. */
+export const accesoAlModulo: AccesoAlModulo = {
+  porDefecto: 'denegado',
+  permitidos: [
+    'jefeDeGrupo',
+    'secretariaDeGrupo',
+    'directorDeGrupo',
+    'comisionadoDeDistrito',
+    'autoridadDeDistrito',
+    'jefeScoutDiocesano',
+    'administracionDiocesana',
+  ],
+}
+
+/** Leer es cuestion de alcance y no de funcion: el comisionado ve los grupos de
+ *  su distrito porque `estructura` se los expandio, no porque tenga un rol en
+ *  cada uno. Escribir, en cambio, exige la funcion (ver abajo). */
+export function puedeVerPersonasDelGrupo(alcance: Alcance, grupoId: string): boolean {
+  return alcance.esAdministrador || alcance.gruposVisibles.includes(grupoId)
 }
 
 export function puedeAdministrarPlantelDeGrupo(actor: Actor, grupoId: string): boolean {
@@ -22,43 +34,5 @@ export function puedeAdministrarEquiposDiocesanos(actor: Actor): boolean {
   return (
     actor.estaElevado ||
     tieneRol(actor, ['jefeScoutDiocesano', 'administracionDiocesana'], 'diocesis', null)
-  )
-}
-
-/** Jefatura y Secretaría leen la cuenta corriente de su propio grupo; las
- *  autoridades diocesanas -incluida Tesorería- la leen de cualquiera, porque
- *  necesitan ver a toda la diócesis para reconciliar y cobrar. */
-export function puedeLeerCuentaDeGrupo(actor: Actor, grupoId: string): boolean {
-  return (
-    actor.estaElevado ||
-    tieneRol(actor, ['jefeDeGrupo', 'secretariaDeGrupo'], 'grupo', grupoId) ||
-    tieneRol(
-      actor,
-      ['tesoreriaDiocesana', 'administracionDiocesana', 'jefeScoutDiocesano'],
-      'diocesis',
-      null,
-    )
-  )
-}
-
-/** Registrar o anular un pago es privativo de Tesorería diocesana: ni la
- *  jefatura ni la Secretaría de un grupo pueden escribir su propia cuenta,
- *  aunque puedan leerla (diseño §6, separación lectura/escritura). */
-export function puedeRegistrarPagos(actor: Actor): boolean {
-  return actor.estaElevado || tieneRol(actor, ['tesoreriaDiocesana'], 'diocesis', null)
-}
-
-/** Definir el importe de la cuota por período es una decisión diocesana:
- *  Tesorería, que después cobra esa cuota, y Administración/jefatura scout,
- *  que administran las transiciones de Tesorería. */
-export function puedeConfigurarCuotas(actor: Actor): boolean {
-  return (
-    actor.estaElevado ||
-    tieneRol(
-      actor,
-      ['tesoreriaDiocesana', 'administracionDiocesana', 'jefeScoutDiocesano'],
-      'diocesis',
-      null,
-    )
   )
 }

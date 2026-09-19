@@ -688,7 +688,8 @@ export function crearServicioDeAuth(
     },
 
     async asignarAdministrador(personaId) {
-      if (!(await personas.personaExiste(personaId))) throw new IdentidadInvalida()
+      if (!(await personas.personaExiste(personaId)))
+        throw new Error(`La persona ${personaId} no existe.`)
       const anterior = core.bd
         .select({ personaId: administradorDelSistema.personaId })
         .from(administradorDelSistema)

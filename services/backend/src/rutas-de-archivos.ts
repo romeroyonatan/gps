@@ -1,6 +1,6 @@
 import { SinAutorizador, SubidaInvalida, SubidaNoAutorizada } from '@gps/archivos/servidor'
-import type { Context, Logger } from '@gps/core'
-import { PermisoNoEditable } from '@gps/salidas/servidor'
+import { alcanceDe, type Context, type Logger } from '@gps/core'
+import { PermisoFueraDeAlcance, PermisoNoEditable } from '@gps/salidas/servidor'
 
 /** El PDF del permiso tal como esta ahora: las firmas de la app estampadas, la
  *  marca de las de papel, y los escaneos como anexo. Se genera al pedirlo y no
@@ -15,7 +15,7 @@ export async function rutaDelPdfDeUnPermiso(
   pedido: Bun.BunRequest<'/permisos/:id/pdf'>,
 ): Promise<Response> {
   try {
-    const pdf = await contexto.salidas.pdfDelPermiso(pedido.params.id)
+    const pdf = await contexto.salidas.pdfDelPermiso(alcanceDe(contexto), pedido.params.id)
     return new Response(pdf as BlobPart, {
       headers: {
         'content-type': 'application/pdf',
@@ -23,6 +23,9 @@ export async function rutaDelPdfDeUnPermiso(
       },
     })
   } catch (error) {
+    if (error instanceof PermisoFueraDeAlcance) {
+      return new Response(error.message, { status: 403 })
+    }
     if (error instanceof PermisoNoEditable) return new Response(error.message, { status: 400 })
     return loQueNoEsperabamos(logger, error, `armando el PDF del permiso ${pedido.params.id}`)
   }
@@ -51,10 +54,10 @@ export async function rutaDeArchivos(
     }
 
     if (pedido.method === 'GET') {
-      // El actor sale del contexto igual que en los resolvers. Hoy es siempre
-      // null y cada dueño autoriza todo; cuando exista auth, lo unico que
-      // cambia es lo que decide el autorizador.
-      const { contenido, tipo, nombre } = await contexto.archivos.descargar(id, contexto.actor)
+      // El alcance sale del contexto igual que en los resolvers: la descarga
+      // aplica el mismo filtro que la consulta GraphQL porque el modulo dueño
+      // decide con el mismo dato.
+      const { contenido, tipo, nombre } = await contexto.archivos.descargar(id, contexto.alcance)
       return new Response(contenido as BlobPart, {
         headers: {
           'content-type': tipo,

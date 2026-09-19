@@ -32,6 +32,11 @@ export function crearContexto(base: Context, reloj: Reloj) {
       esAdministradorDesignado: await base.auth.esAdministradorDesignado(sesion.personaId),
       estaElevado: sesion.estaElevada,
     }
-    return { ...base, actor, alcance: await base.estructura.expandirAlcance(actor) }
+    return {
+      ...base,
+      actor,
+      sesionId: sesion.sesionId,
+      alcance: await base.estructura.expandirAlcance(actor),
+    }
   }
 }

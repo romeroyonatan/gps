@@ -26,9 +26,15 @@ async function montar() {
 }
 
 /** `salidas` es un dueño de verdad y la composicion le registra su autorizador,
- *  que hoy autoriza todo. Para los casos de "no autoriza" y "no hay quien
- *  autorice" hace falta un modulo inventado, que es justo lo que ejercita la
- *  regla: archivos no sabe de permisos, pregunta. */
+ *  que desde que hay alcance mira el permiso y el grupo de quien pide. Estos
+ *  tests son de transporte -bytes, cabeceras, codigos- y no de autorizacion,
+ *  asi que reemplazan ese autorizador por uno que dice que si; la autorizacion
+ *  real la prueba salidas. Para "no autoriza" y "no hay quien autorice" hace
+ *  falta un modulo inventado, que es justo lo que ejercita la regla: archivos
+ *  no sabe de permisos, pregunta. */
+const autorizarTodo = () => {
+  autorizadores.salidas = async () => true
+}
 const pedirSubida = (
   contexto: Awaited<ReturnType<typeof montar>>['contexto'],
   modulo = 'salidas',
@@ -50,6 +56,7 @@ afterEach(() => {
 describe('rutas de archivos', () => {
   test('PUT deja los bytes y GET los devuelve con su tipo', async () => {
     const { servidor, contexto, base } = await montar()
+    autorizarTodo()
     const subida = await pedirSubida(contexto)
 
     const puesto = await fetch(`${base}${subida.url}`, { method: 'PUT', body: BYTES })
@@ -65,6 +72,7 @@ describe('rutas de archivos', () => {
 
   test('el nombre viaja en la cabecera: guardar no deja el id como nombre', async () => {
     const { servidor, contexto, base } = await montar()
+    autorizarTodo()
     const subida = await pedirSubida(contexto)
     await fetch(`${base}${subida.url}`, { method: 'PUT', body: BYTES })
     await contexto.archivos.confirmarSubida(subida.id)
@@ -82,6 +90,7 @@ describe('rutas de archivos', () => {
   test('un nombre con comillas no parte la cabecera', async () => {
     // Las comillas cierran el parametro: `plan".docx` partiria el header en dos.
     const { servidor, contexto, base } = await montar()
+    autorizarTodo()
     const subida = await contexto.archivos.solicitarSubida({
       nombre: 'plan".jpg',
       tipo: 'image/jpeg',

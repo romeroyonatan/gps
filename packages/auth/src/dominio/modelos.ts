@@ -1,6 +1,10 @@
 import type { Marcas } from '@gps/core'
 
-export type ProveedorDeIdentidad = 'google' | 'apple' | 'demo'
+/** El proveedor externo con el que se prueba una identidad. `demo` es el
+ *  proveedor interno de un clic: sólo existe en entorno demo. */
+export const PROVEEDORES = ['google', 'apple', 'demo'] as const
+
+export type ProveedorDeIdentidad = (typeof PROVEEDORES)[number]
 
 export interface IdentidadExterna extends Marcas {
   readonly id: string

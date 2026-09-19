@@ -16,7 +16,8 @@
     "compile": "bun run --filter './packages/*' --filter './services/*' --filter './apps/*' compile",
     "schema": "bun run --filter backend schema",
     "dev": "bun run --filter backend dev",
-    "demo": "bun run --filter backend demo"
+    "demo": "bun run --filter backend demo",
+    "admin": "bun run --filter backend admin"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.10",

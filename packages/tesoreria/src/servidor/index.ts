@@ -1,6 +1,7 @@
 import type { Afiliacion } from '@gps/afiliacion/dominio'
 import type { Module } from '@gps/core'
 import type { Estructura } from '@gps/estructura/dominio'
+import { accesoAlModulo } from '../dominio'
 import { migraciones } from './migraciones'
 import { registrarSchema } from './schema'
 import { crearServicioDeTesoreria, type ServicioDeTesoreria } from './servicio'
@@ -16,6 +17,7 @@ export const tesoreria: Module<
   { afiliacion: Afiliacion; estructura: Estructura }
 > = {
   name: 'tesoreria',
+  accesoAlModulo,
   dependencies: ['afiliacion', 'estructura'],
   migraciones,
   createServices: (core, dependencias) =>
@@ -24,4 +26,4 @@ export const tesoreria: Module<
 }
 
 export type { ServicioDeTesoreria } from './servicio'
-export { CuotaUtilizada, DatosDePagoInvalidos, PagoNoAnulable } from './servicio'
+export { CuotaUtilizada, DatosDePagoInvalidos, OperacionDenegada, PagoNoAnulable } from './servicio'

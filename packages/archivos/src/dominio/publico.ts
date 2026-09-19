@@ -1,3 +1,4 @@
+import type { Alcance } from '@gps/core'
 import type { Archivo } from './modelos'
 
 /** Lo que archivos le publica a los otros modulos, y nada mas.
@@ -26,7 +27,7 @@ export interface Archivos {
    *  guardar el archivo lo deja llamado como su id. */
   descargar(
     id: string,
-    actor: unknown,
+    alcance: Alcance | null,
   ): Promise<{ contenido: Uint8Array; tipo: string; nombre: string }>
 
   /** Si ese archivo esta confirmado y es de ese recurso de ese modulo. Lo llama

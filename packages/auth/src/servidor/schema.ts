@@ -1,0 +1,154 @@
+import { alcanceDe } from '@gps/core'
+import type { Builder } from '@gps/core/graphql'
+import { GraphQLError } from 'graphql'
+import { PROVEEDORES, type ProveedorDeIdentidad } from '../dominio/modelos'
+import { AutoridadInsuficiente, InvitacionInvalida } from './servicio'
+
+/** Lo que el cliente necesita saber de quien tiene la sesión abierta. Los
+ *  cargos y equipos vigentes viajan acá porque las pantallas los usan para
+ *  esconder acciones con las mismas políticas puras que aplica el servidor. */
+interface PersonaAutenticada {
+  readonly personaId: string
+  readonly roles: readonly { rol: string; ambitoTipo: string; ambitoId: string | null }[]
+  readonly esAdministradorDesignado: boolean
+  readonly estaElevado: boolean
+}
+
+export function registrarSchema(builder: Builder): void {
+  const ProveedorRef = builder.enumType('ProveedorDeIdentidad', {
+    description: 'Con qué proveedor externo se autentica una identidad.',
+    values: PROVEEDORES as unknown as readonly ProveedorDeIdentidad[],
+  })
+
+  const FuncionRef = builder
+    .objectRef<PersonaAutenticada['roles'][number]>('FuncionVigente')
+    .implement({
+      description: 'Un cargo o equipo vigente, con el ámbito donde lo ejerce.',
+      fields: (t) => ({
+        rol: t.exposeString('rol'),
+        ambitoTipo: t.exposeString('ambitoTipo'),
+        ambitoId: t.exposeID('ambitoId', { nullable: true }),
+      }),
+    })
+
+  const PersonaAutenticadaRef = builder
+    .objectRef<PersonaAutenticada>('PersonaAutenticada')
+    .implement({
+      description: 'Quién está autenticado en este pedido.',
+      fields: (t) => ({
+        personaId: t.exposeID('personaId'),
+        roles: t.field({ type: [FuncionRef], resolve: (quien) => [...quien.roles] }),
+        esAdministradorDesignado: t.exposeBoolean('esAdministradorDesignado'),
+        estaElevado: t.exposeBoolean('estaElevado'),
+      }),
+    })
+
+  const InvitacionRef = builder
+    .objectRef<{ invitacionId: string; secreto: string; url: string }>('EnlaceDeInvitacion')
+    .implement({
+      description:
+        'El enlace para compartir a mano. El secreto vuelve una única vez: ' +
+        'el servidor sólo guarda su hash.',
+      fields: (t) => ({
+        invitacionId: t.exposeID('invitacionId'),
+        url: t.exposeString('url'),
+      }),
+    })
+
+  builder.queryField('personaActual', (t) =>
+    t.field({
+      type: PersonaAutenticadaRef,
+      nullable: true,
+      description: 'La persona de esta sesión, o null si el pedido es anónimo.',
+      resolve: (_padre, _args, contexto) =>
+        contexto.actor && {
+          personaId: contexto.actor.personaId,
+          roles: contexto.actor.roles.map((funcion) => ({
+            rol: funcion.rol,
+            ambitoTipo: funcion.ambito.tipo,
+            ambitoId: funcion.ambito.id,
+          })),
+          esAdministradorDesignado: contexto.actor.esAdministradorDesignado,
+          estaElevado: contexto.actor.estaElevado,
+        },
+    }),
+  )
+
+  builder.mutationField('cerrarSesion', (t) =>
+    t.boolean({
+      description: 'Revoca la sesión de este pedido. El cliente borra su secreto.',
+      resolve: async (_padre, _args, contexto) => {
+        if (!contexto.sesionId) return false
+        await contexto.auth.revocarSesion(contexto.sesionId)
+        return true
+      },
+    }),
+  )
+
+  builder.mutationField('invitar', (t) =>
+    t.field({
+      type: InvitacionRef,
+      description:
+        'Emite un enlace de activación o de recuperación para una persona del propio ámbito.',
+      args: {
+        personaId: t.arg.id({ required: true }),
+        tipo: t.arg.string({ required: true }),
+        proveedorAReemplazar: t.arg({ type: ProveedorRef }),
+      },
+      resolve: async (_padre, args, contexto) => {
+        const alcance = alcanceDe(contexto)
+        if (args.tipo !== 'activacion' && args.tipo !== 'recuperacion') {
+          throw new GraphQLError('El tipo de invitación tiene que ser activación o recuperación.', {
+            extensions: { code: 'InvitacionInvalida' },
+          })
+        }
+        try {
+          const emitida = await contexto.auth.emitirInvitacion(alcance.actor, {
+            tipo: args.tipo,
+            personaId: String(args.personaId),
+            proveedorAReemplazar: args.proveedorAReemplazar ?? undefined,
+          })
+          return {
+            invitacionId: emitida.invitacionId,
+            secreto: emitida.secreto,
+            url: enlaceDe(contexto.config.auth?.origenPublico ?? '', args.tipo, emitida.secreto),
+          }
+        } catch (error) {
+          return traducir(error)
+        }
+      },
+    }),
+  )
+
+  builder.mutationField('revocarInvitacion', (t) =>
+    t.boolean({
+      description: 'Anula un enlace que todavía no se consumió.',
+      args: { invitacionId: t.arg.id({ required: true }) },
+      resolve: async (_padre, args, contexto) => {
+        try {
+          await contexto.auth.revocarInvitacion(
+            alcanceDe(contexto).actor,
+            String(args.invitacionId),
+          )
+          return true
+        } catch (error) {
+          return traducir(error)
+        }
+      },
+    }),
+  )
+}
+
+/** El enlace que se comparte por WhatsApp. Es una ruta de la app y no de la
+ *  API: la pantalla muestra persona y ámbito antes de confirmar, y recién ahí
+ *  arranca el login del proveedor. */
+function enlaceDe(origen: string, tipo: 'activacion' | 'recuperacion', secreto: string): string {
+  return `${origen}/${tipo}/${secreto}`
+}
+
+const traducir = (error: unknown): never => {
+  if (error instanceof AutoridadInsuficiente || error instanceof InvitacionInvalida) {
+    throw new GraphQLError(error.message, { extensions: { code: error.name } })
+  }
+  throw error
+}

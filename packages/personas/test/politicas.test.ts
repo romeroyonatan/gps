@@ -1,11 +1,9 @@
 import { describe, expect, test } from 'bun:test'
-import type { Actor } from '@gps/core'
+import type { Actor, Alcance } from '@gps/core'
 import {
   puedeAdministrarEquiposDiocesanos,
   puedeAdministrarPlantelDeGrupo,
-  puedeConfigurarCuotas,
-  puedeLeerCuentaDeGrupo,
-  puedeRegistrarPagos,
+  puedeVerPersonasDelGrupo,
 } from '../src/dominio/politicas'
 
 const anonimo: Actor = {
@@ -46,33 +44,17 @@ describe('puedeAdministrarEquiposDiocesanos', () => {
   })
 })
 
-describe('puedeLeerCuentaDeGrupo', () => {
-  test('jefatura y secretaria leen su grupo; las autoridades diocesanas leen cualquiera', () => {
-    expect(puedeLeerCuentaDeGrupo(actorCon('jefeDeGrupo', 'grupo', 'g1'), 'g1')).toBe(true)
-    expect(puedeLeerCuentaDeGrupo(actorCon('jefeDeGrupo', 'grupo', 'g1'), 'g2')).toBe(false)
-    expect(puedeLeerCuentaDeGrupo(actorCon('tesoreriaDiocesana', 'diocesis', null), 'g1')).toBe(
-      true,
-    )
-    expect(puedeLeerCuentaDeGrupo(actorCon('tesoreriaDiocesana', 'diocesis', null), 'g2')).toBe(
-      true,
-    )
-    expect(puedeLeerCuentaDeGrupo(anonimo, 'g1')).toBe(false)
+describe('puedeVerPersonasDelGrupo', () => {
+  const alcance = (grupos: string[], esAdministrador = false): Alcance => ({
+    actor: anonimo,
+    gruposVisibles: grupos,
+    distritosVisibles: [],
+    esAdministrador,
   })
-})
 
-describe('puedeRegistrarPagos', () => {
-  test('sólo Tesorería diocesana o la elevación global registran pagos', () => {
-    expect(puedeRegistrarPagos(actorCon('tesoreriaDiocesana', 'diocesis', null))).toBe(true)
-    expect(puedeRegistrarPagos(actorCon('jefeDeGrupo', 'grupo', 'g1'))).toBe(false)
-    expect(puedeRegistrarPagos(actorCon('administracionDiocesana', 'diocesis', null))).toBe(false)
-    expect(puedeRegistrarPagos(elevado)).toBe(true)
-  })
-})
-
-describe('puedeConfigurarCuotas', () => {
-  test('Tesorería y las autoridades diocesanas configuran cuotas', () => {
-    expect(puedeConfigurarCuotas(actorCon('tesoreriaDiocesana', 'diocesis', null))).toBe(true)
-    expect(puedeConfigurarCuotas(actorCon('jefeScoutDiocesano', 'diocesis', null))).toBe(true)
-    expect(puedeConfigurarCuotas(actorCon('jefeDeGrupo', 'grupo', 'g1'))).toBe(false)
+  test('se lee lo que el alcance ya expandio, y nada mas', () => {
+    expect(puedeVerPersonasDelGrupo(alcance(['g1']), 'g1')).toBe(true)
+    expect(puedeVerPersonasDelGrupo(alcance(['g1']), 'g2')).toBe(false)
+    expect(puedeVerPersonasDelGrupo(alcance([], true), 'g2')).toBe(true)
   })
 })

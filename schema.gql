@@ -138,6 +138,14 @@ type Emision {
 }
 
 """
+El enlace para compartir a mano. El secreto vuelve una única vez: el servidor sólo guarda su hash.
+"""
+type EnlaceDeInvitacion {
+  invitacionId: ID!
+  url: String!
+}
+
+"""
 Como esta una de las tres firmas de un permiso.
 """
 type EstadoDeFirma {
@@ -170,6 +178,15 @@ enum EstadoDePermiso {
   borrador
   emitido
   firmado
+}
+
+"""
+Un cargo o equipo vigente, con el ámbito donde lo ejerce.
+"""
+type FuncionVigente {
+  ambitoId: ID
+  ambitoTipo: String!
+  rol: String!
 }
 
 """
@@ -217,6 +234,11 @@ type Mutation {
   anularPermiso(permisoId: ID!): Permiso!
 
   """
+  Revoca la sesión de este pedido. El cliente borra su secreto.
+  """
+  cerrarSesion: Boolean!
+
+  """
   Ultimo paso: valida lo recibido y deja el archivo usable.
   """
   confirmarSubida(id: ID!): ID!
@@ -253,6 +275,15 @@ type Mutation {
   generarDeudasPendientes: ResultadoDeReconciliacion!
 
   """
+  Emite un enlace de activación o de recuperación para una persona del propio ámbito.
+  """
+  invitar(
+    personaId: ID!
+    proveedorAReemplazar: ProveedorDeIdentidad
+    tipo: String!
+  ): EnlaceDeInvitacion!
+
+  """
   Saca un adjunto y borra su archivo. No toca las firmas.
   """
   quitarAdjuntoDePermiso(adjuntoId: ID!, permisoId: ID!): Permiso!
@@ -270,6 +301,11 @@ type Mutation {
     observacion: String
     referencia: String
   ): MovimientoDeTesoreria!
+
+  """
+  Anula un enlace que todavía no se consumió.
+  """
+  revocarInvitacion(invitacionId: ID!): Boolean!
 
   """
   Primer paso de una subida: reserva el archivo y dice por donde mandar los bytes.
@@ -351,6 +387,16 @@ type Persona {
 }
 
 """
+Quién está autenticado en este pedido.
+"""
+type PersonaAutenticada {
+  esAdministradorDesignado: Boolean!
+  estaElevado: Boolean!
+  personaId: ID!
+  roles: [FuncionVigente!]!
+}
+
+"""
 Como y desde cuando una persona pertenece a su grupo.
 """
 type Pertenencia {
@@ -365,6 +411,15 @@ type Pertenencia {
   La unidad del grupo. Vacía si y sólo si la categoría es adherente. La rama sale de la unidad, que la pantalla ya tiene del grupo.
   """
   unidadId: ID
+}
+
+"""
+Con qué proveedor externo se autentica una identidad.
+"""
+enum ProveedorDeIdentidad {
+  apple
+  demo
+  google
 }
 
 type Query {
@@ -393,6 +448,11 @@ type Query {
   Los permisos de un grupo, del más próximo al más viejo.
   """
   permisos(grupoId: ID!): [Permiso!]!
+
+  """
+  La persona de esta sesión, o null si el pedido es anónimo.
+  """
+  personaActual: PersonaAutenticada
 
   """
   Las personas de un grupo, ordenadas por apellido.
