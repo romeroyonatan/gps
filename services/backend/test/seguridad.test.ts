@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import type { Config, Context } from '@gps/core'
+import type { Config } from '@gps/core'
 import { execute, parse } from 'graphql'
 import { crearAlmacenamientoEnMemoria } from '../src/almacenamiento'
 import { crearBd } from '../src/bd'
@@ -63,6 +63,9 @@ async function montar() {
 
   return { contexto, consultar, entrar, como }
 }
+
+/** El largo de una lista que el test ya verificó que vino sin errores. */
+const cuantos = (valor: unknown) => (Array.isArray(valor) ? valor.length : -1)
 
 const codigos = (resultado: { errors?: readonly { extensions?: unknown }[] }) =>
   (resultado.errors ?? []).map(
@@ -277,7 +280,7 @@ describe('alcance entre grupos', () => {
     )
 
     expect(resultado.errors).toBeUndefined()
-    expect((resultado.data?.cuentasDeGrupos as unknown[]).length).toBe(1)
+    expect(cuantos(resultado.data?.cuentasDeGrupos)).toBe(1)
     expect(resultado.data?.deudasPendientes).toBeNull()
     expect(resultado.data?.periodosConfigurablesDeAfiliacion).toBeNull()
   })
@@ -310,7 +313,7 @@ describe('alcance entre grupos', () => {
         { g: grupo },
       )
       expect(permisos.errors).toBeUndefined()
-      expect((permisos.data?.permisos as unknown[]).length).toBeGreaterThan(0)
+      expect(cuantos(permisos.data?.permisos)).toBeGreaterThan(0)
 
       const cuenta = await consultar(
         sesion.secreto,
@@ -318,7 +321,7 @@ describe('alcance entre grupos', () => {
         { g: grupo },
       )
       expect(cuenta.errors).toBeUndefined()
-      expect((cuenta.data?.movimientosDeTesoreria as unknown[]).length).toBeGreaterThan(0)
+      expect(cuantos(cuenta.data?.movimientosDeTesoreria)).toBeGreaterThan(0)
     }
   })
 

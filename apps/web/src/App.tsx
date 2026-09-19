@@ -95,12 +95,18 @@ export function App(props: { particion: ParticionDelCache }) {
         <h1 className="text-2xl font-semibold">GPS</h1>
         <p className="mt-1 text-sm text-slate-500">Gestión para Scouts</p>
 
+        {/* El enlace de invitación va antes de la puerta: es justamente para
+            quien todavía no tiene sesión. */}
+        {enlace && <Enlace tipo={enlace.tipo} secreto={enlace.secreto} />}
+
         {/* Mientras no se sepa quién es, no se dibuja ni el login ni las
             pantallas: mostrar el login un instante a alguien que ya entró es
             peor que esperar. */}
-        {sesion.isPending && <p className="mt-8 text-sm text-slate-500">Un momento…</p>}
+        {!enlace && sesion.isPending && <p className="mt-8 text-sm text-slate-500">Un momento…</p>}
 
-        {!sesion.isPending && !quien && <Ingreso entorno={version.data?.version.entorno ?? ''} />}
+        {!enlace && !sesion.isPending && !quien && (
+          <Ingreso entorno={version.data?.version.entorno ?? ''} />
+        )}
 
         {!enlace && quien && (
           <>

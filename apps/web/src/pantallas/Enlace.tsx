@@ -31,7 +31,7 @@ export function Enlace(props: { tipo: 'activacion' | 'recuperacion'; secreto: st
     )
   }
 
-  if (!invitacion || invitacion.estado !== 'valida') {
+  if (invitacion?.estado !== 'valida') {
     return (
       <p className="mt-8 rounded-lg bg-slate-100 p-4 text-sm text-slate-700">
         {PORQUE[invitacion?.estado ?? 'vencida'] ?? PORQUE.vencida}
