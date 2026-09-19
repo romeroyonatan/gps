@@ -88,6 +88,25 @@ Jefatura y Secretaría SHALL poder gestionar personas, datos, plantel, cargos y 
 - **WHEN** intenta realizar la misma operación sobre otro grupo
 - **THEN** el sistema la deniega
 
+### Requirement: El padrón de un grupo es del grupo
+El sistema MUST limitar la lectura de las personas de un grupo a su jefatura y su
+Secretaría. Alcanzar un grupo no es verlo por dentro: el comisionado de distrito alcanza
+los grupos de su distrito porque necesita leer los permisos de salida que firma, y las
+autoridades diocesanas administran equipos diocesanos, pero ninguno de los dos SHALL ver
+el padrón de un grupo. Sólo el administrador elevado.
+
+#### Scenario: Comisionado mirando un grupo de su distrito
+- **WHEN** el comisionado de distrito consulta las personas de un grupo de su distrito
+- **THEN** el sistema no devuelve ninguna
+
+#### Scenario: Comisionado mirando el permiso que firma
+- **WHEN** el mismo comisionado consulta un permiso de salida de ese grupo
+- **THEN** ve el permiso y la nómina de quienes van a esa salida
+
+#### Scenario: Autoridad diocesana mirando un grupo
+- **WHEN** el jefe scout diocesano o Administración diocesana consulta las personas de un grupo
+- **THEN** el sistema no devuelve ninguna
+
 ### Requirement: Separación entre lectura y escritura de Tesorería
 Jefatura y Secretaría SHALL poder ver el saldo, la cuenta corriente y el registro de pagos de su grupo, pero MUST NOT crear, editar ni eliminar registros de pago. Sólo Tesorería diocesana SHALL registrar pagos.
 
@@ -98,6 +117,10 @@ Jefatura y Secretaría SHALL poder ver el saldo, la cuenta corriente y el regist
 #### Scenario: Secretaría intenta registrar un pago
 - **WHEN** Jefatura o Secretaría intenta crear un registro de pago
 - **THEN** el sistema deniega la operación
+
+#### Scenario: Comisionado mirando la cuenta de un grupo
+- **WHEN** el comisionado de distrito consulta el saldo o los movimientos de un grupo de su distrito
+- **THEN** el sistema deniega el acceso: la cuenta corriente es de Tesorería y del propio grupo
 
 #### Scenario: Tesorería registra un pago
 - **WHEN** un integrante vigente de Tesorería diocesana registra un pago de cualquier grupo de la diócesis

@@ -19,10 +19,6 @@ export const accesoAlModulo: AccesoAlModulo = {
   ],
 }
 
-export function puedeVerGrupo(alcance: Alcance, grupoId: string): boolean {
-  return alcance.esAdministrador || alcance.gruposVisibles.includes(grupoId)
-}
-
 export function puedeVerDistrito(alcance: Alcance, distritoId: string): boolean {
   return alcance.esAdministrador || alcance.distritosVisibles.includes(distritoId)
 }

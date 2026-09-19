@@ -9,6 +9,7 @@ const PERFILES_DEMO = [
   { subject: 'jefatura', nombre: 'Jefatura de grupo' },
   { subject: 'secretaria', nombre: 'Secretaría' },
   { subject: 'tesoreria', nombre: 'Tesorería diocesana' },
+  { subject: 'comisionado', nombre: 'Comisionado de distrito' },
   { subject: 'administrador', nombre: 'Administración' },
 ] as const
 

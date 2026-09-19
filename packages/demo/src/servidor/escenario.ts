@@ -515,6 +515,9 @@ const PERFILES_DEMO = [
   { subject: 'secretaria', documento: '20.447.195', equipo: 'secretaria' },
   // Tesorería diocesana: la única que registra pagos, de cualquier grupo.
   { subject: 'tesoreria', documento: '36.114.780', equipo: 'tesoreriaDiocesana' },
+  // Comisionada de distrito: alcanza los grupos de su distrito para firmar sus
+  // permisos de salida, pero no ve el padrón ni la cuenta de ninguno.
+  { subject: 'comisionado', documento: '28.904.331', equipo: null },
   // La persona administradora. Entra con lo que le dan sus cargos -es jefe
   // scout diocesano- y para el alcance global tiene que elevarse con otro
   // clic, igual que una real.

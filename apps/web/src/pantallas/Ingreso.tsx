@@ -5,6 +5,11 @@ const PERFILES_DEMO = [
   { subject: 'secretaria', nombre: 'Secretaría', que: 'Lo mismo, desde el equipo del grupo' },
   { subject: 'tesoreria', nombre: 'Tesorería diocesana', que: 'La única que registra pagos' },
   {
+    subject: 'comisionado',
+    nombre: 'Comisionado de distrito',
+    que: 'Firma los permisos de su distrito, no ve los grupos por dentro',
+  },
+  {
     subject: 'administrador',
     nombre: 'Administración',
     que: 'Entra sin alcance global: tiene que elevarse',

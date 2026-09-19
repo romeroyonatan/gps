@@ -1,11 +1,7 @@
 import { useAlcance, useDistritos, useJefesDeGrupos } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
-import {
-  etiquetaDeEdades,
-  puedeVerGrupo,
-  ramaDelCatalogo,
-  type Unidad,
-} from '@gps/estructura/dominio'
+import { etiquetaDeEdades, ramaDelCatalogo, type Unidad } from '@gps/estructura/dominio'
+import { puedeVerPersonasDelGrupo } from '@gps/personas/dominio'
 import { Link } from 'wouter'
 
 /** El nombre propio y, en gris, el tramo de edad de su rama. Se muestra el
@@ -118,7 +114,7 @@ export function Estructura() {
                   numero={grupo.numero}
                   nombre={grupo.nombre}
                   jefes={porGrupo.get(grupo.id) ?? []}
-                  seAbre={alcance !== null && puedeVerGrupo(alcance, grupo.id)}
+                  seAbre={alcance !== null && puedeVerPersonasDelGrupo(alcance, grupo.id)}
                   unidades={grupo.unidades}
                 />
               ))}

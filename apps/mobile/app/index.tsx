@@ -1,11 +1,7 @@
 import { useAlcance, useDistritos, useJefesDeGrupos, useVersion } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
-import {
-  etiquetaDeEdades,
-  puedeVerGrupo,
-  ramaDelCatalogo,
-  type Unidad,
-} from '@gps/estructura/dominio'
+import { etiquetaDeEdades, ramaDelCatalogo, type Unidad } from '@gps/estructura/dominio'
+import { puedeVerPersonasDelGrupo } from '@gps/personas/dominio'
 import { Link } from 'expo-router'
 import { Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native'
 import { BarraDeSesion } from '../src/BarraDeSesion'
@@ -124,7 +120,7 @@ export default function Pantalla() {
                   numero={grupo.numero}
                   nombre={grupo.nombre}
                   jefes={porGrupo.get(grupo.id) ?? []}
-                  seAbre={alcance !== null && puedeVerGrupo(alcance, grupo.id)}
+                  seAbre={alcance !== null && puedeVerPersonasDelGrupo(alcance, grupo.id)}
                   unidades={grupo.unidades}
                 />
               ))}

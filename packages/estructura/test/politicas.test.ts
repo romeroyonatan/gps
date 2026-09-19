@@ -1,10 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { Actor, Alcance } from '@gps/core'
-import {
-  puedeAdministrarLaEstructura,
-  puedeVerDistrito,
-  puedeVerGrupo,
-} from '../src/dominio/politicas'
+import { puedeAdministrarLaEstructura, puedeVerDistrito } from '../src/dominio/politicas'
 
 const anonimo: Actor = {
   personaId: 'nadie',
@@ -37,11 +33,9 @@ describe('puedeAdministrarLaEstructura', () => {
 })
 
 describe('lectura por alcance', () => {
-  test('sólo se ve lo que estructura expandió, salvo elevación', () => {
-    expect(puedeVerGrupo(alcance(['g1'], []), 'g1')).toBe(true)
-    expect(puedeVerGrupo(alcance(['g1'], []), 'g2')).toBe(false)
+  test('sólo se ve el distrito que estructura expandió, salvo elevación', () => {
     expect(puedeVerDistrito(alcance([], ['d1']), 'd1')).toBe(true)
     expect(puedeVerDistrito(alcance([], ['d1']), 'd2')).toBe(false)
-    expect(puedeVerGrupo(alcance([], [], true), 'g9')).toBe(true)
+    expect(puedeVerDistrito(alcance([], [], true), 'd9')).toBe(true)
   })
 })

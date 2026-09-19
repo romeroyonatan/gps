@@ -144,6 +144,13 @@ pantallas grandes, nunca arreglan lo que se rompió en chicas.
    puras sobre `Actor` o `Alcance`, las aplica el servidor y las usan las pantallas
    para no ofrecer lo que después se va a rechazar. La interfaz nunca es la barrera.
 
+Alcanzar un grupo **no** es verlo por dentro, y las dos capas del medio son distintas a
+propósito. El comisionado tiene los grupos de su distrito en `gruposVisibles` porque
+necesita leer los permisos de salida que firma; el padrón de esos grupos no lo ve, y su
+cuenta corriente tampoco. Cuando escribas una política de lectura, preguntate cuál de
+las dos cosas estás decidiendo: `alcance.gruposVisibles.includes(...)` responde "¿lo
+alcanza?", y `tieneRol(alcance.actor, ...)` responde "¿es suyo?".
+
 Un campo denegado **no puede** ser no-nulable en GraphQL: uno que lanza se lleva puesta
 la respuesta entera, así que una consulta que mezcla campos de distinto permiso pierde
 también lo que sí podía ver. Un campo que se deniega por función se declara nullable y

@@ -353,6 +353,54 @@ describe('alcance entre grupos', () => {
     expect(anonimo.data).toEqual({ personaActual: null })
   })
 
+  test('el comisionado firma los permisos de su distrito sin ver los grupos por dentro', async () => {
+    const { consultar, entrar } = await montar()
+    const comisionado = await entrar('comisionado')
+
+    const quien = await consultar(
+      comisionado.secreto,
+      '{ personaActual { alcance { gruposVisibles } } }',
+    )
+    const suyos =
+      (quien.data as { personaActual?: { alcance: { gruposVisibles: string[] } } } | null)
+        ?.personaActual?.alcance.gruposVisibles ?? []
+    // Su distrito se expande a sus grupos: los alcanza, que es lo que necesita
+    // para leer los permisos que firma.
+    expect(suyos.length).toBeGreaterThan(1)
+    const grupo = suyos[0] ?? ''
+
+    // El permiso y su nómina, sí: es lo que va a firmar.
+    const permisos = await consultar(
+      comisionado.secreto,
+      'query ($g: ID!) { permisos(grupoId: $g) { id emitidos { nombres } } }',
+      { g: grupo },
+    )
+    expect(permisos.errors).toBeUndefined()
+    expect(cuantos(permisos.data?.permisos)).toBeGreaterThan(0)
+
+    // El padrón del grupo, no: es otra cosa que quiénes van a una salida.
+    const padron = await consultar(
+      comisionado.secreto,
+      'query ($g: ID!) { personas(grupoId: $g) { id } }',
+      { g: grupo },
+    )
+    expect(padron.data).toEqual({ personas: [] })
+
+    // Y la cuenta corriente tampoco: eso es de Tesorería.
+    expect(
+      codigos(
+        await consultar(
+          comisionado.secreto,
+          'query ($g: ID!) { movimientosDeTesoreria(grupoId: $g) { id } }',
+          { g: grupo },
+        ),
+      ),
+    ).toEqual(['SIN_PERMISO'])
+    expect(codigos(await consultar(comisionado.secreto, '{ cuentasDeGrupos { numero } }'))).toEqual(
+      ['SIN_PERMISO'],
+    )
+  })
+
   test('sólo Tesorería diocesana registra un pago', async () => {
     const { consultar, entrar } = await montar()
     const jefatura = await entrar('jefatura')

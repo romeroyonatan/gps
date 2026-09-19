@@ -61,7 +61,7 @@ export function registrarSchema(builder: Builder): void {
     })
 
   // El alcance ya expandido, tal como lo resolvió el contexto de este pedido.
-  // Viaja para que las pantallas puedan preguntar `puedeVerGrupo` con la misma
+  // Viaja para que las pantallas puedan preguntar `puedeVerPersonasDelGrupo` con la misma
   // función pura que aplica el servidor, en vez de reimplementar la expansión
   // de ámbitos —un comisionado alcanza los grupos de su distrito— del lado del
   // cliente. Es qué alcanza, no qué puede hacer: eso lo dicen los roles.

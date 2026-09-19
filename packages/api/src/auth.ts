@@ -50,7 +50,7 @@ export function useActor(): Actor | null {
 /** El alcance ya expandido de esta sesión: qué grupos y distritos alcanza.
  *  Lo resolvió el servidor —expandir el distrito de un comisionado a sus
  *  grupos es su trabajo— y viaja para que la pantalla pueda preguntar
- *  `puedeVerGrupo` sin reimplementar esa expansión. */
+ *  `puedeVerPersonasDelGrupo` sin reimplementar esa expansión. */
 export function useAlcance(): Alcance | null {
   const { data } = usePersonaActual()
   const actor = useActor()
