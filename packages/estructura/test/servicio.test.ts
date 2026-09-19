@@ -1,6 +1,8 @@
 import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
 import {
+  type Alcance,
+  alcanceSinLimites,
   aplicarMigraciones,
   type Bd,
   type Core,
@@ -36,7 +38,7 @@ function montarConBd(reloj: Reloj = { ahora: () => HORA }): {
 
   let contador = 0
   const core: Core = {
-    config: { version: '0.0.0', entorno: 'prueba', puerto: 0 },
+    config: { version: '0.0.0', entorno: 'prueba', puerto: 0, auth: null },
     logger: { info: () => {}, error: () => {} },
     reloj,
     bd,
@@ -59,6 +61,7 @@ function montarConBd(reloj: Reloj = { ahora: () => HORA }): {
     hash: (contenido: Uint8Array | string) =>
       `hash:${typeof contenido === 'string' ? contenido : contenido.join(',')}`,
     nuevoId: (prefijo) => `${prefijo}_${++contador}`,
+    nuevoSecreto: () => `secreto_${++contador}`,
   }
 
   const modulo: Module<object> = {
@@ -66,6 +69,7 @@ function montarConBd(reloj: Reloj = { ahora: () => HORA }): {
     dependencies: [],
     migraciones,
     createServices: () => ({}),
+    accesoAlModulo: { porDefecto: 'denegado', permitidos: [] },
     registerSchema: () => {},
   }
   aplicarMigraciones(core, [modulo])
@@ -93,9 +97,49 @@ describe('crearDistrito', () => {
   })
 })
 
+describe('expandirAlcance', () => {
+  test('expande grupo, distrito y sudo sin dar poder al administrador no elevado', async () => {
+    const servicio = montar()
+    const distrito1 = await servicio.crearDistrito({ numero: 1, zona: 'Norte' })
+    const distrito2 = await servicio.crearDistrito({ numero: 2, zona: 'Sur' })
+    const grupo1 = await servicio.crearGrupo({ numero: 1, nombre: 'Uno', distritoId: distrito1.id })
+    const grupo2 = await servicio.crearGrupo({ numero: 2, nombre: 'Dos', distritoId: distrito2.id })
+    const actor = {
+      personaId: 'persona_1',
+      roles: [
+        {
+          rol: 'comisionadoDeDistrito' as const,
+          ambito: { tipo: 'distrito' as const, id: distrito1.id },
+        },
+      ],
+      esAdministradorDesignado: true,
+      estaElevado: false,
+    }
+
+    expect(await servicio.expandirAlcance(actor)).toEqual({
+      actor,
+      distritosVisibles: [distrito1.id],
+      gruposVisibles: [grupo1.id],
+      esAdministrador: false,
+    })
+    expect(await servicio.expandirAlcance({ ...actor, roles: [] })).toEqual({
+      actor: { ...actor, roles: [] },
+      distritosVisibles: [],
+      gruposVisibles: [],
+      esAdministrador: false,
+    })
+    expect(await servicio.expandirAlcance({ ...actor, roles: [], estaElevado: true })).toEqual({
+      actor: { ...actor, roles: [], estaElevado: true },
+      distritosVisibles: [distrito1.id, distrito2.id],
+      gruposVisibles: [grupo1.id, grupo2.id],
+      esAdministrador: true,
+    })
+  })
+})
+
 describe('listarDistritos', () => {
   test('sin datos devuelve una lista vacia, no undefined', async () => {
-    expect(await montar().listarDistritos()).toEqual([])
+    expect(await montar().listarDistritos(alcanceSinLimites())).toEqual([])
   })
 
   test('las marcas vuelven de la base como Date, no como el entero que guarda', async () => {
@@ -103,7 +147,7 @@ describe('listarDistritos', () => {
     // unico que verifica el ida y vuelta timestamp_ms <-> Date del mapeo.
     const servicio = montar()
     await servicio.crearDistrito({ numero: 1, zona: 'San Isidro' })
-    const [distrito] = await servicio.listarDistritos()
+    const [distrito] = await servicio.listarDistritos(alcanceSinLimites())
     expect(distrito?.creadoEn).toEqual(HORA)
     expect(distrito?.actualizadoEn).toEqual(HORA)
   })
@@ -119,7 +163,7 @@ describe('listarDistritos', () => {
     await abrirUnidadDe(servicio, grupo.id, 'lobatos')
     await abrirUnidadDe(servicio, grupo.id, 'scouts')
 
-    const arbol = await servicio.listarDistritos()
+    const arbol = await servicio.listarDistritos(alcanceSinLimites())
     expect(arbol).toHaveLength(1)
     expect(arbol[0]?.zona).toBe('San Isidro')
     expect(arbol[0]?.grupos).toHaveLength(1)
@@ -137,7 +181,7 @@ describe('listarDistritos', () => {
     await abrirUnidadDe(servicio, grupo.id, 'castores')
     await abrirUnidadDe(servicio, grupo.id, 'scouts')
 
-    const arbol = await servicio.listarDistritos()
+    const arbol = await servicio.listarDistritos(alcanceSinLimites())
     expect(arbol[0]?.grupos[0]?.unidades.map((unidad) => unidad.rama)).toEqual([
       'castores',
       'scouts',
@@ -164,7 +208,7 @@ describe('listarDistritos', () => {
       nombre: 'Ana Frank',
     })
 
-    const arbol = await servicio.listarDistritos()
+    const arbol = await servicio.listarDistritos(alcanceSinLimites())
     expect(arbol[0]?.grupos[0]?.unidades.map((unidad) => unidad.nombre)).toEqual([
       'Ana Frank',
       'San Jorge',
@@ -176,14 +220,14 @@ describe('listarDistritos', () => {
     const distrito = await servicio.crearDistrito({ numero: 1, zona: 'San Isidro' })
     await servicio.crearGrupo({ numero: 88, nombre: 'Ocho Ocho', distritoId: distrito.id })
 
-    const arbol = await servicio.listarDistritos()
+    const arbol = await servicio.listarDistritos(alcanceSinLimites())
     expect(arbol[0]?.grupos[0]?.unidades).toEqual([])
   })
 
   test('un distrito sin grupos viene con la lista vacia', async () => {
     const servicio = montar()
     await servicio.crearDistrito({ numero: 1, zona: 'San Isidro' })
-    expect((await servicio.listarDistritos())[0]?.grupos).toEqual([])
+    expect((await servicio.listarDistritos(alcanceSinLimites()))[0]?.grupos).toEqual([])
   })
 
   test('distritos y grupos vienen ordenados por numero, no por orden de carga', async () => {
@@ -193,7 +237,7 @@ describe('listarDistritos', () => {
     await servicio.crearGrupo({ numero: 42, nombre: 'Cuarenta', distritoId: sur.id })
     await servicio.crearGrupo({ numero: 7, nombre: 'Siete', distritoId: sur.id })
 
-    const arbol = await servicio.listarDistritos()
+    const arbol = await servicio.listarDistritos(alcanceSinLimites())
     expect(arbol.map((distrito) => distrito.numero)).toEqual([1, 2])
     expect(arbol[1]?.grupos.map((grupo) => grupo.numero)).toEqual([7, 42])
   })
@@ -222,7 +266,7 @@ describe('listarDistritos', () => {
       ),
     )
 
-    const arbol = await servicio.listarDistritos()
+    const arbol = await servicio.listarDistritos(alcanceSinLimites())
     expect(arbol[0]?.grupos[0]?.unidades.map((unidad) => unidad.rama)).toEqual(['scouts'])
   })
 })
@@ -440,7 +484,7 @@ describe('cerrarGrupo', () => {
     await servicio.crearGrupo({ numero: 2, nombre: 'Dos', distritoId: distrito.id })
     await servicio.cerrarGrupo(uno.id)
 
-    const arbol = await servicio.listarDistritos()
+    const arbol = await servicio.listarDistritos(alcanceSinLimites())
     expect(arbol[0]?.grupos.map((grupo) => grupo.numero)).toEqual([2])
   })
 
@@ -452,7 +496,7 @@ describe('cerrarGrupo', () => {
     const uno = await servicio.crearGrupo({ numero: 1, nombre: 'Uno', distritoId: distrito.id })
     await servicio.cerrarGrupo(uno.id)
 
-    const arbol = await servicio.listarDistritos()
+    const arbol = await servicio.listarDistritos(alcanceSinLimites())
     expect(arbol).toHaveLength(1)
     expect(arbol[0]?.grupos).toEqual([])
   })
@@ -548,5 +592,53 @@ describe('gruposAbiertosEn', () => {
     })
 
     expect(await servicio.gruposAbiertosEn('2999-12-31')).toContain(grupo.id)
+  })
+})
+
+describe('listarDistritos es el directorio de la asociación', () => {
+  const alcanceDe = (grupos: string[]): Alcance => ({
+    actor: {
+      personaId: 'persona_1',
+      roles: grupos.map((id) => ({
+        rol: 'jefeDeGrupo' as const,
+        ambito: { tipo: 'grupo' as const, id },
+      })),
+      esAdministradorDesignado: false,
+      estaElevado: false,
+    },
+    gruposVisibles: grupos,
+    distritosVisibles: [],
+    esAdministrador: false,
+  })
+
+  test('un jefe de grupo ve la diócesis entera, no sólo su grupo', async () => {
+    // Saber qué distritos y qué grupos hay no revela nada de la gente de un
+    // grupo. Los datos de un grupo -sus personas, su cuenta, sus salidas- sí
+    // van por alcance, cada uno en su módulo.
+    const servicio = montar()
+    const norte = await servicio.crearDistrito({ numero: 1, zona: 'Norte' })
+    const sur = await servicio.crearDistrito({ numero: 2, zona: 'Sur' })
+    const suyo = await servicio.crearGrupo({ numero: 1, nombre: 'Uno', distritoId: norte.id })
+    await servicio.crearGrupo({ numero: 2, nombre: 'Dos', distritoId: norte.id })
+    await servicio.crearGrupo({ numero: 3, nombre: 'Tres', distritoId: sur.id })
+
+    const arbol = await servicio.listarDistritos(alcanceDe([suyo.id]))
+
+    expect(arbol).toHaveLength(2)
+    expect(arbol.flatMap((distrito) => distrito.grupos).map((grupo) => grupo.numero)).toEqual([
+      1, 2, 3,
+    ])
+  })
+
+  test('un grupo cerrado sigue sin aparecer', async () => {
+    // El filtro que sí queda es el de vigencia, no el de alcance.
+    const servicio = montar()
+    const norte = await servicio.crearDistrito({ numero: 1, zona: 'Norte' })
+    const abierto = await servicio.crearGrupo({ numero: 1, nombre: 'Uno', distritoId: norte.id })
+    const cerrado = await servicio.crearGrupo({ numero: 2, nombre: 'Dos', distritoId: norte.id })
+    await servicio.cerrarGrupo(cerrado.id)
+
+    const arbol = await servicio.listarDistritos(alcanceDe([]))
+    expect(arbol[0]?.grupos.map((grupo) => grupo.id)).toEqual([abierto.id])
   })
 })

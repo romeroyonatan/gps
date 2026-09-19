@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./graphql": "./src/builder.ts",
-    "./fechas": "./src/fechas.ts"
+    "./fechas": "./src/fechas.ts",
+    "./roles": "./src/roles.ts"
   },
   "scripts": {
     "compile": "tsc --noEmit"

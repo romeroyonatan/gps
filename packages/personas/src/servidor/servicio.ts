@@ -1,13 +1,33 @@
-import type { Core } from '@gps/core'
+import type { Actor, Alcance, Core, RolConAmbito } from '@gps/core'
+import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Estructura } from '@gps/estructura/dominio'
-import { and, eq, gte, isNull, lte, or } from 'drizzle-orm'
+import { and, eq, gte, inArray, isNull, lte, or } from 'drizzle-orm'
 import { ambitoDelCargo, nombreDelCargo, type TipoDeCargo } from '../dominio/cargos'
 import { nombreDelTipo, normalizarNumero, type TipoDeDocumento } from '../dominio/documentos'
+import type { IntegranteDeEquipo, TipoDeEquipo } from '../dominio/equipos'
 import type { DatosDePersona } from '../dominio/modelos'
+import {
+  puedeAdministrarEquiposDiocesanos,
+  puedeAdministrarPlantelDeGrupo,
+  puedeVerPersonasDelGrupo,
+} from '../dominio/politicas'
 import type { Personas } from '../dominio/publico'
 import { type Problema, validarIngreso, validarPersona } from '../dominio/validaciones'
-import type { Cargo, DatosDeIngreso, PersonaConVinculos, Pertenencia } from '../dominio/vinculos'
-import { personas, pertenencias, cargos as tablaDeCargos } from './tablas'
+import type {
+  Cargo,
+  DatosDeIngreso,
+  JefeDeGrupo,
+  PersonaConVinculos,
+  Pertenencia,
+} from '../dominio/vinculos'
+import {
+  equipos,
+  eventosDeAutoridad,
+  integrantesDeEquipo,
+  personas,
+  pertenencias,
+  cargos as tablaDeCargos,
+} from './tablas'
 
 /** Los datos del alta no pasan las reglas de /dominio. Lleva los problemas
  *  adentro para que el resolver los pueda publicar campo por campo. */
@@ -48,23 +68,65 @@ export class CargoInvalido extends Error {
   }
 }
 
+export class CambioDeAutoridadDenegado extends Error {
+  constructor() {
+    super('No podés administrar autoridades de ese ámbito.')
+    this.name = 'CambioDeAutoridadDenegado'
+  }
+}
+
 /** Lo que este modulo hace, que es mas que lo que publica: ver Personas en
  *  /dominio/publico.ts. `extends` es lo que hace que la implementacion no pueda
  *  quedar corta sin que TypeScript se entere. */
+export interface DatosDeAsignacionDeCargo {
+  readonly personaId: string
+  readonly cargo: TipoDeCargo
+  readonly ambitoId: string | null
+  readonly desde: string
+  readonly hasta?: string | null
+}
+
 export interface ServicioDePersonas extends Personas {
-  crearPersona(datos: DatosDePersona, ingreso: DatosDeIngreso): Promise<PersonaConVinculos>
+  crearPersona(
+    alcance: Alcance,
+    datos: DatosDePersona,
+    ingreso: DatosDeIngreso,
+  ): Promise<PersonaConVinculos>
   /** Las personas con pertenencia vigente en ese grupo, ordenadas por apellido. */
-  listarPersonas(grupoId: string): Promise<readonly PersonaConVinculos[]>
+  listarPersonas(alcance: Alcance, grupoId: string): Promise<readonly PersonaConVinculos[]>
+
+  /** Quién conduce cada grupo hoy. Es el directorio de la asociación —el
+   *  complemento del árbol de distritos— y por eso no se filtra por alcance:
+   *  saber quién es el jefe del grupo 7 no dice nada de la gente del grupo 7.
+   *  Sus datos, su cuenta y sus salidas siguen yendo por alcance.
+   *
+   *  Una consulta suelta y no un campo de `Grupo` porque la flecha va en esta
+   *  dirección: `personas` conoce a `estructura`, no al revés. Mismo motivo
+   *  que `afiliadosEn`. */
+  jefesDeGrupos(
+    alcance: Alcance,
+    grupoIds: readonly string[],
+    fecha: string,
+  ): Promise<readonly JefeDeGrupo[]>
 
   /** Le da a una persona un cargo en la entidad que corresponde a su ambito:
    *  un grupo, un distrito, o ninguna si es de la diocesis. */
-  asignarCargo(datos: {
-    personaId: string
-    cargo: TipoDeCargo
-    ambitoId: string | null
-    desde: string
-    hasta?: string | null
-  }): Promise<Cargo>
+  asignarCargo(datos: DatosDeAsignacionDeCargo): Promise<Cargo>
+  asignarCargoComo(actor: Actor, datos: DatosDeAsignacionDeCargo): Promise<Cargo>
+  revocarCargo(actor: Actor, cargoId: string): Promise<void>
+
+  integrarEquipo(
+    actor: Actor,
+    datos: {
+      personaId: string
+      tipo: TipoDeEquipo
+      ambitoTipo: 'grupo' | 'diocesis'
+      ambitoId: string | null
+      desde: string
+      hasta?: string | null
+    },
+  ): Promise<IntegranteDeEquipo>
+  revocarIntegranteDeEquipo(actor: Actor, integranteId: string): Promise<void>
 }
 
 /** El orden alfabetico lo hace Intl y no un ORDER BY: SQLite compara bytes, asi
@@ -76,6 +138,22 @@ export interface ServicioDePersonas extends Personas {
  *  de sobra, y si algun dia deja de alcanzar se arregla en un solo lugar. */
 const alfabeto = new Intl.Collator('es')
 
+function rolDelCargo(cargo: TipoDeCargo, ambitoId: string | null): RolConAmbito | null {
+  if (cargo === 'jefeDeGrupo' || cargo === 'director') {
+    return {
+      rol: cargo === 'director' ? 'directorDeGrupo' : cargo,
+      ambito: { tipo: 'grupo', id: ambitoId },
+    }
+  }
+  if (cargo === 'comisionadoDeDistrito') {
+    return { rol: cargo, ambito: { tipo: 'distrito', id: ambitoId } }
+  }
+  if (cargo === 'jefeScoutDiocesano') {
+    return { rol: cargo, ambito: { tipo: 'diocesis', id: null } }
+  }
+  return null
+}
+
 /** Los metodos devuelven Promise aunque el driver de SQLite sea sincrono: es la
  *  costura que deja pasar a Postgres o a un driver asincrono en el telefono sin
  *  tocar a ningun consumidor.
@@ -86,8 +164,294 @@ const alfabeto = new Intl.Collator('es')
  *  saber si hay un request encima, que es lo que le permite correr dentro del
  *  telefono. */
 export function crearServicioDePersonas(core: Core, estructura: Estructura): ServicioDePersonas {
-  return {
-    async crearPersona(datos, ingreso) {
+  async function validarAsignacionDeCargo(datos: DatosDeAsignacionDeCargo): Promise<void> {
+    // Que la entidad exista y siga abierta lo verifica estructura, no una
+    // foreign key: sus tablas son de otro modulo. Es la misma perdida
+    // consciente que grupo_id en pertenencias.
+    const ambito = ambitoDelCargo(datos.cargo)
+    const nombre = nombreDelCargo(datos.cargo)
+    if (ambito === 'diocesis') {
+      if (datos.ambitoId !== null) {
+        throw new CargoInvalido(`${nombre} es de la diocesis: no apunta a ninguna entidad.`)
+      }
+    } else if (datos.ambitoId === null) {
+      throw new CargoInvalido(`${nombre} necesita el ${ambito} al que corresponde.`)
+    } else if (ambito === 'grupo') {
+      if (!(await estructura.obtenerGrupo(datos.ambitoId))) {
+        throw new CargoInvalido(`${nombre}: el grupo no existe o esta cerrado.`)
+      }
+    } else if (!(await estructura.distritoEstaAbierto(datos.ambitoId))) {
+      throw new CargoInvalido(`${nombre}: el distrito no existe o esta cerrado.`)
+    }
+
+    // El UNIQUE de la tabla ataja el duplicado exacto salvo cuando ambito_id
+    // es NULL: SQLite trata dos NULL como distintos. Por eso el de la
+    // diocesis se verifica aca, que es el unico caso que la base deja pasar.
+    if (ambito === 'diocesis') {
+      const yaEsta = core.bd
+        .select({ id: tablaDeCargos.id })
+        .from(tablaDeCargos)
+        .where(
+          and(
+            eq(tablaDeCargos.personaId, datos.personaId),
+            eq(tablaDeCargos.cargo, datos.cargo),
+            isNull(tablaDeCargos.ambitoId),
+            eq(tablaDeCargos.desde, datos.desde),
+          ),
+        )
+        .get()
+      if (yaEsta) throw new CargoInvalido(`${nombre} ya esta cargado con esa fecha.`)
+    }
+  }
+
+  function construirCargo(datos: DatosDeAsignacionDeCargo): Cargo {
+    const ahora = core.reloj.ahora()
+    return {
+      id: core.nuevoId('cargo'),
+      personaId: datos.personaId,
+      ambitoId: datos.ambitoId,
+      cargo: datos.cargo,
+      desde: datos.desde,
+      hasta: datos.hasta ?? null,
+      revocadoEn: null,
+      creadoEn: ahora,
+      actualizadoEn: ahora,
+    }
+  }
+
+  const servicio: ServicioDePersonas = {
+    async personaExiste(personaId) {
+      return (
+        core.bd
+          .select({ id: personas.id })
+          .from(personas)
+          .where(eq(personas.id, personaId))
+          .get() !== undefined
+      )
+    },
+
+    async nombreDe(personaId) {
+      return (
+        core.bd
+          .select({ nombres: personas.nombres, apellidos: personas.apellidos })
+          .from(personas)
+          .where(eq(personas.id, personaId))
+          .get() ?? null
+      )
+    },
+
+    async grupoVigenteDe(personaId, fecha) {
+      return (
+        core.bd
+          .select({ grupoId: pertenencias.grupoId })
+          .from(pertenencias)
+          .where(
+            and(
+              eq(pertenencias.personaId, personaId),
+              lte(pertenencias.desde, fecha),
+              or(isNull(pertenencias.hasta), gte(pertenencias.hasta, fecha)),
+            ),
+          )
+          .get()?.grupoId ?? null
+      )
+    },
+
+    async funcionesVigentes(personaId, fecha) {
+      const resultado: RolConAmbito[] = []
+      const pertenencia = core.bd
+        .select({ grupoId: pertenencias.grupoId, categoria: pertenencias.categoria })
+        .from(pertenencias)
+        .where(
+          and(
+            eq(pertenencias.personaId, personaId),
+            lte(pertenencias.desde, fecha),
+            or(isNull(pertenencias.hasta), gte(pertenencias.hasta, fecha)),
+          ),
+        )
+        .get()
+      if (pertenencia?.categoria === 'activo') {
+        resultado.push({
+          rol: 'dirigente',
+          ambito: { tipo: 'grupo', id: pertenencia.grupoId },
+        })
+      }
+
+      const filasDeCargos = core.bd
+        .select({ cargo: tablaDeCargos.cargo, ambitoId: tablaDeCargos.ambitoId })
+        .from(tablaDeCargos)
+        .where(
+          and(
+            eq(tablaDeCargos.personaId, personaId),
+            isNull(tablaDeCargos.revocadoEn),
+            lte(tablaDeCargos.desde, fecha),
+            or(isNull(tablaDeCargos.hasta), gte(tablaDeCargos.hasta, fecha)),
+          ),
+        )
+        .all()
+      for (const fila of filasDeCargos) {
+        const funcion = rolDelCargo(fila.cargo, fila.ambitoId)
+        if (funcion) resultado.push(funcion)
+      }
+
+      const filasDeEquipos = core.bd
+        .select({ tipo: equipos.tipo, ambitoTipo: equipos.ambitoTipo, ambitoId: equipos.ambitoId })
+        .from(integrantesDeEquipo)
+        .innerJoin(equipos, eq(equipos.id, integrantesDeEquipo.equipoId))
+        .where(
+          and(
+            eq(integrantesDeEquipo.personaId, personaId),
+            isNull(integrantesDeEquipo.revocadoEn),
+            lte(integrantesDeEquipo.desde, fecha),
+            or(isNull(integrantesDeEquipo.hasta), gte(integrantesDeEquipo.hasta, fecha)),
+          ),
+        )
+        .all()
+      for (const fila of filasDeEquipos) {
+        resultado.push({
+          rol: fila.tipo === 'secretaria' ? 'secretariaDeGrupo' : fila.tipo,
+          ambito: {
+            tipo: fila.ambitoTipo,
+            id: fila.ambitoId,
+          },
+        })
+      }
+
+      return resultado
+    },
+
+    async integrarEquipo(actor, datos) {
+      const esSecretaria = datos.tipo === 'secretaria'
+      const ambitoValido = esSecretaria
+        ? datos.ambitoTipo === 'grupo' && datos.ambitoId !== null
+        : datos.ambitoTipo === 'diocesis' && datos.ambitoId === null
+      const autorizado = esSecretaria
+        ? datos.ambitoId !== null && puedeAdministrarPlantelDeGrupo(actor, datos.ambitoId)
+        : puedeAdministrarEquiposDiocesanos(actor)
+      if (!ambitoValido || !autorizado) throw new CambioDeAutoridadDenegado()
+
+      const persona = core.bd
+        .select({ id: personas.id })
+        .from(personas)
+        .where(eq(personas.id, datos.personaId))
+        .get()
+      if (!persona) throw new CambioDeAutoridadDenegado()
+
+      if (esSecretaria) {
+        const hoy = aFechaDeCalendario(core.reloj.ahora())
+        const pertenece = core.bd
+          .select({ id: pertenencias.id })
+          .from(pertenencias)
+          .where(
+            and(
+              eq(pertenencias.personaId, datos.personaId),
+              eq(pertenencias.grupoId, datos.ambitoId as string),
+              lte(pertenencias.desde, hoy),
+              or(isNull(pertenencias.hasta), gte(pertenencias.hasta, hoy)),
+            ),
+          )
+          .get()
+        if (!pertenece) throw new CambioDeAutoridadDenegado()
+      }
+
+      const ahora = core.reloj.ahora()
+      const equipo = core.bd
+        .select({ id: equipos.id })
+        .from(equipos)
+        .where(
+          and(
+            eq(equipos.tipo, datos.tipo),
+            eq(equipos.ambitoTipo, datos.ambitoTipo),
+            datos.ambitoId === null
+              ? isNull(equipos.ambitoId)
+              : eq(equipos.ambitoId, datos.ambitoId),
+          ),
+        )
+        .get()
+      const equipoId = equipo?.id ?? core.nuevoId('equipo')
+
+      const integrante: IntegranteDeEquipo = {
+        id: core.nuevoId('integrante_de_equipo'),
+        equipoId,
+        personaId: datos.personaId,
+        desde: datos.desde,
+        hasta: datos.hasta ?? null,
+        revocadoEn: null,
+        creadoEn: ahora,
+        actualizadoEn: ahora,
+      }
+
+      core.bd.transaction((tx) => {
+        if (!equipo) {
+          tx.insert(equipos)
+            .values({
+              id: equipoId,
+              tipo: datos.tipo,
+              ambitoTipo: datos.ambitoTipo,
+              ambitoId: datos.ambitoId,
+              creadoEn: ahora,
+              actualizadoEn: ahora,
+            })
+            .run()
+        }
+        tx.insert(integrantesDeEquipo).values(integrante).run()
+        tx.insert(eventosDeAutoridad)
+          .values({
+            id: core.nuevoId('evento_de_autoridad'),
+            tipo: `equipo.${datos.tipo}.integrar`,
+            actorPersonaId: actor.personaId,
+            objetivoPersonaId: datos.personaId,
+            ambitoTipo: datos.ambitoTipo,
+            ambitoId: datos.ambitoId,
+            creadoEn: ahora,
+          })
+          .run()
+      })
+      return integrante
+    },
+
+    async revocarIntegranteDeEquipo(actor, integranteId) {
+      const fila = core.bd
+        .select({
+          personaId: integrantesDeEquipo.personaId,
+          tipo: equipos.tipo,
+          ambitoTipo: equipos.ambitoTipo,
+          ambitoId: equipos.ambitoId,
+        })
+        .from(integrantesDeEquipo)
+        .innerJoin(equipos, eq(equipos.id, integrantesDeEquipo.equipoId))
+        .where(eq(integrantesDeEquipo.id, integranteId))
+        .get()
+      if (!fila) return
+      const autorizado =
+        fila.ambitoTipo === 'grupo' && fila.ambitoId !== null
+          ? puedeAdministrarPlantelDeGrupo(actor, fila.ambitoId)
+          : puedeAdministrarEquiposDiocesanos(actor)
+      if (!autorizado) throw new CambioDeAutoridadDenegado()
+
+      const ahora = core.reloj.ahora()
+      core.bd.transaction((tx) => {
+        tx.update(integrantesDeEquipo)
+          .set({ revocadoEn: ahora, actualizadoEn: ahora })
+          .where(eq(integrantesDeEquipo.id, integranteId))
+          .run()
+        tx.insert(eventosDeAutoridad)
+          .values({
+            id: core.nuevoId('evento_de_autoridad'),
+            tipo: `equipo.${fila.tipo}.revocar`,
+            actorPersonaId: actor.personaId,
+            objetivoPersonaId: fila.personaId,
+            ambitoTipo: fila.ambitoTipo,
+            ambitoId: fila.ambitoId,
+            creadoEn: ahora,
+          })
+          .run()
+      })
+    },
+
+    async crearPersona(alcance, datos, ingreso) {
+      if (!puedeAdministrarPlantelDeGrupo(alcance.actor, ingreso.grupoId)) {
+        throw new CambioDeAutoridadDenegado()
+      }
       // Primero el grupo: sin el no se pueden validar ni la unidad ni la
       // existencia del destino, y no tiene sentido validar lo demas.
       const grupo = await estructura.obtenerGrupo(ingreso.grupoId)
@@ -149,6 +513,7 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
         // pedir la misma fecha una vez por cargo no le sirve a nadie.
         desde: ingreso.desde,
         hasta: datosDelCargo.hasta,
+        revocadoEn: null,
         creadoEn: ahora,
         actualizadoEn: ahora,
       }))
@@ -163,7 +528,8 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
         }
       })
 
-      return { ...persona, pertenencia, cargos: cargosDeLaPersona }
+      // Recién creada: todavía no integra ningún equipo.
+      return { ...persona, pertenencia, cargos: cargosDeLaPersona, equipos: [] }
     },
 
     async miembrosDelGrupo(grupoId, fecha) {
@@ -204,6 +570,7 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
               : eq(tablaDeCargos.ambitoId, ambitoId),
             lte(tablaDeCargos.desde, fecha),
             or(isNull(tablaDeCargos.hasta), gte(tablaDeCargos.hasta, fecha)),
+            isNull(tablaDeCargos.revocadoEn),
           ),
         )
         .orderBy(tablaDeCargos.desde)
@@ -212,60 +579,106 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
     },
 
     async asignarCargo(datos) {
-      // Que la entidad exista y siga abierta lo verifica estructura, no una
-      // foreign key: sus tablas son de otro modulo. Es la misma perdida
-      // consciente que grupo_id en pertenencias.
-      const ambito = ambitoDelCargo(datos.cargo)
-      const nombre = nombreDelCargo(datos.cargo)
-      if (ambito === 'diocesis') {
-        if (datos.ambitoId !== null) {
-          throw new CargoInvalido(`${nombre} es de la diocesis: no apunta a ninguna entidad.`)
-        }
-      } else if (datos.ambitoId === null) {
-        throw new CargoInvalido(`${nombre} necesita el ${ambito} al que corresponde.`)
-      } else if (ambito === 'grupo') {
-        if (!(await estructura.obtenerGrupo(datos.ambitoId))) {
-          throw new CargoInvalido(`${nombre}: el grupo no existe o esta cerrado.`)
-        }
-      } else if (!(await estructura.distritoEstaAbierto(datos.ambitoId))) {
-        throw new CargoInvalido(`${nombre}: el distrito no existe o esta cerrado.`)
-      }
-
-      // El UNIQUE de la tabla ataja el duplicado exacto salvo cuando ambito_id
-      // es NULL: SQLite trata dos NULL como distintos. Por eso el de la
-      // diocesis se verifica aca, que es el unico caso que la base deja pasar.
-      if (ambito === 'diocesis') {
-        const yaEsta = core.bd
-          .select({ id: tablaDeCargos.id })
-          .from(tablaDeCargos)
-          .where(
-            and(
-              eq(tablaDeCargos.personaId, datos.personaId),
-              eq(tablaDeCargos.cargo, datos.cargo),
-              isNull(tablaDeCargos.ambitoId),
-              eq(tablaDeCargos.desde, datos.desde),
-            ),
-          )
-          .get()
-        if (yaEsta) throw new CargoInvalido(`${nombre} ya esta cargado con esa fecha.`)
-      }
-
-      const ahora = core.reloj.ahora()
-      const cargo: Cargo = {
-        id: core.nuevoId('cargo'),
-        personaId: datos.personaId,
-        ambitoId: datos.ambitoId,
-        cargo: datos.cargo,
-        desde: datos.desde,
-        hasta: datos.hasta ?? null,
-        creadoEn: ahora,
-        actualizadoEn: ahora,
-      }
+      await validarAsignacionDeCargo(datos)
+      const cargo = construirCargo(datos)
       core.bd.insert(tablaDeCargos).values(cargo).run()
       return cargo
     },
 
-    async listarPersonas(grupoId) {
+    async asignarCargoComo(actor, datos) {
+      const ambito = ambitoDelCargo(datos.cargo)
+      const autorizado =
+        ambito === 'grupo' && datos.ambitoId !== null
+          ? puedeAdministrarPlantelDeGrupo(actor, datos.ambitoId)
+          : puedeAdministrarEquiposDiocesanos(actor)
+      if (!autorizado) throw new CambioDeAutoridadDenegado()
+
+      // La validacion es async -consulta estructura-, asi que corre antes de
+      // la transaccion: adentro de una transaccion de better-sqlite3 solo hay
+      // lugar para trabajo sincrono.
+      await validarAsignacionDeCargo(datos)
+      const cargo = construirCargo(datos)
+      core.bd.transaction((tx) => {
+        tx.insert(tablaDeCargos).values(cargo).run()
+        tx.insert(eventosDeAutoridad)
+          .values({
+            id: core.nuevoId('evento_de_autoridad'),
+            tipo: `cargo.${datos.cargo}.asignar`,
+            actorPersonaId: actor.personaId,
+            objetivoPersonaId: datos.personaId,
+            ambitoTipo: ambito,
+            ambitoId: datos.ambitoId,
+            creadoEn: cargo.creadoEn,
+          })
+          .run()
+      })
+      return cargo
+    },
+
+    async revocarCargo(actor, cargoId) {
+      const fila = core.bd
+        .select({
+          personaId: tablaDeCargos.personaId,
+          ambitoId: tablaDeCargos.ambitoId,
+          cargo: tablaDeCargos.cargo,
+        })
+        .from(tablaDeCargos)
+        .where(eq(tablaDeCargos.id, cargoId))
+        .get()
+      if (!fila) return
+      const ambito = ambitoDelCargo(fila.cargo)
+      const autorizado =
+        ambito === 'grupo' && fila.ambitoId !== null
+          ? puedeAdministrarPlantelDeGrupo(actor, fila.ambitoId)
+          : puedeAdministrarEquiposDiocesanos(actor)
+      if (!autorizado) throw new CambioDeAutoridadDenegado()
+
+      const ahora = core.reloj.ahora()
+      core.bd.transaction((tx) => {
+        tx.update(tablaDeCargos)
+          .set({ revocadoEn: ahora, actualizadoEn: ahora })
+          .where(eq(tablaDeCargos.id, cargoId))
+          .run()
+        tx.insert(eventosDeAutoridad)
+          .values({
+            id: core.nuevoId('evento_de_autoridad'),
+            tipo: `cargo.${fila.cargo}.revocar`,
+            actorPersonaId: actor.personaId,
+            objetivoPersonaId: fila.personaId,
+            ambitoTipo: ambito,
+            ambitoId: fila.ambitoId,
+            creadoEn: ahora,
+          })
+          .run()
+      })
+    },
+
+    async jefesDeGrupos(_alcance, grupoIds, fecha) {
+      if (grupoIds.length === 0) return []
+      return core.bd
+        .select({
+          grupoId: tablaDeCargos.ambitoId,
+          personaId: personas.id,
+          nombres: personas.nombres,
+          apellidos: personas.apellidos,
+        })
+        .from(tablaDeCargos)
+        .innerJoin(personas, eq(personas.id, tablaDeCargos.personaId))
+        .where(
+          and(
+            eq(tablaDeCargos.cargo, 'jefeDeGrupo'),
+            inArray(tablaDeCargos.ambitoId, [...grupoIds]),
+            isNull(tablaDeCargos.revocadoEn),
+            lte(tablaDeCargos.desde, fecha),
+            or(isNull(tablaDeCargos.hasta), gte(tablaDeCargos.hasta, fecha)),
+          ),
+        )
+        .all()
+        .flatMap((fila) => (fila.grupoId === null ? [] : [{ ...fila, grupoId: fila.grupoId }]))
+    },
+
+    async listarPersonas(alcance, grupoId) {
+      if (!puedeVerPersonasDelGrupo(alcance, grupoId)) return []
       // Dos consultas y el armado en memoria, el mismo criterio que
       // listarDistritos: con la cantidad de personas de un grupo alcanza de
       // sobra, y si algun dia deja de alcanzar se arregla en un solo lugar.
@@ -282,6 +695,15 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
         .where(eq(tablaDeCargos.ambitoId, grupoId))
         .all()
 
+      // Los equipos de ese grupo -hoy sólo Secretaría- más los diocesanos de
+      // su gente: los dos son plantel para quien mira la pantalla.
+      const filasDeEquipos = core.bd
+        .select({ integrante: integrantesDeEquipo })
+        .from(integrantesDeEquipo)
+        .innerJoin(equipos, eq(equipos.id, integrantesDeEquipo.equipoId))
+        .where(isNull(integrantesDeEquipo.revocadoEn))
+        .all()
+
       const cargosPorPersona = new Map<string, Cargo[]>()
       for (const cargo of filasDeCargos) {
         const suyos = cargosPorPersona.get(cargo.personaId) ?? []
@@ -289,11 +711,19 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
         cargosPorPersona.set(cargo.personaId, suyos)
       }
 
+      const equiposPorPersona = new Map<string, IntegranteDeEquipo[]>()
+      for (const { integrante } of filasDeEquipos) {
+        const suyos = equiposPorPersona.get(integrante.personaId) ?? []
+        suyos.push(integrante)
+        equiposPorPersona.set(integrante.personaId, suyos)
+      }
+
       return filas
         .map((fila) => ({
           ...fila.personas,
           pertenencia: fila.pertenencias,
           cargos: cargosPorPersona.get(fila.personas.id) ?? [],
+          equipos: equiposPorPersona.get(fila.personas.id) ?? [],
         }))
         .sort(
           (una, otra) =>
@@ -326,4 +756,5 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
       }))
     },
   }
+  return servicio
 }

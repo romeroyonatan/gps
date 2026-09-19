@@ -1,3 +1,4 @@
+import type { RolConAmbito } from '@gps/core'
 import type { TipoDeCargo } from './cargos'
 import type { Categoria } from './categorias'
 import type { Persona } from './modelos'
@@ -30,6 +31,22 @@ export interface MiembroDelGrupo {
  *  Vive en /dominio y no en /servidor porque /servidor es privado: son tipos
  *  puros, sin estado, que cualquiera puede leer. */
 export interface Personas {
+  /** Si el id pertenece a una Persona existente. Autenticación lo usa antes de
+   *  vincular una identidad externa. */
+  personaExiste(personaId: string): Promise<boolean>
+
+  /** Nombre y apellido, para mostrar de quién es algo. Sólo eso: el documento
+   *  y la fecha de nacimiento no salen de personas sin una razón. Lo usa el
+   *  enlace de invitación, que muestra a quién le da acceso antes de que
+   *  alguien lo confirme. */
+  nombreDe(personaId: string): Promise<{ nombres: string; apellidos: string } | null>
+
+  /** El grupo al que pertenecía la persona ese día, o null. */
+  grupoVigenteDe(personaId: string, fecha: string): Promise<string | null>
+
+  /** Roles derivados de pertenencias, cargos y equipos vigentes. */
+  funcionesVigentes(personaId: string, fecha: string): Promise<readonly RolConAmbito[]>
+
   /** Las personas con pertenencia vigente el dia `fecha` (aaaa-mm-dd), de toda
    *  la asociacion, con el grupo al que pertenecian ese dia.
    *

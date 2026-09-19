@@ -1,4 +1,4 @@
-import type { Core } from '@gps/core'
+import type { Alcance, Core } from '@gps/core'
 import { and, eq, isNull } from 'drizzle-orm'
 import type {
   Distrito,
@@ -27,7 +27,17 @@ export interface ServicioDeEstructura extends Estructura {
   }): Promise<Unidad>
   cerrarUnidad(unidadId: string): Promise<void>
   cerrarGrupo(grupoId: string): Promise<void>
-  listarDistritos(): Promise<readonly DistritoConGrupos[]>
+  /** El arbol de la diocesis: distritos, grupos y unidades abiertas.
+   *
+   *  No se filtra por alcance, y es a proposito: es el directorio de la
+   *  asociacion -que distritos hay, que grupos hay- y saberlo no revela nada
+   *  de la gente de un grupo. Los datos de un grupo -sus personas, su cuenta,
+   *  sus salidas- si van por alcance, cada uno en su modulo.
+   *
+   *  Recibe `Alcance` igual porque lo inicia un usuario: la convencion vale
+   *  aunque hoy no filtre, y el dia que algo de esto se restrinja el parametro
+   *  ya esta donde tiene que estar. */
+  listarDistritos(alcance: Alcance): Promise<readonly DistritoConGrupos[]>
 }
 
 /** De menor a mayor edad y, dentro de una rama, por nombre: como las muestra
@@ -64,6 +74,59 @@ export class UnidadInvalida extends Error {
  *  telefono sin tocar a ningun consumidor. */
 export function crearServicioDeEstructura(core: Core): ServicioDeEstructura {
   return {
+    async expandirAlcance(actor) {
+      const todosLosDistritos = () =>
+        core.bd
+          .select({ id: distritos.id })
+          .from(distritos)
+          .where(isNull(distritos.cerradoEn))
+          .all()
+          .map(({ id }) => id)
+      const todosLosGrupos = () =>
+        core.bd
+          .select({ id: grupos.id })
+          .from(grupos)
+          .where(isNull(grupos.cerradoEn))
+          .all()
+          .map(({ id }) => id)
+
+      if (actor.estaElevado) {
+        return {
+          actor,
+          distritosVisibles: todosLosDistritos(),
+          gruposVisibles: todosLosGrupos(),
+          esAdministrador: true,
+        }
+      }
+
+      const distritosVisibles = new Set<string>()
+      const gruposVisibles = new Set<string>()
+      for (const { ambito } of actor.roles) {
+        if (ambito.tipo === 'grupo' && ambito.id) gruposVisibles.add(ambito.id)
+        if (ambito.tipo === 'distrito' && ambito.id) distritosVisibles.add(ambito.id)
+        if (ambito.tipo === 'diocesis') {
+          for (const id of todosLosDistritos()) distritosVisibles.add(id)
+          for (const id of todosLosGrupos()) gruposVisibles.add(id)
+        }
+      }
+      if (distritosVisibles.size > 0) {
+        const filas = core.bd
+          .select({ id: grupos.id, distritoId: grupos.distritoId })
+          .from(grupos)
+          .where(isNull(grupos.cerradoEn))
+          .all()
+        for (const grupo of filas) {
+          if (distritosVisibles.has(grupo.distritoId)) gruposVisibles.add(grupo.id)
+        }
+      }
+      return {
+        actor,
+        distritosVisibles: [...distritosVisibles],
+        gruposVisibles: [...gruposVisibles],
+        esAdministrador: false,
+      }
+    },
+
     async crearDistrito(datos) {
       const ahora = core.reloj.ahora()
       const distrito = {
@@ -159,7 +222,7 @@ export function crearServicioDeEstructura(core: Core): ServicioDeEstructura {
       return core.bd.select().from(grupos).orderBy(grupos.numero).all()
     },
 
-    async listarDistritos() {
+    async listarDistritos(_alcance) {
       // Tres consultas y el arbol se arma en memoria. Con la cantidad de
       // distritos y grupos de una diocesis alcanza de sobra; si algun dia deja
       // de alcanzar, se arregla aca y en ningun otro lado.

@@ -25,6 +25,24 @@ type Afiliado {
 }
 
 """
+Qué entidades alcanza quien pregunta, ya expandidas.
+"""
+type AlcanceDelPedido {
+  distritosVisibles: [ID!]!
+  esAdministrador: Boolean!
+  gruposVisibles: [ID!]!
+}
+
+"""
+Contra qué entidad apunta una función.
+"""
+enum AmbitoDeRol {
+  diocesis
+  distrito
+  grupo
+}
+
+"""
 Un cargo de una persona en su grupo, con su periodo.
 """
 type Cargo {
@@ -35,6 +53,7 @@ type Cargo {
   Vacía si no tiene fin previsto. Puede estar en el futuro: un mandato dura cuatro años.
   """
   hasta: String
+  id: ID!
 }
 
 """
@@ -138,6 +157,14 @@ type Emision {
 }
 
 """
+El enlace para compartir a mano. El secreto vuelve una única vez: el servidor sólo guarda su hash.
+"""
+type EnlaceDeInvitacion {
+  invitacionId: ID!
+  url: String!
+}
+
+"""
 Como esta una de las tres firmas de un permiso.
 """
 type EstadoDeFirma {
@@ -163,6 +190,16 @@ type EstadoDeFirma {
 }
 
 """
+Si el enlace sirve, y si no, por qué.
+"""
+enum EstadoDeInvitacion {
+  revocada
+  usada
+  valida
+  vencida
+}
+
+"""
 Por donde va un permiso de salida.
 """
 enum EstadoDePermiso {
@@ -170,6 +207,15 @@ enum EstadoDePermiso {
   borrador
   emitido
   firmado
+}
+
+"""
+Un cargo o equipo vigente, con el ámbito donde lo ejerce.
+"""
+type FuncionVigente {
+  ambitoId: ID
+  ambitoTipo: AmbitoDeRol!
+  rol: Rol!
 }
 
 """
@@ -184,6 +230,37 @@ type Grupo {
   De menor a mayor edad y, dentro de una rama, por nombre. Vacia si el grupo no abrio ninguna.
   """
   unidades: [Unidad!]!
+}
+
+"""
+La pertenencia de una persona a un equipo, con su periodo.
+"""
+type IntegranteDeEquipo {
+  desde: String!
+  equipoId: ID!
+  hasta: String
+  id: ID!
+}
+
+"""
+Lo que muestra un enlace de activación o recuperación antes de que alguien lo confirme. Un enlace que ya no sirve no dice de quién era.
+"""
+type Invitacion {
+  estado: EstadoDeInvitacion!
+  grupo: String
+  persona: String
+  proveedorAReemplazar: ProveedorDeIdentidad
+  tipo: TipoDeInvitacion
+}
+
+"""
+Quién conduce un grupo hoy, para el directorio de la asociación.
+"""
+type JefeDeGrupo {
+  apellidos: String!
+  grupoId: ID!
+  nombres: String!
+  personaId: ID!
 }
 
 """
@@ -215,6 +292,22 @@ type Mutation {
   agregarParticipante(permisoId: ID!, personaId: ID!): Permiso!
   anularPago(pagoId: ID!): MovimientoDeTesoreria!
   anularPermiso(permisoId: ID!): Permiso!
+
+  """
+  Nombra a alguien en un cargo de su grupo, su distrito o la diócesis.
+  """
+  asignarCargo(
+    ambitoId: ID
+    cargo: TipoDeCargo!
+    desde: String!
+    hasta: String
+    personaId: ID!
+  ): Cargo!
+
+  """
+  Revoca la sesión de este pedido. El cliente borra su secreto.
+  """
+  cerrarSesion: Boolean!
 
   """
   Ultimo paso: valida lo recibido y deja el archivo usable.
@@ -253,6 +346,25 @@ type Mutation {
   generarDeudasPendientes: ResultadoDeReconciliacion!
 
   """
+  Suma a alguien a Secretaría de su grupo o a un equipo diocesano.
+  """
+  integrarEquipo(
+    ambitoId: ID
+    desde: String!
+    personaId: ID!
+    tipo: TipoDeEquipo!
+  ): IntegranteDeEquipo!
+
+  """
+  Emite un enlace de activación o de recuperación para una persona del propio ámbito.
+  """
+  invitar(
+    personaId: ID!
+    proveedorAReemplazar: ProveedorDeIdentidad
+    tipo: TipoDeInvitacion!
+  ): EnlaceDeInvitacion!
+
+  """
   Saca un adjunto y borra su archivo. No toca las firmas.
   """
   quitarAdjuntoDePermiso(adjuntoId: ID!, permisoId: ID!): Permiso!
@@ -270,6 +382,21 @@ type Mutation {
     observacion: String
     referencia: String
   ): MovimientoDeTesoreria!
+
+  """
+  Saca a alguien de un cargo. El acceso se pierde en el pedido siguiente.
+  """
+  revocarCargo(cargoId: ID!): Boolean!
+
+  """
+  Saca a alguien de un equipo. El acceso se pierde en el pedido siguiente.
+  """
+  revocarIntegranteDeEquipo(integranteId: ID!): Boolean!
+
+  """
+  Anula un enlace que todavía no se consumió.
+  """
+  revocarInvitacion(invitacionId: ID!): Boolean!
 
   """
   Primer paso de una subida: reserva el archivo y dice por donde mandar los bytes.
@@ -340,6 +467,11 @@ type Persona {
   cargos: [Cargo!]!
 
   """
+  Los equipos que integra hoy. Secretaría no es un cargo: es esto.
+  """
+  equipos: [IntegranteDeEquipo!]!
+
+  """
   Fecha de calendario en formato aaaa-mm-dd, sin hora ni zona horaria.
   """
   fechaDeNacimiento: String!
@@ -348,6 +480,22 @@ type Persona {
   numeroDeDocumento: String!
   pertenencia: Pertenencia!
   tipoDeDocumento: TipoDeDocumento!
+}
+
+"""
+Quién está autenticado en este pedido.
+"""
+type PersonaAutenticada {
+  alcance: AlcanceDelPedido!
+
+  """
+  Hasta cuándo vale la elevación, en ISO. Null si no está elevada.
+  """
+  elevadaHasta: String
+  esAdministradorDesignado: Boolean!
+  estaElevado: Boolean!
+  personaId: ID!
+  roles: [FuncionVigente!]!
 }
 
 """
@@ -367,6 +515,15 @@ type Pertenencia {
   unidadId: ID
 }
 
+"""
+Con qué proveedor externo se autentica una identidad.
+"""
+enum ProveedorDeIdentidad {
+  apple
+  demo
+  google
+}
+
 type Query {
   """
   Los ids, de entre los preguntados, que ya tienen afiliación ese período.
@@ -379,20 +536,43 @@ type Query {
   Las declaraciones de un grupo, de la más reciente a la más vieja.
   """
   declaraciones(grupoId: ID!): [Declaracion!]!
-  deudasPendientes: ResumenDeDeudasPendientes!
+
+  """
+  Null si quien pregunta no es autoridad diocesana de Tesorería.
+  """
+  deudasPendientes: ResumenDeDeudasPendientes
 
   """
   El arbol de la diocesis: distritos, sus grupos y sus unidades.
   """
   distritos: [Distrito!]!
+
+  """
+  Mira un enlace sin consumirlo. No pide sesión: el secreto es la autorización, y quien lo tiene ya podría consumirlo.
+  """
+  invitacion(secreto: ID!): Invitacion!
+
+  """
+  Quiénes conducen esos grupos el día dado. No filtra por alcance: es el directorio de la asociación, no los datos de la gente de un grupo.
+  """
+  jefesDeGrupos(fecha: String!, grupoIds: [ID!]!): [JefeDeGrupo!]!
   movimientosDeTesoreria(grupoId: ID!): [MovimientoDeTesoreria!]!
-  periodosConfigurablesDeAfiliacion: [Int!]!
+
+  """
+  Null si quien pregunta no es autoridad diocesana de Tesorería.
+  """
+  periodosConfigurablesDeAfiliacion: [Int!]
   permiso(id: ID!): Permiso
 
   """
   Los permisos de un grupo, del más próximo al más viejo.
   """
   permisos(grupoId: ID!): [Permiso!]!
+
+  """
+  La persona de esta sesión, o null si el pedido es anónimo.
+  """
+  personaActual: PersonaAutenticada
 
   """
   Las personas de un grupo, ordenadas por apellido.
@@ -426,6 +606,21 @@ type ResultadoDeReconciliacion {
 type ResumenDeDeudasPendientes {
   cantidad: Int!
   periodosSinCuota: [Int!]!
+}
+
+"""
+La función que un cargo o un equipo vigente concede.
+"""
+enum Rol {
+  administracionDiocesana
+  autoridadDeDistrito
+  comisionadoDeDistrito
+  directorDeGrupo
+  dirigente
+  jefeDeGrupo
+  jefeScoutDiocesano
+  secretariaDeGrupo
+  tesoreriaDiocesana
 }
 
 """
@@ -472,6 +667,23 @@ Tipos de documento que la asociacion acepta.
 enum TipoDeDocumento {
   dni
   pasaporte
+}
+
+"""
+Los equipos funcionales que la autorización conoce.
+"""
+enum TipoDeEquipo {
+  administracionDiocesana
+  secretaria
+  tesoreriaDiocesana
+}
+
+"""
+Para qué es un enlace: activar el acceso, o recuperarlo.
+"""
+enum TipoDeInvitacion {
+  activacion
+  recuperacion
 }
 
 """

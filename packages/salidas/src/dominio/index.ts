@@ -23,4 +23,10 @@ export {
   validarDatos,
   validarParticipantes,
 } from './permisos'
+export {
+  accesoAlModulo,
+  puedeAdministrarPermisosDelGrupo,
+  puedeFirmarEnLaApp,
+  puedeVerPermisoDelGrupo,
+} from './politicas'
 export { deserializar, estaVacio, serializar, type Trazos } from './trazos'

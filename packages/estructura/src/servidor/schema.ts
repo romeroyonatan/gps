@@ -1,3 +1,4 @@
+import { alcanceDe } from '@gps/core'
 import { type Builder, enumCompartido } from '@gps/core/graphql'
 import type { DistritoConGrupos, GrupoConUnidades, Unidad } from '../dominio/modelos'
 import { RAMAS } from '../dominio/ramas'
@@ -67,7 +68,7 @@ export function registrarSchema(builder: Builder): void {
       type: [DistritoRef],
       description: 'El arbol de la diocesis: distritos, sus grupos y sus unidades.',
       resolve: async (_padre, _args, contexto) => [
-        ...(await contexto.estructura.listarDistritos()),
+        ...(await contexto.estructura.listarDistritos(alcanceDe(contexto))),
       ],
     }),
   )

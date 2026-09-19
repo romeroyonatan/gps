@@ -1,3 +1,4 @@
+import { alcanceDe } from '@gps/core'
 import { type Builder, enumCompartido } from '@gps/core/graphql'
 import { TIPOS_DE_DOCUMENTO } from '@gps/personas/dominio'
 import { GraphQLError } from 'graphql'
@@ -64,7 +65,10 @@ export function registrarSchema(builder: Builder): void {
       description: 'Las declaraciones de un grupo, de la más reciente a la más vieja.',
       args: { grupoId: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) => [
-        ...(await contexto.afiliacion.listarDeclaraciones(String(args.grupoId))),
+        ...(await contexto.afiliacion.listarDeclaracionesDelGrupo(
+          alcanceDe(contexto),
+          String(args.grupoId),
+        )),
       ],
     }),
   )
@@ -81,6 +85,7 @@ export function registrarSchema(builder: Builder): void {
       },
       resolve: async (_padre, args, contexto) => [
         ...(await contexto.afiliacion.afiliadosEn(
+          alcanceDe(contexto),
           args.periodo,
           args.personaIds.map((id) => String(id)),
         )),
@@ -95,7 +100,10 @@ export function registrarSchema(builder: Builder): void {
       args: { grupoId: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) => {
         try {
-          return await contexto.afiliacion.declararExtraordinaria(String(args.grupoId))
+          return await contexto.afiliacion.declararExtraordinaria(
+            alcanceDe(contexto),
+            String(args.grupoId),
+          )
         } catch (error) {
           // Yoga enmascara todo lo que no sea un GraphQLError: sin esta
           // traduccion, la pantalla recibe "Unexpected error." en vez del

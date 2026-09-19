@@ -1,7 +1,10 @@
-import { useDistritos, useVersion } from '@gps/api'
+import { useAlcance, useDistritos, useJefesDeGrupos, useVersion } from '@gps/api'
+import { aFechaDeCalendario } from '@gps/core/fechas'
 import { etiquetaDeEdades, ramaDelCatalogo, type Unidad } from '@gps/estructura/dominio'
+import { puedeVerPersonasDelGrupo } from '@gps/personas/dominio'
 import { Link } from 'expo-router'
 import { Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native'
+import { BarraDeSesion } from '../src/BarraDeSesion'
 
 /** El nombre propio y, en gris, el tramo de edad de su rama. Se muestra el
  *  nombre y no la rama porque es lo que distingue dos tropas del mismo grupo. */
@@ -21,24 +24,40 @@ function Grupo(props: {
   id: string
   numero: number
   nombre: string
+  jefes: readonly string[]
+  /** Si quien mira alcanza este grupo. El directorio los lista todos, pero el
+   *  detalle -su gente, su cuenta, sus salidas- es del ámbito de cada uno: un
+   *  grupo que no se va a poder abrir no se ofrece como enlace. */
+  seAbre: boolean
   unidades: readonly Pick<Unidad, 'id' | 'rama' | 'nombre'>[]
 }) {
+  const contenido = (
+    <>
+      <Text className={`text-sm font-medium ${props.seAbre ? 'text-slate-900' : 'text-slate-500'}`}>
+        <Text className="text-slate-400">Grupo Scout Nº{props.numero} -</Text> {props.nombre}
+      </Text>
+      {props.jefes.length > 0 && (
+        <Text className="mt-0.5 text-xs text-slate-500">{props.jefes.join(' · ')}</Text>
+      )}
+      {props.unidades.length === 0 ? (
+        <Text className="mt-1.5 text-xs text-slate-400">Todavía no abrió ninguna unidad</Text>
+      ) : (
+        <View className="mt-1.5 flex-row flex-wrap gap-1.5">
+          {props.unidades.map((unidad) => (
+            <EtiquetaDeUnidad key={unidad.id} unidad={unidad} />
+          ))}
+        </View>
+      )}
+    </>
+  )
+
+  if (!props.seAbre) {
+    return <View className="border-b border-slate-200 px-4 py-3">{contenido}</View>
+  }
+
   return (
     <Link href={`/grupos/${props.id}`} asChild>
-      <Pressable className="border-b border-slate-200 px-4 py-3">
-        <Text className="text-sm font-medium text-slate-900">
-          <Text className="text-slate-400">Grupo Scout Nº{props.numero} -</Text> {props.nombre}
-        </Text>
-        {props.unidades.length === 0 ? (
-          <Text className="mt-1.5 text-xs text-slate-400">Todavía no abrió ninguna unidad</Text>
-        ) : (
-          <View className="mt-1.5 flex-row flex-wrap gap-1.5">
-            {props.unidades.map((unidad) => (
-              <EtiquetaDeUnidad key={unidad.id} unidad={unidad} />
-            ))}
-          </View>
-        )}
-      </Pressable>
+      <Pressable className="border-b border-slate-200 px-4 py-3">{contenido}</Pressable>
     </Link>
   )
 }
@@ -47,11 +66,26 @@ export default function Pantalla() {
   const { data, isPending, error } = useDistritos()
   const version = useVersion()
 
+  // El árbol lo da `estructura` y los jefes `personas`: dos módulos, dos
+  // consultas, y la pantalla cruza por id.
+  const grupos = (data?.distritos ?? []).flatMap((distrito) =>
+    distrito.grupos.map((grupo) => grupo.id),
+  )
+  const jefes = useJefesDeGrupos(grupos, aFechaDeCalendario(new Date()))
+  const alcance = useAlcance()
+  const porGrupo = new Map<string, string[]>()
+  for (const jefe of jefes.data?.jefesDeGrupos ?? []) {
+    const suyos = porGrupo.get(jefe.grupoId) ?? []
+    suyos.push(`${jefe.nombres} ${jefe.apellidos}`)
+    porGrupo.set(jefe.grupoId, suyos)
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
       <ScrollView contentContainerClassName="px-4 py-10">
         <Text className="text-2xl font-semibold text-slate-900">GPS</Text>
         <Text className="mt-1 text-sm text-slate-500">Gestión para Scouts</Text>
+        <BarraDeSesion />
         <Link href="/tesoreria" className="mt-6 text-sm font-medium text-slate-700">
           Tesorería →
         </Link>
@@ -85,6 +119,8 @@ export default function Pantalla() {
                   id={grupo.id}
                   numero={grupo.numero}
                   nombre={grupo.nombre}
+                  jefes={porGrupo.get(grupo.id) ?? []}
+                  seAbre={alcance !== null && puedeVerPersonasDelGrupo(alcance, grupo.id)}
                   unidades={grupo.unidades}
                 />
               ))}

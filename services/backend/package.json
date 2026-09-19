@@ -8,11 +8,13 @@
     "demo": "ENTORNO=demo bun --watch src/index.ts",
     "start": "bun src/index.ts",
     "schema": "bun scripts/generar-schema.ts && bunx biome format --write ../../schema.gql",
+    "admin": "bun scripts/admin.ts",
     "compile": "tsc --noEmit"
   },
   "dependencies": {
     "@gps/afiliacion": "workspace:*",
     "@gps/archivos": "workspace:*",
+    "@gps/auth": "workspace:*",
     "@gps/core": "workspace:*",
     "@gps/demo": "workspace:*",
     "@gps/estructura": "workspace:*",

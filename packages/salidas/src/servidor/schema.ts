@@ -1,3 +1,4 @@
+import { alcanceDe, type Context } from '@gps/core'
 import { type Builder, enumCompartido } from '@gps/core/graphql'
 import { TIPOS_DE_CARGO, type TipoDeCargo } from '@gps/personas/dominio'
 import { GraphQLError } from 'graphql'
@@ -117,26 +118,26 @@ export function registrarSchema(builder: Builder): void {
         type: [ParticipanteRef],
         description: 'Los elegidos mientras es borrador.',
         resolve: async (permiso, _args, contexto) => [
-          ...(await contexto.salidas.listarParticipantes(permiso.id)),
+          ...(await contexto.salidas.listarParticipantes(alcanceDe(contexto), permiso.id)),
         ],
       }),
       emitidos: t.field({
         type: [EmitidoRef],
         description: 'Los que figuran en el papel, tal como estaban al emitirse.',
         resolve: async (permiso, _args, contexto) => [
-          ...(await contexto.salidas.listarParticipantesEmitidos(permiso.id)),
+          ...(await contexto.salidas.listarParticipantesEmitidos(alcanceDe(contexto), permiso.id)),
         ],
       }),
       firmas: t.field({
         type: [FirmaRef],
         resolve: async (permiso, _args, contexto) => [
-          ...(await contexto.salidas.estadoDeLasFirmas(permiso.id)),
+          ...(await contexto.salidas.estadoDeLasFirmas(alcanceDe(contexto), permiso.id)),
         ],
       }),
       adjuntos: t.field({
         type: [AdjuntoRef],
         resolve: async (permiso, _args, contexto) => [
-          ...(await contexto.salidas.listarAdjuntos(permiso.id)),
+          ...(await contexto.salidas.listarAdjuntos(alcanceDe(contexto), permiso.id)),
         ],
       }),
     }),
@@ -187,7 +188,7 @@ export function registrarSchema(builder: Builder): void {
       description: 'Los permisos de un grupo, del más próximo al más viejo.',
       args: { grupoId: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) => [
-        ...(await contexto.salidas.listarPermisos(String(args.grupoId))),
+        ...(await contexto.salidas.listarPermisos(alcanceDe(contexto), String(args.grupoId))),
       ],
     }),
   )
@@ -198,7 +199,9 @@ export function registrarSchema(builder: Builder): void {
       nullable: true,
       args: { id: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) =>
-        await traduciendoErrores(() => contexto.salidas.obtenerPermiso(String(args.id))),
+        await traduciendoErrores(() =>
+          contexto.salidas.obtenerPermiso(alcanceDe(contexto), String(args.id)),
+        ),
     }),
   )
 
@@ -214,7 +217,7 @@ export function registrarSchema(builder: Builder): void {
       },
       resolve: async (_padre, args, contexto) =>
         await traduciendoErrores(() =>
-          contexto.salidas.crearPermiso(String(args.grupoId), {
+          contexto.salidas.crearPermiso(alcanceDe(contexto), String(args.grupoId), {
             lugar: args.lugar,
             desde: args.desde,
             hasta: args.hasta,
@@ -234,7 +237,11 @@ export function registrarSchema(builder: Builder): void {
       resolve: async (_padre, args, contexto) => {
         const permisoId = String(args.permisoId)
         await traduciendoErrores(() =>
-          contexto.salidas.elegirUnidades(permisoId, args.unidadIds.map(String)),
+          contexto.salidas.elegirUnidades(
+            alcanceDe(contexto),
+            permisoId,
+            args.unidadIds.map(String),
+          ),
         )
         return await exigirPermiso(contexto, permisoId)
       },
@@ -251,7 +258,11 @@ export function registrarSchema(builder: Builder): void {
       resolve: async (_padre, args, contexto) => {
         const permisoId = String(args.permisoId)
         await traduciendoErrores(() =>
-          contexto.salidas.agregarParticipante(permisoId, String(args.personaId)),
+          contexto.salidas.agregarParticipante(
+            alcanceDe(contexto),
+            permisoId,
+            String(args.personaId),
+          ),
         )
         return await exigirPermiso(contexto, permisoId)
       },
@@ -268,7 +279,11 @@ export function registrarSchema(builder: Builder): void {
       resolve: async (_padre, args, contexto) => {
         const permisoId = String(args.permisoId)
         await traduciendoErrores(() =>
-          contexto.salidas.quitarParticipante(permisoId, String(args.personaId)),
+          contexto.salidas.quitarParticipante(
+            alcanceDe(contexto),
+            permisoId,
+            String(args.personaId),
+          ),
         )
         return await exigirPermiso(contexto, permisoId)
       },
@@ -280,7 +295,9 @@ export function registrarSchema(builder: Builder): void {
       type: EmisionRef,
       args: { permisoId: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) =>
-        await traduciendoErrores(() => contexto.salidas.emitir(String(args.permisoId))),
+        await traduciendoErrores(() =>
+          contexto.salidas.emitir(alcanceDe(contexto), String(args.permisoId)),
+        ),
     }),
   )
 
@@ -296,7 +313,7 @@ export function registrarSchema(builder: Builder): void {
       resolve: async (_padre, args, contexto) => {
         const permisoId = String(args.permisoId)
         await traduciendoErrores(() =>
-          contexto.salidas.firmarEnApp(permisoId, args.cargo as TipoDeCargo, {
+          contexto.salidas.firmarEnApp(alcanceDe(contexto), permisoId, args.cargo as TipoDeCargo, {
             trazos: JSON.parse(args.trazos),
           }),
         )
@@ -318,6 +335,7 @@ export function registrarSchema(builder: Builder): void {
         const permisoId = String(args.permisoId)
         await traduciendoErrores(() =>
           contexto.salidas.firmarEnPapel(
+            alcanceDe(contexto),
             permisoId,
             args.cargos as TipoDeCargo[],
             String(args.escaneoId),
@@ -333,7 +351,9 @@ export function registrarSchema(builder: Builder): void {
       type: PermisoRef,
       args: { permisoId: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) =>
-        await traduciendoErrores(() => contexto.salidas.anular(String(args.permisoId))),
+        await traduciendoErrores(() =>
+          contexto.salidas.anular(alcanceDe(contexto), String(args.permisoId)),
+        ),
     }),
   )
 
@@ -343,7 +363,9 @@ export function registrarSchema(builder: Builder): void {
       description: 'Crea un borrador nuevo con los datos de un permiso anulado.',
       args: { permisoId: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) =>
-        await traduciendoErrores(() => contexto.salidas.reEmitir(String(args.permisoId))),
+        await traduciendoErrores(() =>
+          contexto.salidas.reEmitir(alcanceDe(contexto), String(args.permisoId)),
+        ),
     }),
   )
 
@@ -358,7 +380,7 @@ export function registrarSchema(builder: Builder): void {
       resolve: async (_padre, args, contexto) => {
         const permisoId = String(args.permisoId)
         await traduciendoErrores(() =>
-          contexto.salidas.quitarAdjunto(permisoId, String(args.adjuntoId)),
+          contexto.salidas.quitarAdjunto(alcanceDe(contexto), permisoId, String(args.adjuntoId)),
         )
         return await exigirPermiso(contexto, permisoId)
       },
@@ -374,7 +396,9 @@ export function registrarSchema(builder: Builder): void {
       },
       resolve: async (_padre, args, contexto) => {
         const permisoId = String(args.permisoId)
-        await traduciendoErrores(() => contexto.salidas.adjuntar(permisoId, String(args.archivoId)))
+        await traduciendoErrores(() =>
+          contexto.salidas.adjuntar(alcanceDe(contexto), permisoId, String(args.archivoId)),
+        )
         return await exigirPermiso(contexto, permisoId)
       },
     }),
@@ -384,11 +408,8 @@ export function registrarSchema(builder: Builder): void {
 /** Las mutations devuelven el permiso releido: la pantalla necesita el estado
  *  nuevo y con esto no tiene que pedirlo aparte. Si no existe es un bug, no un
  *  caso: la operacion que acaba de correr lo tocaba. */
-async function exigirPermiso(
-  contexto: { salidas: { obtenerPermiso(id: string): Promise<Permiso | null> } },
-  permisoId: string,
-): Promise<Permiso> {
-  const permiso = await contexto.salidas.obtenerPermiso(permisoId)
+async function exigirPermiso(contexto: Context, permisoId: string): Promise<Permiso> {
+  const permiso = await contexto.salidas.obtenerPermiso(alcanceDe(contexto), permisoId)
   if (!permiso)
     throw new Error(`El permiso ${permisoId} desaparecio entre la operacion y la lectura.`)
   return permiso

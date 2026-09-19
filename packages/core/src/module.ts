@@ -1,3 +1,4 @@
+import type { AccesoAlModulo } from './autorizacion'
 import type { Builder } from './builder'
 import type { Core } from './core'
 import type { Migracion } from './migraciones'
@@ -13,6 +14,10 @@ import type { Migracion } from './migraciones'
  *  de nadie. */
 export interface Module<S = unknown, D = Record<never, never>> {
   readonly name: string
+  /** Capa 1 de la autorizacion: quien alcanza este modulo. Es obligatorio a
+   *  proposito -un modulo nuevo no compila sin decidirlo- para que ninguno
+   *  quede publicado por olvido. Vive en su /dominio/politicas.ts. */
+  readonly accesoAlModulo: AccesoAlModulo
   /** Nombres de otros modulos que este necesita. Ordenan el registro, se
    *  validan al arrancar, y su tipo son las claves de D: un nombre que no este
    *  en D no compila. */

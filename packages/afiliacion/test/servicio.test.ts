@@ -2,6 +2,8 @@ import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
 import type { Declaracion } from '@gps/afiliacion/dominio'
 import {
+  type Alcance,
+  alcanceSinLimites,
   aplicarMigraciones,
   type Bd,
   type Core,
@@ -15,6 +17,7 @@ import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migraciones } from '../src/servidor/migraciones'
 import {
   crearServicioDeAfiliacion,
+  DeclaracionDenegada,
   FechaInvalida,
   NadaQueDeclarar,
   type ServicioDeAfiliacion,
@@ -47,6 +50,18 @@ interface Miembro {
  *  constructor, asi que el test no necesita levantar el otro modulo. */
 function personasFalsas(miembros: readonly Miembro[]): Personas {
   return {
+    async personaExiste() {
+      throw new Error('afiliacion no deberia llamar a personaExiste')
+    },
+    async nombreDe() {
+      throw new Error('afiliacion no deberia llamar a nombreDe')
+    },
+    async grupoVigenteDe() {
+      throw new Error('afiliacion no deberia llamar a grupoVigenteDe')
+    },
+    async funcionesVigentes() {
+      throw new Error('afiliacion no deberia llamar a funcionesVigentes')
+    },
     // Mismo criterio que obtenerGrupo mas abajo: afiliacion no pregunta por
     // cargos, y si algun dia empieza a hacerlo el test tiene que enterarse.
     async ocupantesDelCargo() {
@@ -83,6 +98,9 @@ function estructuraFalsa(
   grupos: readonly { id: string; cerradoEn?: string }[] = [{ id: 'grupo_7' }],
 ): Estructura {
   return {
+    async expandirAlcance() {
+      throw new Error('afiliacion no deberia llamar a expandirAlcance')
+    },
     async obtenerGrupo() {
       throw new Error('afiliacion no deberia llamar a obtenerGrupo')
     },
@@ -117,7 +135,7 @@ function montar(
 
   let contador = 0
   const core: Core = {
-    config: { version: '0.0.0', entorno: 'prueba', puerto: 0 },
+    config: { version: '0.0.0', entorno: 'prueba', puerto: 0, auth: null },
     logger: { info: () => {}, error: (mensaje) => opciones.alError?.(mensaje) },
     reloj: opciones.reloj ?? { ahora: () => HORA },
     bd,
@@ -140,6 +158,7 @@ function montar(
     hash: (contenido: Uint8Array | string) =>
       `hash:${typeof contenido === 'string' ? contenido : contenido.join(',')}`,
     nuevoId: (prefijo) => `${prefijo}_${++contador}`,
+    nuevoSecreto: () => `secreto_${++contador}`,
   }
 
   const modulo: Module<object> = {
@@ -147,6 +166,7 @@ function montar(
     dependencies: [],
     migraciones,
     createServices: () => ({}),
+    accesoAlModulo: { porDefecto: 'denegado', permitidos: [] },
     registerSchema: () => {},
   }
   aplicarMigraciones(core, [modulo])
@@ -358,7 +378,7 @@ describe('declararExtraordinaria', () => {
       miembros: [JUAN, { ...PEDRO, grupoId: 'grupo_12', desde: '1969-03-01' }],
       grupos: [{ id: 'grupo_7' }, { id: 'grupo_12' }],
     })
-    const declaracion = await servicio.declararExtraordinaria('grupo_7')
+    const declaracion = await servicio.declararExtraordinaria(alcanceSinLimites(), 'grupo_7')
 
     expect(declaracion.grupoId).toBe('grupo_7')
     expect(declaracion.fecha).toBe('1971-06-01')
@@ -366,7 +386,9 @@ describe('declararExtraordinaria', () => {
 
   test('avisa si el grupo no tiene a nadie que declarar', async () => {
     const servicio = montar({ miembros: [] })
-    expect(servicio.declararExtraordinaria('grupo_7')).rejects.toThrow(NadaQueDeclarar)
+    expect(servicio.declararExtraordinaria(alcanceSinLimites(), 'grupo_7')).rejects.toThrow(
+      NadaQueDeclarar,
+    )
   })
 
   test('avisa si el grupo ya declaro hoy, en vez de tirar el error crudo de SQLite', async () => {
@@ -374,8 +396,10 @@ describe('declararExtraordinaria', () => {
     // Sin este error, el UNIQUE(fecha, grupo_id) sube como SQLiteError y la
     // pantalla dibuja "Unexpected error.".
     const servicio = montar({ miembros: ESCENARIO })
-    await servicio.declararExtraordinaria('grupo_7')
-    expect(servicio.declararExtraordinaria('grupo_7')).rejects.toThrow(YaDeclaroHoy)
+    await servicio.declararExtraordinaria(alcanceSinLimites(), 'grupo_7')
+    expect(servicio.declararExtraordinaria(alcanceSinLimites(), 'grupo_7')).rejects.toThrow(
+      YaDeclaroHoy,
+    )
   })
 
   test('tambien si el que declaro hoy fue el barrido', async () => {
@@ -386,7 +410,9 @@ describe('declararExtraordinaria', () => {
       miembros: ESCENARIO,
       reloj: { ahora: () => new Date('1969-05-01T12:00:00Z') },
     })
-    await expect(servicio.declararExtraordinaria('grupo_7')).rejects.toThrow(YaDeclaroHoy)
+    await expect(servicio.declararExtraordinaria(alcanceSinLimites(), 'grupo_7')).rejects.toThrow(
+      YaDeclaroHoy,
+    )
     expect((await servicio.listarDeclaraciones('grupo_7')).map((una) => una.fecha)).toEqual([
       '1969-05-01',
     ])
@@ -473,7 +499,7 @@ describe('listarACobrar', () => {
     const [mayo] = await servicio.declarar('1969-05-01')
     expect(nombresDe(await servicio.listarACobrar(mayo?.id ?? ''))).toEqual(['Juan'])
 
-    const extraordinaria = await servicio.declararExtraordinaria('grupo_7')
+    const extraordinaria = await servicio.declararExtraordinaria(alcanceSinLimites(), 'grupo_7')
     expect(nombresDe(await servicio.listarACobrar(extraordinaria.id))).toEqual(['Pedro', 'Rosario'])
   })
 
@@ -532,7 +558,7 @@ describe('afiliadosEn', () => {
     const servicio = montar({ miembros: ESCENARIO })
     await servicio.declarar('1969-05-01')
 
-    const afiliados = await servicio.afiliadosEn(1969, [
+    const afiliados = await servicio.afiliadosEn(alcanceSinLimites(), 1969, [
       'persona_juan',
       'persona_maria',
       'persona_pedro',
@@ -544,12 +570,14 @@ describe('afiliadosEn', () => {
   test('el periodo siguiente arranca vacio', async () => {
     const servicio = montar({ miembros: ESCENARIO })
     await servicio.declarar('1969-05-01')
-    expect(await servicio.afiliadosEn(1970, ['persona_juan'])).toEqual(new Set())
+    expect(await servicio.afiliadosEn(alcanceSinLimites(), 1970, ['persona_juan'])).toEqual(
+      new Set(),
+    )
   })
 
   test('sin ids que preguntar no consulta la base', async () => {
     const servicio = montar({ miembros: ESCENARIO })
-    expect(await servicio.afiliadosEn(1969, [])).toEqual(new Set())
+    expect(await servicio.afiliadosEn(alcanceSinLimites(), 1969, [])).toEqual(new Set())
   })
 })
 
@@ -562,6 +590,18 @@ describe('declararPendientes', () => {
     })
     const nuevas = await servicio.declararPendientes()
     expect(nuevas.map((una) => una.fecha)).toEqual(['1969-05-01', '1969-11-01'])
+  })
+
+  test('cubre todos los grupos abiertos: es interno y no depende de ningun actor', async () => {
+    const servicio = montar({
+      miembros: [JUAN, { ...PEDRO, grupoId: 'grupo_12', desde: '1969-03-01' }],
+      grupos: [{ id: 'grupo_7' }, { id: 'grupo_12' }],
+      reloj: { ahora: () => new Date('1969-11-20T12:00:00Z') },
+    })
+    // Sin alcance y sin actor: el barrido no pasa por la autorizacion porque no
+    // lo inicia un usuario. Si alguna vez lo hiciera, dejaria grupos afuera.
+    const nuevas = await servicio.declararPendientes()
+    expect([...new Set(nuevas.map((una) => una.grupoId))].sort()).toEqual(['grupo_12', 'grupo_7'])
   })
 
   test('no declara las que todavia no llegaron', async () => {
@@ -624,7 +664,7 @@ describe('declararPendientes', () => {
       miembros: ESCENARIO,
       reloj: { ahora: () => new Date('1969-05-02T12:00:00Z') },
     })
-    const extraordinaria = await servicio.declararExtraordinaria('grupo_7')
+    const extraordinaria = await servicio.declararExtraordinaria(alcanceSinLimites(), 'grupo_7')
 
     expect(extraordinaria.fecha).toBe('1969-05-02')
     expect((await servicio.listarDeclaraciones('grupo_7')).map((una) => una.fecha)).toEqual([
@@ -642,5 +682,44 @@ describe('declararPendientes', () => {
     })
     // Estamos en el periodo 1970: solo el 1 de mayo de 1970 esta vencido.
     expect((await servicio.declararPendientes()).map((una) => una.fecha)).toEqual(['1970-05-01'])
+  })
+})
+
+describe('alcance entre grupos', () => {
+  const delGrupo = (grupoId: string): Alcance => ({
+    actor: {
+      personaId: 'persona_1',
+      roles: [{ rol: 'jefeDeGrupo', ambito: { tipo: 'grupo', id: grupoId } }],
+      esAdministradorDesignado: false,
+      estaElevado: false,
+    },
+    gruposVisibles: [grupoId],
+    distritosVisibles: [],
+    esAdministrador: false,
+  })
+
+  test('no se declara la nomina de un grupo ajeno', async () => {
+    const servicio = montar({ miembros: [JUAN] })
+    expect(servicio.declararExtraordinaria(delGrupo('grupo_12'), 'grupo_7')).rejects.toThrow(
+      DeclaracionDenegada,
+    )
+  })
+
+  test('no se leen las declaraciones de un grupo ajeno', async () => {
+    const servicio = montar({ miembros: [JUAN] })
+    await servicio.declararExtraordinaria(delGrupo('grupo_7'), 'grupo_7')
+    expect(
+      (await servicio.listarDeclaracionesDelGrupo(delGrupo('grupo_7'), 'grupo_7')).length,
+    ).toBeGreaterThan(0)
+    expect(await servicio.listarDeclaracionesDelGrupo(delGrupo('grupo_12'), 'grupo_7')).toEqual([])
+  })
+
+  test('afiliadosEn no contesta por personas de grupos ajenos', async () => {
+    const servicio = montar({ miembros: [JUAN] })
+    const declarada = await servicio.declararExtraordinaria(delGrupo('grupo_7'), 'grupo_7')
+    const propios = await servicio.afiliadosEn(delGrupo('grupo_7'), declarada.periodo, [JUAN.id])
+    expect(propios.has(JUAN.id)).toBe(true)
+    const ajenos = await servicio.afiliadosEn(delGrupo('grupo_12'), declarada.periodo, [JUAN.id])
+    expect(ajenos.has(JUAN.id)).toBe(false)
   })
 })

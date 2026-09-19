@@ -15,6 +15,9 @@ export default function Pantalla() {
   const generar = useGenerarDeudasPendientes()
   const [filtro, setFiltro] = useState<Filtro>('todos')
   const pendientes = consulta.data?.deudasPendientes
+  // Null quiere decir "esto no es para vos": el enlace a configurar cuotas no
+  // se muestra si no se van a poder configurar.
+  const configura = consulta.data?.periodosConfigurablesDeAfiliacion != null
   const cuentas = (consulta.data?.cuentasDeGrupos ?? []).filter((cuenta) =>
     filtro === 'deuda'
       ? cuenta.saldo > 0
@@ -33,9 +36,11 @@ export default function Pantalla() {
         </Link>
         <View className="mt-1 flex-row items-center justify-between gap-3">
           <Text className="text-lg font-semibold text-slate-900">Tesorería</Text>
-          <Link href="/tesoreria/configuracion" className="text-sm text-slate-600">
-            Configurar cuotas
-          </Link>
+          {configura && (
+            <Link href="/tesoreria/configuracion" className="text-sm text-slate-600">
+              Configurar cuotas
+            </Link>
+          )}
         </View>
         {consulta.isPending && (
           <Text className="mt-8 text-sm text-slate-500">Consultando cuentas…</Text>

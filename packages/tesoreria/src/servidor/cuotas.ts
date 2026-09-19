@@ -1,10 +1,10 @@
 import type { Afiliacion } from '@gps/afiliacion/dominio'
 import { periodoDe } from '@gps/afiliacion/dominio'
-import type { Core } from '@gps/core'
+import type { Alcance, Core } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import { and, desc, eq } from 'drizzle-orm'
-import { type CuotaDeAfiliacion, importeEnPesosValido } from '../dominio'
-import { CuotaUtilizada, DatosDePagoInvalidos } from './errores'
+import { type CuotaDeAfiliacion, importeEnPesosValido, puedeConfigurarCuotas } from '../dominio'
+import { CuotaUtilizada, DatosDePagoInvalidos, OperacionDenegada } from './errores'
 import { cuotasDeAfiliacion, movimientosDeTesoreria } from './tablas'
 
 /** Casos de uso sobre la cuota por período: qué períodos se pueden
@@ -14,7 +14,7 @@ export function crearOperacionesDeCuotas(core: Core, afiliacion: Afiliacion) {
    * declaraciones existentes también, para poder saldar deuda vieja. Un
    * período que ya generó un cargo queda fuera: cambiarlo alteraría cargos
    * congelados. */
-  async function listarPeriodosConfigurables(): Promise<readonly number[]> {
+  async function periodosConfigurables(): Promise<readonly number[]> {
     const actual = periodoDe(aFechaDeCalendario(core.reloj.ahora()))
     const utilizados = new Set(
       core.bd
@@ -31,7 +31,23 @@ export function crearOperacionesDeCuotas(core: Core, afiliacion: Afiliacion) {
     return [...candidatos].filter((periodo) => !utilizados.has(periodo)).sort((a, b) => a - b)
   }
 
-  async function definirCuota(periodo: number, importe: number): Promise<CuotaDeAfiliacion> {
+  /** Los períodos configurables son parte de la decisión diocesana de cuánto
+   * vale la cuota: los ve quien puede definirla. */
+  async function listarPeriodosConfigurables(alcance: Alcance): Promise<readonly number[]> {
+    if (!puedeConfigurarCuotas(alcance.actor)) {
+      throw new OperacionDenegada('Definir la cuota es de Tesorería o Administración diocesana.')
+    }
+    return periodosConfigurables()
+  }
+
+  async function definirCuota(
+    alcance: Alcance,
+    periodo: number,
+    importe: number,
+  ): Promise<CuotaDeAfiliacion> {
+    if (!puedeConfigurarCuotas(alcance.actor)) {
+      throw new OperacionDenegada('Definir la cuota es de Tesorería o Administración diocesana.')
+    }
     if (!Number.isInteger(periodo) || !importeEnPesosValido(importe)) {
       throw new DatosDePagoInvalidos('El período y el importe deben ser enteros positivos.')
     }
@@ -51,7 +67,7 @@ export function crearOperacionesDeCuotas(core: Core, afiliacion: Afiliacion) {
       )
       .get()
     if (anterior && fueUtilizada) throw new CuotaUtilizada(periodo)
-    if (!(await listarPeriodosConfigurables()).includes(periodo)) {
+    if (!(await periodosConfigurables()).includes(periodo)) {
       throw new DatosDePagoInvalidos('El período no está disponible para configurar.')
     }
 

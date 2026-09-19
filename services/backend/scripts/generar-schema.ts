@@ -6,7 +6,7 @@ import { crearConversorDeImagenes } from '../src/conversor'
 import { crearSellador } from '../src/sellador'
 
 const { esquema } = await componer(
-  { version: '0.0.0', entorno: 'prueba', puerto: 0 },
+  { version: '0.0.0', entorno: 'prueba', puerto: 0, auth: null },
   crearBd(':memory:'),
   crearSellador({ prueba: 'una-clave' }, 'prueba'),
   crearAlmacenamientoEnMemoria(),

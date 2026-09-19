@@ -11,7 +11,7 @@ const HORA = new Date('1970-01-01T00:00:00Z')
 
 function coreDePrueba(bd: Bd): Core {
   return {
-    config: { version: '0.0.0', entorno: 'prueba', puerto: 0 },
+    config: { version: '0.0.0', entorno: 'prueba', puerto: 0, auth: null },
     logger: { info: () => {}, error: () => {} },
     reloj: { ahora: () => HORA },
     bd,
@@ -34,6 +34,7 @@ function coreDePrueba(bd: Bd): Core {
     hash: (contenido: Uint8Array | string) =>
       `hash:${typeof contenido === 'string' ? contenido : contenido.join(',')}`,
     nuevoId: (prefijo) => `${prefijo}_fijo`,
+    nuevoSecreto: () => 'secreto_fijo',
   }
 }
 
@@ -43,6 +44,7 @@ function moduloFalso(name: string, migraciones: Migracion[]): Module<object> {
     dependencies: [],
     migraciones,
     createServices: () => ({}),
+    accesoAlModulo: { porDefecto: 'denegado', permitidos: [] },
     registerSchema: () => {},
   }
 }

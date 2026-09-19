@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   leerClavesDeSello,
+  leerConfigDeAuth,
   leerDirectorioDeArchivos,
   leerEntorno,
   leerPuerto,
@@ -37,6 +38,60 @@ describe('leerPuerto', () => {
 
   test('con un valor malformado, lanza en vez de dejarlo en NaN', () => {
     expect(() => leerPuerto('abc')).toThrow('PUERTO invalido')
+  })
+})
+
+describe('leerConfigDeAuth', () => {
+  const variables = {
+    ORIGEN_PUBLICO: 'https://gps.example',
+    GOOGLE_CLIENTE_WEB_ID: 'google-web',
+    GOOGLE_CLIENTE_IOS_ID: 'google-ios',
+    GOOGLE_CLIENTE_ANDROID_ID: 'google-android',
+    GOOGLE_CLIENTE_SECRETO: 'google-secreto',
+    APPLE_SERVICIO_ID: 'apple-web',
+    APPLE_BUNDLE_ID: 'org.example.gps',
+    APPLE_EQUIPO_ID: 'equipo',
+    APPLE_CLAVE_ID: 'clave',
+    APPLE_CLAVE_PRIVADA: 'linea-1\\nlinea-2',
+  }
+
+  test('fuera de produccion permite trabajar sin proveedores externos', () => {
+    expect(leerConfigDeAuth('prueba', {})).toBeNull()
+  })
+
+  test('produccion exige todas las credenciales', () => {
+    expect(() => leerConfigDeAuth('produccion', {})).toThrow('Faltan variables de auth')
+  })
+
+  test('rechaza configuraciones parciales tambien en desarrollo', () => {
+    expect(() => leerConfigDeAuth('desarrollo', { ORIGEN_PUBLICO: 'http://localhost' })).toThrow(
+      'GOOGLE_CLIENTE_WEB_ID',
+    )
+  })
+
+  test('produccion exige origen https', () => {
+    expect(() =>
+      leerConfigDeAuth('produccion', { ...variables, ORIGEN_PUBLICO: 'http://gps.example' }),
+    ).toThrow('https')
+  })
+
+  test('valida y normaliza la configuracion completa', () => {
+    expect(leerConfigDeAuth('produccion', variables)).toEqual({
+      origenPublico: 'https://gps.example',
+      google: {
+        clienteWebId: 'google-web',
+        clienteIosId: 'google-ios',
+        clienteAndroidId: 'google-android',
+        clienteSecreto: 'google-secreto',
+      },
+      apple: {
+        servicioId: 'apple-web',
+        bundleId: 'org.example.gps',
+        equipoId: 'equipo',
+        claveId: 'clave',
+        clavePrivada: 'linea-1\nlinea-2',
+      },
+    })
   })
 })
 

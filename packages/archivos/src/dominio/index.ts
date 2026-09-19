@@ -8,4 +8,5 @@ export {
   type TipoAdmitido,
 } from './archivos'
 export type { Archivo } from './modelos'
+export { accesoAlModulo } from './politicas'
 export type { Archivos } from './publico'

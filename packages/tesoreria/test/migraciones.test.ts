@@ -32,12 +32,14 @@ beforeEach(() => {
     conversorDeImagenes: { aJpeg: async (contenido: Uint8Array) => contenido },
     hash: (contenido) => `hash:${typeof contenido === 'string' ? contenido : contenido.join(',')}`,
     nuevoId: (prefijo) => `${prefijo}_fijo`,
+    nuevoSecreto: () => 'secreto_fijo',
   }
   const modulo: Module<object> = {
     name: 'tesoreria',
     dependencies: [],
     migraciones,
     createServices: () => ({}),
+    accesoAlModulo: { porDefecto: 'denegado', permitidos: [] },
     registerSchema: () => {},
   }
   aplicarMigraciones(core, [modulo])

@@ -1,0 +1,54 @@
+import { usePersonaActual, useRefrescarSesion } from '@gps/api'
+import { useEffect, useState } from 'react'
+import { cuantoFalta } from './cuenta-regresiva'
+import { enlaceDeElevacion } from './Ingreso'
+
+/** La franja del modo elevado, con la cuenta regresiva.
+ *
+ *  La cuenta es de la interfaz, no la barrera: el servidor compara
+ *  `elevadaHasta` contra su propio reloj en cada pedido, así que adelantar el
+ *  reloj del teléfono no estira nada. Lo que hace acá es que las acciones
+ *  globales desaparezcan solas cuando vence, en vez de quedar dibujadas hasta
+ *  que alguien las toque y reciba un error. */
+export function ModoElevado(props: { entorno: string }) {
+  const sesion = usePersonaActual()
+  const refrescar = useRefrescarSesion()
+  const quien = sesion.data?.personaActual
+  const [ahora, setAhora] = useState(() => Date.now())
+
+  const hasta = quien?.elevadaHasta ?? null
+  useEffect(() => {
+    if (!hasta) return
+    const reloj = setInterval(() => setAhora(Date.now()), 1000)
+    return () => clearInterval(reloj)
+  }, [hasta])
+
+  const falta = hasta ? cuantoFalta(hasta, ahora) : null
+
+  // Al vencer se vuelve a preguntar una sola vez: el servidor va a contestar
+  // que ya no está elevada, y con eso desaparece todo lo global.
+  useEffect(() => {
+    if (hasta && !falta) void refrescar()
+  }, [hasta, falta, refrescar])
+
+  if (!quien?.esAdministradorDesignado) return null
+
+  if (!quien.estaElevado || !falta) {
+    return (
+      <a
+        href={enlaceDeElevacion(props.entorno === 'demo' ? 'demo' : 'google', 'administrador')}
+        className="mt-4 block rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900"
+      >
+        Elevarse para administrar todo →{' '}
+        <span className="text-amber-700">pide volver a identificarte</span>
+      </a>
+    )
+  }
+
+  return (
+    <div className="mt-4 rounded-lg bg-amber-100 px-4 py-2 text-sm text-amber-900">
+      Modo elevado: ves y modificás toda la diócesis. Vence en {falta}. Todo lo que escribas queda
+      auditado.
+    </div>
+  )
+}

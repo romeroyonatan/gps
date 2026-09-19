@@ -6,9 +6,11 @@ import {
   type Config,
   type Context,
   type ConversorDeImagenes,
+  componerEsquema,
   crearServicios,
   type Logger,
   ordenarModulos,
+  type Reloj,
   type Sellador,
 } from '@gps/core'
 import { crearBuilder } from '@gps/core/graphql'
@@ -28,7 +30,7 @@ export async function componer(
   sellador: Sellador,
   almacenamiento: Almacenamiento,
   conversorDeImagenes: ConversorDeImagenes,
-): Promise<{ esquema: GraphQLSchema; contexto: Context; logger: Logger }> {
+): Promise<{ esquema: GraphQLSchema; contexto: Context; logger: Logger; reloj: Reloj }> {
   const ordenados = ordenarModulos(modulos)
   const core = crearCore(
     config,
@@ -45,14 +47,21 @@ export async function componer(
   aplicarMigraciones(core, ordenados)
 
   const servicios = crearServicios(core, ordenados)
-  const contexto = { actor: null, ...servicios } as Context
+  const contexto = {
+    actor: null,
+    alcance: null,
+    sesionId: null,
+    elevadaHasta: null,
+    config,
+    ...servicios,
+  } as Context
 
   // `archivos` no puede depender de sus dueños -seria un ciclo-, asi que los
   // dueños se registran aca, cuando sus servicios ya existen. Un archivo cuyo
   // modulo no este en este registro no se entrega.
-  autorizadores.salidas = (recursoId, actor) =>
-    contexto.salidas.puedeVerArchivosDe(recursoId, actor)
-  for (const modulo of ordenados) modulo.registerSchema(builder)
+  autorizadores.salidas = (recursoId, alcance) =>
+    contexto.salidas.puedeVerArchivosDe(recursoId, alcance)
+  const esquema = componerEsquema(builder, ordenados)
 
   // La base del demo es siempre nueva y en memoria (ver leerRutaDeBd), asi que
   // no hace falta que la siembra sea idempotente.
@@ -67,5 +76,5 @@ export async function componer(
   // resolvers, y sumarle plomeria del servidor lo ensancha para todos los
   // modulos. Quien sirve HTTP si lo necesita, para dejar rastro de lo que no
   // supo traducir.
-  return { esquema: builder.toSchema(), contexto, logger: core.logger }
+  return { esquema, contexto, logger: core.logger, reloj: core.reloj }
 }

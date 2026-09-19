@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import type { Config } from '@gps/core'
+import { alcanceSinLimites, type Config } from '@gps/core'
 import { execute, parse } from 'graphql'
 import { crearAlmacenamientoEnMemoria } from '../src/almacenamiento'
 import { crearBd } from '../src/bd'
@@ -10,7 +10,13 @@ const sellador = crearSellador({ prueba: 'una-clave' }, 'prueba')
 
 import { componer } from '../src/composicion'
 
-const config: Config = { version: '1.2.3', entorno: 'prueba', puerto: 0 }
+const config: Config = { version: '1.2.3', entorno: 'prueba', puerto: 0, auth: null }
+
+/** Estos tests verifican la forma del esquema compuesto, no la autorizacion:
+ *  cada modulo prueba su matriz de permisos por separado. Un actor elevado
+ *  atraviesa la capa 1 sin tener que sembrar cargos para cada consulta. */
+const sinLimites = alcanceSinLimites('persona_prueba')
+const elevado = sinLimites.actor
 
 async function consultar(consulta: string) {
   const { esquema, contexto } = await componer(
@@ -23,11 +29,30 @@ async function consultar(consulta: string) {
   return execute({
     schema: esquema,
     document: parse(consulta),
-    contextValue: contexto,
+    contextValue: { ...contexto, actor: elevado, alcance: sinLimites },
   })
 }
 
 describe('esquema compuesto', () => {
+  test('los casos internos no estan publicados', async () => {
+    // El barrido de afiliacion y el suscriptor de tesoreria corren sin usuario
+    // y por eso no pasan por el alcance. Que no haya forma de dispararlos desde
+    // GraphQL es lo que sostiene esa excepcion.
+    const { esquema } = await componer(
+      config,
+      crearBd(':memory:'),
+      sellador,
+      crearAlmacenamientoEnMemoria(),
+      crearConversorDeImagenes(),
+    )
+    const raices = [
+      ...Object.keys(esquema.getQueryType()?.getFields() ?? {}),
+      ...Object.keys(esquema.getMutationType()?.getFields() ?? {}),
+    ]
+    expect(raices).not.toContain('declararPendientes')
+    expect(raices).not.toContain('generarCargo')
+  })
+
   test('responde la version con los datos de la configuracion', async () => {
     const resultado = await consultar('{ version { numero entorno } }')
     expect(resultado.errors).toBeUndefined()
@@ -44,6 +69,7 @@ describe('esquema compuesto', () => {
           'sistema',
           'estructura',
           'personas',
+          'auth',
           'afiliacion',
           'tesoreria',
           'archivos',
@@ -53,7 +79,7 @@ describe('esquema compuesto', () => {
     })
   })
 
-  test('el contexto expone actor en null: auth todavia no existe', async () => {
+  test('el contexto base es anónimo y sin alcance', async () => {
     const { contexto } = await componer(
       config,
       crearBd(':memory:'),
@@ -62,6 +88,7 @@ describe('esquema compuesto', () => {
       crearConversorDeImagenes(),
     )
     expect(contexto.actor).toBeNull()
+    expect(contexto.alcance).toBeNull()
   })
 
   test('expone el arbol de la diocesis, vacio si no hay datos', async () => {
@@ -98,19 +125,19 @@ describe('tesoreria en el esquema compuesto', () => {
       crearAlmacenamientoEnMemoria(),
       crearConversorDeImagenes(),
     )
-    const [periodo] = await contexto.tesoreria.listarPeriodosConfigurables()
+    const [periodo] = await contexto.tesoreria.listarPeriodosConfigurables(alcanceSinLimites())
     const mutacion = await execute({
       schema: esquema,
       document: parse(
         'mutation Definir($periodo: Int!) { definirCuotaDeAfiliacion(periodo: $periodo, importe: 20000) { periodo importe } }',
       ),
       variableValues: { periodo },
-      contextValue: contexto,
+      contextValue: { ...contexto, actor: elevado, alcance: sinLimites },
     })
     const consulta = await execute({
       schema: esquema,
       document: parse('{ cuotasDeAfiliacion { periodo importe } }'),
-      contextValue: contexto,
+      contextValue: { ...contexto, actor: elevado, alcance: sinLimites },
     })
     expect(mutacion.errors).toBeUndefined()
     expect(consulta.data).toEqual({ cuotasDeAfiliacion: [{ periodo, importe: 20000 }] })

@@ -3,10 +3,29 @@ import type { BusDeEventos } from './eventos'
 
 export type Entorno = 'desarrollo' | 'produccion' | 'prueba' | 'demo'
 
+export interface ConfigDeAuth {
+  readonly origenPublico: string
+  readonly google: {
+    readonly clienteWebId: string
+    readonly clienteIosId: string
+    readonly clienteAndroidId: string
+    readonly clienteSecreto: string
+  }
+  readonly apple: {
+    readonly servicioId: string
+    readonly bundleId: string
+    readonly equipoId: string
+    readonly claveId: string
+    readonly clavePrivada: string
+  }
+}
+
 export interface Config {
   readonly version: string
   readonly entorno: Entorno
   readonly puerto: number
+  /** null fuera de produccion permite tests y demo sin proveedores externos. */
+  readonly auth?: ConfigDeAuth | null
 }
 
 export interface Logger {
@@ -94,6 +113,9 @@ export interface Core {
    *  en singular. Va en Core por la misma razon que reloj.ahora(): generar un
    *  UUID es tocar la plataforma. */
   nuevoId(prefijo: string): string
+  /** Secreto criptografico nuevo codificado como hexadecimal. La plataforma lo
+   *  genera para que sesiones, invitaciones y PKCE sigan siendo portables. */
+  nuevoSecreto(bytes?: number): string
   /** sha256 en hexadecimal. Va en Core por la regla de portabilidad, igual que
    *  el sellador, pero es otra cosa: un hash no lleva secreto, asi que dice si
    *  unos bytes cambiaron y no quien los escribio. Es lo que se necesita para

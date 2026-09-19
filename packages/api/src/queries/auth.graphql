@@ -1,0 +1,48 @@
+# packages/api/src/queries/auth.graphql
+query PersonaActual {
+  personaActual {
+    personaId
+    esAdministradorDesignado
+    estaElevado
+    elevadaHasta
+    alcance {
+      gruposVisibles
+      distritosVisibles
+      esAdministrador
+    }
+    roles {
+      rol
+      ambitoTipo
+      ambitoId
+    }
+  }
+}
+
+mutation CerrarSesion {
+  cerrarSesion
+}
+
+mutation Invitar(
+  $personaId: ID!
+  $tipo: TipoDeInvitacion!
+  $proveedorAReemplazar: ProveedorDeIdentidad
+) {
+  invitar(personaId: $personaId, tipo: $tipo, proveedorAReemplazar: $proveedorAReemplazar) {
+    invitacionId
+    url
+  }
+}
+
+mutation RevocarInvitacion($invitacionId: ID!) {
+  revocarInvitacion(invitacionId: $invitacionId)
+}
+
+query Invitacion($secreto: ID!) {
+  invitacion(secreto: $secreto) {
+    estado
+    tipo
+    persona
+    grupo
+    proveedorAReemplazar
+  }
+}

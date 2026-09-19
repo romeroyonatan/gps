@@ -1,4 +1,5 @@
 import type { Module } from '@gps/core'
+import { accesoAlModulo } from '../dominio'
 import { migraciones } from './migraciones'
 import { registrarSchema } from './schema'
 import { type Autorizador, crearServicioDeArchivos, type ServicioDeArchivos } from './servicio'
@@ -22,6 +23,7 @@ export const autorizadores: Record<string, Autorizador> = {}
 
 export const archivos: Module<ServicioDeArchivos> = {
   name: 'archivos',
+  accesoAlModulo,
   dependencies: [],
   migraciones,
   createServices: (core) => crearServicioDeArchivos(core, autorizadores),

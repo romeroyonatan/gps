@@ -36,15 +36,18 @@ Mapa de piezas en `docs/arquitectura.md`. Tutorial en prosa en `docs/crear-un-mo
    pero no crear un archivo, una interfaz o un repository por cada método corto.
 5. Si otro módulo va a necesitar algo de éste, declararlo en `src/dominio/publico.ts` —
    sólo eso, no la interfaz entera del servicio.
-6. Declarar las dependencias en `dependencies` del objeto `Module`. `Module<S, D>` tipa
+6. Declarar `accesoAlModulo` en `src/dominio/politicas.ts` y pasarlo al objeto `Module`.
+   Es obligatorio: el módulo no compila sin decidir quién lo alcanza, y la decisión por
+   omisión es `denegado`. `publico` es sólo para lo que tiene que funcionar sin sesión.
+7. Declarar las dependencias en `dependencies` del objeto `Module`. `Module<S, D>` tipa
    `dependencies` contra las claves de `D`: un nombre que no esté ahí no compila. Los
    servicios ya construidos de esas dependencias llegan por el segundo parámetro de
    `createServices(core, dependencias)`, no por el contexto.
-7. Si el módulo tiene tablas: declararlas en `src/servidor/tablas.ts`, generar la
+8. Si el módulo tiene tablas: declararlas en `src/servidor/tablas.ts`, generar la
    migración con `bunx drizzle-kit generate --name <nombre>` parado en el paquete, y
    sumarla a `src/servidor/migraciones.ts`.
-8. Agregarlo a la lista de `services/backend/src/modules.ts`.
-9. `bun run schema` y commitear el `schema.gql` resultante.
+9. Agregarlo a la lista de `services/backend/src/modules.ts`.
+10. `bun run schema` y commitear el `schema.gql` resultante.
 
 `modules.ts` es el único archivo central que hay que tocar. El `Dockerfile` no:
 copia los `package.json` con `COPY --parents packages/*/package.json` (necesita el
@@ -123,18 +126,77 @@ al índice.
 **Mobile-first.** Todo se diseña primero a 375px. `sm:` y `md:` sólo agregan en
 pantallas grandes, nunca arreglan lo que se rompió en chicas.
 
-**Autorización** (cuando exista `auth`). Tres capas: acceso al módulo declarado en
-`accesoAlModulo`, filtrado por `Alcance` como **primer parámetro obligatorio** de todo
-método de repositorio, y políticas por campo en `src/dominio/politicas.ts`. Las
-políticas son funciones puras y las usan el servidor y las pantallas. Estas
-convenciones están documentadas pero no implementadas todavía: no hay `auth`, ni
-`Alcance` real, ni `politicas.ts` en ningún módulo existente.
+**Autorización.** Tres capas, y las tres están implementadas:
+
+1. **Acceso al módulo.** Cada `Module` declara `accesoAlModulo` —es un campo
+   obligatorio de la interfaz, así que un módulo nuevo no compila sin decidirlo— y
+   `componerEsquema` se lo cuelga a cada campo raíz que ese módulo registra. Un campo
+   raíz sin módulo dueño aborta el arranque en vez de quedar publicado abierto.
+2. **Alcance.** `Alcance` es el **primer parámetro obligatorio** de todo camino de
+   consulta o escritura iniciado por un usuario. La excepción declarada es el directorio
+   de la asociación —el árbol de distritos y grupos, y quién conduce cada grupo—, que
+   ve cualquiera con sesión: saber que un grupo existe no es un dato de ese grupo. Sus
+   datos —gente, cuenta corriente, salidas— sí van por alcance. Lleva adentro al `Actor`, porque las
+   dos preguntas viajan siempre juntas: qué filas se ven y qué puede hacer quien
+   pregunta. Los caminos internos —el barrido de Afiliación, el suscriptor de
+   Tesorería— no lo reciben y no son alcanzables desde GraphQL.
+3. **Políticas por operación y campo** en `src/dominio/politicas.ts`. Son funciones
+   puras sobre `Actor` o `Alcance`, las aplica el servidor y las usan las pantallas
+   para no ofrecer lo que después se va a rechazar. La interfaz nunca es la barrera.
+
+Alcanzar un grupo **no** es verlo por dentro, y las dos capas del medio son distintas a
+propósito. El comisionado tiene los grupos de su distrito en `gruposVisibles` porque
+necesita leer los permisos de salida que firma; el padrón de esos grupos no lo ve, y su
+cuenta corriente tampoco. Cuando escribas una política de lectura, preguntate cuál de
+las dos cosas estás decidiendo: `alcance.gruposVisibles.includes(...)` responde "¿lo
+alcanza?", y `tieneRol(alcance.actor, ...)` responde "¿es suyo?".
+
+Un campo denegado **no puede** ser no-nulable en GraphQL: uno que lanza se lleva puesta
+la respuesta entera, así que una consulta que mezcla campos de distinto permiso pierde
+también lo que sí podía ver. Un campo que se deniega por función se declara nullable y
+devuelve `null` —ver `deudasPendientes`—; las escrituras sí lanzan.
+
+`alcanceSinLimites()` existe para la siembra del demo y los tests que no prueban
+autorización. No sale de ahí: el alcance de un request se construye siempre con
+`estructura.expandirAlcance` a partir del actor real.
+
+## Autenticación
+
+La identidad interna es una `Persona`: no hay tabla de usuarios ni contraseñas. Se
+entra con Google o Apple —Authorization Code con PKCE, `state` y `nonce`, validado con
+JOSE— y en entorno demo con un proveedor interno de un clic, que recorre exactamente el
+mismo camino. Una persona puede tener varias identidades externas; los correos no se
+usan para correlacionar nada.
+
+La sesión es un secreto opaco de 30 días, revocable, del que el servidor guarda sólo el
+hash. Los roles **nunca** viajan adentro: se reconstruyen en cada request desde los
+cargos y equipos vigentes, y por eso una remoción quita acceso en el pedido siguiente.
+Web la lleva en una cookie `HttpOnly`; mobile en `expo-secure-store`, nunca en
+AsyncStorage, y la manda como bearer. No hay refresh token: no hace falta, porque cada
+request ya consulta la base y `revocarSesion` corta al instante. Lo que sí falta es un
+corte por inactividad.
+
+El acceso se activa con un enlace de un solo uso que se comparte a mano, vence a los
+siete días y se puede revocar; la pantalla muestra a quién le da acceso antes de
+confirmar. Recuperar es lo mismo pero reemplazando una identidad perdida: desactiva la
+anterior, vincula la nueva y revoca todas las sesiones, en una transacción.
+
+Hay una única persona administradora designada. Su sesión normal no es global: para
+tener alcance global tiene que **reautenticarse** con una identidad ya vinculada, y esa
+elevación dura diez minutos, vive en la sesión y se audita entera. Transferir la
+administración exige elevación; si la única administradora pierde sus identidades,
+`bun run admin asignar --persona <id>` la reemplaza desde el servidor, y no hay mutation
+equivalente a propósito.
+
+Los equipos —Secretaría de grupo, Administración diocesana, Tesorería diocesana— son
+hechos de `personas`, igual que los cargos, con vigencia y revocación instantánea. No
+son roles que alguien asigne a mano en auth.
 
 ## Qué NO existe todavía
 
-Auth, `Alcance` real, `politicas.ts`, rate limiting, auditoría,
-`packages/local`, base en el dispositivo. Cada uno tiene su diseño en la spec y llega
-con su primer consumidor real. No agregarlos por adelantado.
+Rate limiting, corte de sesión por inactividad, firma con certificado, `packages/local`,
+base en el dispositivo. Cada uno tiene su diseño en la spec y llega con su primer
+consumidor real. No agregarlos por adelantado.
 
 El bus de eventos ya existe en `Core`: es en proceso, sincrónico y tipado. Afiliación
 emite `AfiliacionDeclarada` después de guardar la foto y Tesorería intenta generar el
@@ -142,14 +204,19 @@ cargo sin bloquear la declaración; si falla o falta la cuota, la reconciliació
 recupera la deuda pendiente.
 
 Tampoco hay baja ni edición de personas (las columnas `hasta` existen y el historial se
-puede escribir, pero por ahora sólo se llena con altas), ni cargos de equipo, ni equipos, ni
-forma de buscar una persona sin saber su grupo (la única consulta es
-`personas(grupoId: ID!)`). Los cargos **sí** tienen ámbito: `grupo`, `distrito` y
-`diocesis`, con comisionado de distrito y jefe scout diocesano. Un cargo distrital no
-aparece en ninguna pantalla todavía: `listarPersonas` filtra los cargos por el grupo, así
-que el comisionado sólo se ve como firmante de un permiso.
+puede escribir, pero por ahora sólo se llena con altas), ni forma de buscar una persona
+sin saber su grupo (la única consulta es `personas(grupoId: ID!)`). Los cargos **sí**
+tienen ámbito: `grupo`, `distrito` y `diocesis`, con comisionado de distrito y jefe
+scout diocesano. Un cargo distrital no aparece en ninguna pantalla todavía:
+`listarPersonas` filtra los cargos por el grupo, así que el comisionado sólo se ve como
+firmante de un permiso.
 
-**Firma con certificado** (PAdES) tampoco: hoy la firma en la app es el dibujo, sellado con
+Los equipos **sí** existen —Secretaría, Administración diocesana y Tesorería diocesana—
+y la pantalla de plantel de un grupo administra su jefatura y su Secretaría. Los equipos
+diocesanos no tienen pantalla todavía: se administran con las mismas mutations
+(`integrarEquipo`, `revocarIntegranteDeEquipo`) desde la API.
+
+**Firma con certificado** (PAdES) no existe: hoy la firma en la app es el dibujo, sellado con
 HMAC sobre el hash del PDF, los trazos, el cargo, la persona y la fecha. Cada firma guarda
 con qué clave se selló, así que rotar es agregar una clave nueva y apuntar
 `CLAVE_DE_SELLO_ACTIVA` a ella; las viejas se quedan para verificar. Retirar una clave exige
@@ -157,9 +224,13 @@ re-sellar verificando primero —nunca a ciegas, eso lavaría una firma adultera
 está construido. Si una clave se filtra, las firmas selladas con ella dejan de probar nada:
 se anula y se re-emite el permiso.
 
+La firma en la app sí exige identidad: la registra quien ocupa el cargo firmante vigente
+en el ámbito del permiso, y ni siquiera la elevación firma por otro —sería falsificar una
+firma, y es la única política donde `estaElevado` no alcanza—.
+
 La firma en papel **no se verifica**: quien sube el escaneo declara qué cargos lo firmaron.
-El respaldo es el escaneo, que va como página anexa del PDF. Con `auth` se registra además
-quién lo declaró.
+El respaldo es el escaneo, que va como página anexa del PDF. Registrar quién lo declaró
+sigue pendiente.
 
 Tampoco hay forma de abrir o cerrar una unidad desde las pantallas: el servicio de
 `estructura` las tiene (`abrirUnidad`, `cerrarUnidad`) y el demo las usa, pero ninguna

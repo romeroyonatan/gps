@@ -28,13 +28,24 @@ export function crearBuilder() {
 
 export type Builder = ReturnType<typeof crearBuilder>
 
-/** Los enums que ya declaro algun modulo, por builder. WeakMap y no una
- *  constante de modulo porque los tests arman varios builders y no tienen por
- *  que contaminarse entre si. */
-const compartidos = new WeakMap<
-  Builder,
-  Map<string, { valores: readonly string[]; descripcion: string | undefined; ref: unknown }>
->()
+/** Los enums que ya declaro algun modulo, colgados del propio builder. No es
+ *  una constante de modulo porque los tests arman varios builders y no tienen
+ *  por que contaminarse entre si; y no es un WeakMap porque cada modulo puede
+ *  recibir un envoltorio del builder -componerEsquema le pasa uno para anotar
+ *  quien registra cada campo raiz- y todos tienen que compartir el registro. */
+const REGISTRO = Symbol.for('gps.enums-compartidos')
+
+type RegistroDeEnums = Map<
+  string,
+  { valores: readonly string[]; descripcion: string | undefined; ref: unknown }
+>
+
+function registroDe(builder: Builder): RegistroDeEnums {
+  const conRegistro = builder as unknown as { [REGISTRO]?: RegistroDeEnums }
+  const registro = conRegistro[REGISTRO] ?? new Map()
+  conRegistro[REGISTRO] = registro
+  return registro
+}
 
 export class ValoresDistintos extends Error {
   constructor(nombre: string, unos: readonly string[], otros: readonly string[]) {
@@ -91,10 +102,7 @@ export function enumCompartido<V extends string>(
   valores: readonly V[],
   descripcion?: string,
 ): ReturnType<typeof crearEnum<V>> {
-  const delBuilder =
-    compartidos.get(builder) ??
-    new Map<string, { valores: readonly string[]; descripcion: string | undefined; ref: unknown }>()
-  compartidos.set(builder, delBuilder)
+  const delBuilder = registroDe(builder)
 
   const registrado = delBuilder.get(nombre)
   if (registrado) {

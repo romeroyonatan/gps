@@ -1,3 +1,4 @@
+import { alcanceDe } from '@gps/core'
 import type { Builder } from '@gps/core/graphql'
 import { GraphQLError } from 'graphql'
 import {
@@ -6,11 +7,13 @@ import {
   MEDIOS_DE_PAGO,
   type MedioDePago,
   type MovimientoDeTesoreria,
+  puedeConfigurarCuotas,
+  puedeVerTesoreriaDeLaDiocesis,
   type ResultadoDeReconciliacion,
   type ResumenDePendientes,
   type TipoDeMovimiento,
 } from '../dominio'
-import { CuotaUtilizada, DatosDePagoInvalidos, PagoNoAnulable } from './servicio'
+import { CuotaUtilizada, DatosDePagoInvalidos, OperacionDenegada, PagoNoAnulable } from './servicio'
 
 export function registrarSchema(builder: Builder): void {
   const MedioDePagoRef = builder.enumType('MedioDePago', {
@@ -92,17 +95,31 @@ export function registrarSchema(builder: Builder): void {
       resolve: async (_padre, _args, contexto) => [...(await contexto.tesoreria.listarCuotas())],
     }),
   )
+  // Los dos campos diocesanos devuelven null a quien no le corresponde, en vez
+  // de lanzar.
+  //
+  // En GraphQL un campo no-nulable que lanza se lleva puesta la respuesta
+  // entera: la jefatura pedía su cuenta y estos dos campos en la misma query, y
+  // perdía todo -incluida su cuenta, que sí puede ver-. Un campo denegado no
+  // tiene por qué tirar abajo a sus hermanos, y el que decide es la misma
+  // política pura que aplica el servicio.
   builder.queryField('periodosConfigurablesDeAfiliacion', (t) =>
     t.intList({
-      resolve: async (_padre, _args, contexto) => [
-        ...(await contexto.tesoreria.listarPeriodosConfigurables()),
-      ],
+      nullable: true,
+      description: 'Null si quien pregunta no es autoridad diocesana de Tesorería.',
+      resolve: async (_padre, _args, contexto) => {
+        const alcance = alcanceDe(contexto)
+        if (!puedeConfigurarCuotas(alcance.actor)) return null
+        return [...(await contexto.tesoreria.listarPeriodosConfigurables(alcance))]
+      },
     }),
   )
   builder.queryField('cuentasDeGrupos', (t) =>
     t.field({
       type: [CuentaRef],
-      resolve: async (_padre, _args, contexto) => [...(await contexto.tesoreria.listarCuentas())],
+      resolve: async (_padre, _args, contexto) => [
+        ...(await contexto.tesoreria.listarCuentas(alcanceDe(contexto))),
+      ],
     }),
   )
   builder.queryField('movimientosDeTesoreria', (t) =>
@@ -110,14 +127,20 @@ export function registrarSchema(builder: Builder): void {
       type: [MovimientoRef],
       args: { grupoId: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) => [
-        ...(await contexto.tesoreria.listarMovimientos(String(args.grupoId))),
+        ...(await contexto.tesoreria.listarMovimientos(alcanceDe(contexto), String(args.grupoId))),
       ],
     }),
   )
   builder.queryField('deudasPendientes', (t) =>
     t.field({
       type: PendientesRef,
-      resolve: (_padre, _args, contexto) => contexto.tesoreria.resumenDePendientes(),
+      nullable: true,
+      description: 'Null si quien pregunta no es autoridad diocesana de Tesorería.',
+      resolve: (_padre, _args, contexto) => {
+        const alcance = alcanceDe(contexto)
+        if (!puedeVerTesoreriaDeLaDiocesis(alcance.actor)) return null
+        return contexto.tesoreria.resumenDePendientes(alcance)
+      },
     }),
   )
 
@@ -125,7 +148,8 @@ export function registrarSchema(builder: Builder): void {
     if (
       error instanceof DatosDePagoInvalidos ||
       error instanceof CuotaUtilizada ||
-      error instanceof PagoNoAnulable
+      error instanceof PagoNoAnulable ||
+      error instanceof OperacionDenegada
     ) {
       throw new GraphQLError(error.message, { extensions: { code: error.name } })
     }
@@ -138,7 +162,11 @@ export function registrarSchema(builder: Builder): void {
       args: { periodo: t.arg.int({ required: true }), importe: t.arg.int({ required: true }) },
       resolve: async (_padre, args, contexto) => {
         try {
-          return await contexto.tesoreria.definirCuota(args.periodo, args.importe)
+          return await contexto.tesoreria.definirCuota(
+            alcanceDe(contexto),
+            args.periodo,
+            args.importe,
+          )
         } catch (error) {
           return traducir(error)
         }
@@ -158,7 +186,7 @@ export function registrarSchema(builder: Builder): void {
       },
       resolve: async (_padre, args, contexto) => {
         try {
-          return await contexto.tesoreria.registrarPago({
+          return await contexto.tesoreria.registrarPago(alcanceDe(contexto), {
             grupoId: String(args.grupoId),
             fecha: args.fecha,
             importe: args.importe,
@@ -178,7 +206,7 @@ export function registrarSchema(builder: Builder): void {
       args: { pagoId: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) => {
         try {
-          return await contexto.tesoreria.anularPago(String(args.pagoId))
+          return await contexto.tesoreria.anularPago(alcanceDe(contexto), String(args.pagoId))
         } catch (error) {
           return traducir(error)
         }
@@ -188,7 +216,7 @@ export function registrarSchema(builder: Builder): void {
   builder.mutationField('generarDeudasPendientes', (t) =>
     t.field({
       type: ResultadoRef,
-      resolve: (_padre, _args, contexto) => contexto.tesoreria.reconciliar(),
+      resolve: (_padre, _args, contexto) => contexto.tesoreria.reconciliar(alcanceDe(contexto)),
     }),
   )
 }

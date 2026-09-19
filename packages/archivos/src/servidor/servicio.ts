@@ -1,4 +1,4 @@
-import type { Core } from '@gps/core'
+import type { Alcance, Core } from '@gps/core'
 import { and, eq } from 'drizzle-orm'
 import { esTipoAdmitido, necesitaConversion, TAMANO_MAXIMO } from '../dominio/archivos'
 import type { Archivo } from '../dominio/modelos'
@@ -41,7 +41,11 @@ const VENCIMIENTO_MS = 15 * 60 * 1000
  *
  *  Recibe `actor` aunque hoy sea siempre null: cuando exista auth, la firma no
  *  cambia y cada dueño decide con quien esta preguntando. */
-export type Autorizador = (recursoId: string, actor: unknown) => Promise<boolean>
+/** Lo que el modulo dueño de un recurso contesta antes de que se entreguen sus
+ *  bytes. Recibe el alcance del pedido -null si no hay sesion- porque la
+ *  descarga tiene que filtrar igual que la consulta GraphQL: una URL no
+ *  esquiva el filtro del dueño. */
+export type Autorizador = (recursoId: string, alcance: Alcance | null) => Promise<boolean>
 
 /** Lo que este modulo hace, que es mas que lo que publica: ver Archivos en
  *  /dominio/publico.ts. `extends` es lo que hace que la implementacion no pueda
@@ -205,14 +209,14 @@ export function crearServicioDeArchivos(
       return await this.confirmarSubida(subida.id)
     },
 
-    async descargar(id, actor) {
+    async descargar(id, alcance) {
       const fila = filaDe(id)
       if (!fila?.confirmado) {
         throw new SubidaInvalida('No hay ningun archivo confirmado con ese id.')
       }
       const autorizador = autorizadores[fila.modulo]
       if (!autorizador) throw new SinAutorizador(fila.modulo)
-      if (!(await autorizador(fila.recursoId, actor))) {
+      if (!(await autorizador(fila.recursoId, alcance))) {
         throw new SubidaNoAutorizada('No estas autorizado a ver este archivo.')
       }
       return {

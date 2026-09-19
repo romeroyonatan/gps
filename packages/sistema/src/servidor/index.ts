@@ -1,4 +1,5 @@
 import type { Module } from '@gps/core'
+import { accesoAlModulo } from '../dominio'
 import { registrarSchema } from './schema'
 import { crearServicioDeSistema, type ServicioDeSistema } from './servicio'
 
@@ -12,6 +13,7 @@ declare module '@gps/core' {
 
 export const sistema: Module<ServicioDeSistema> = {
   name: 'sistema',
+  accesoAlModulo,
   dependencies: [],
   createServices: (core) => crearServicioDeSistema(core),
   registerSchema: registrarSchema,

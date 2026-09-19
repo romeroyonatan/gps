@@ -1,3 +1,4 @@
+export { accesoAlModulo } from './politicas'
 /** Version del sistema. Es la respuesta de la consulta publica `version`. */
 export interface Version {
   readonly numero: string

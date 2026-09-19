@@ -1,4 +1,4 @@
-import type { Core } from '@gps/core'
+import type { Alcance, Core } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Estructura } from '@gps/estructura/dominio'
 import type { Personas } from '@gps/personas/dominio'
@@ -6,12 +6,22 @@ import { eq, max } from 'drizzle-orm'
 import type { Declaracion } from '../dominio/modelos'
 import { armarNominasDeclarables } from '../dominio/nominas'
 import { fechasOrdinariasDelPeriodo, periodoDe } from '../dominio/periodos'
+import { puedeDeclararAfiliacion } from '../dominio/politicas'
 import { validarFecha } from '../dominio/validaciones'
 import { afiliados, declaraciones } from './tablas'
 
 /** La fecha de la declaracion no sirve: futura, mal formada, o anterior a la
  * ultima ya emitida. Las tres condiciones son sobre el mismo campo y el
  * consumidor las trata igual. */
+/** Declara el grupo: ni una autoridad diocesana ni el grupo vecino declaran
+ * por el. */
+export class DeclaracionDenegada extends Error {
+  constructor(grupoId: string) {
+    super(`No podés declarar la afiliación del grupo ${grupoId}.`)
+    this.name = 'DeclaracionDenegada'
+  }
+}
+
 export class FechaInvalida extends Error {
   constructor(motivo: string) {
     super(motivo)
@@ -167,7 +177,8 @@ export function crearOperacionesDeDeclaracion(
     declarar,
     declararPendientes,
 
-    async declararExtraordinaria(grupoId: string): Promise<Declaracion> {
+    async declararExtraordinaria(alcance: Alcance, grupoId: string): Promise<Declaracion> {
+      if (!puedeDeclararAfiliacion(alcance.actor, grupoId)) throw new DeclaracionDenegada(grupoId)
       // Una extraordinaria de hoy bloquearia para siempre una ordinaria
       // anterior; emitir primero las pendientes resuelve el caso en la fuente.
       await declararPendientes()

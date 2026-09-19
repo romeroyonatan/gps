@@ -1,17 +1,38 @@
+import { alcanceDe } from '@gps/core'
 import { type Builder, enumCompartido } from '@gps/core/graphql'
 import { GraphQLError } from 'graphql'
-import { TIPOS_DE_CARGO } from '../dominio/cargos'
+import { TIPOS_DE_CARGO, type TipoDeCargo } from '../dominio/cargos'
 import { CATEGORIAS, type Categoria } from '../dominio/categorias'
 import { TIPOS_DE_DOCUMENTO } from '../dominio/documentos'
+import { type IntegranteDeEquipo, TIPOS_DE_EQUIPO, type TipoDeEquipo } from '../dominio/equipos'
 import type { DatosDePersona } from '../dominio/modelos'
 import type {
   Cargo,
   DatosDeCargo,
   DatosDeIngreso,
+  JefeDeGrupo,
   PersonaConVinculos,
   Pertenencia,
 } from '../dominio/vinculos'
-import { DatosInvalidos, DocumentoDuplicado, GrupoInexistente } from './servicio'
+import {
+  CambioDeAutoridadDenegado,
+  DatosInvalidos,
+  DocumentoDuplicado,
+  GrupoInexistente,
+} from './servicio'
+
+/** Un cambio de plantel denegado es un error de negocio, no una caída: la
+ *  pantalla tiene que poder decir "no podés nombrar en ese grupo". */
+async function traduciendo<T>(correr: () => Promise<T>): Promise<T> {
+  try {
+    return await correr()
+  } catch (error) {
+    if (error instanceof CambioDeAutoridadDenegado) {
+      throw new GraphQLError(error.message, { extensions: { code: error.name } })
+    }
+    throw error
+  }
+}
 
 export function registrarSchema(builder: Builder): void {
   // Los valores son los ids del dominio, en minuscula y no gritados como manda
@@ -69,6 +90,7 @@ export function registrarSchema(builder: Builder): void {
   const CargoRef = builder.objectRef<Cargo>('Cargo').implement({
     description: 'Un cargo de una persona en su grupo, con su periodo.',
     fields: (t) => ({
+      id: t.exposeID('id'),
       cargo: t.field({ type: TipoDeCargoRef, resolve: (fila) => fila.cargo }),
       desde: t.exposeString('desde'),
       hasta: t.exposeString('hasta', {
@@ -78,6 +100,23 @@ export function registrarSchema(builder: Builder): void {
       }),
     }),
   })
+
+  const TipoDeEquipoRef = builder.enumType('TipoDeEquipo', {
+    description: 'Los equipos funcionales que la autorización conoce.',
+    values: TIPOS_DE_EQUIPO.map((equipo) => equipo.id) as unknown as readonly TipoDeEquipo[],
+  })
+
+  const IntegranteRef = builder
+    .objectRef<IntegranteDeEquipo & { tipo?: TipoDeEquipo }>('IntegranteDeEquipo')
+    .implement({
+      description: 'La pertenencia de una persona a un equipo, con su periodo.',
+      fields: (t) => ({
+        id: t.exposeID('id'),
+        equipoId: t.exposeID('equipoId'),
+        desde: t.exposeString('desde'),
+        hasta: t.exposeString('hasta', { nullable: true }),
+      }),
+    })
 
   // No expone `edad`: calcularla exige consultar el reloj, que esta prohibido
   // bajo src/servidor/, y ademas el "hoy" correcto es el de quien mira la
@@ -102,6 +141,11 @@ export function registrarSchema(builder: Builder): void {
         type: [CargoRef],
         description: 'Todos, también los vencidos: la vigencia la decide el cliente.',
         resolve: (persona) => [...persona.cargos],
+      }),
+      equipos: t.field({
+        type: [IntegranteRef],
+        description: 'Los equipos que integra hoy. Secretaría no es un cargo: es esto.',
+        resolve: (persona) => [...persona.equipos],
       }),
     }),
   })
@@ -144,7 +188,7 @@ export function registrarSchema(builder: Builder): void {
       description: 'Las personas de un grupo, ordenadas por apellido.',
       args: { grupoId: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) => [
-        ...(await contexto.personas.listarPersonas(String(args.grupoId))),
+        ...(await contexto.personas.listarPersonas(alcanceDe(contexto), String(args.grupoId))),
       ],
     }),
   )
@@ -172,7 +216,7 @@ export function registrarSchema(builder: Builder): void {
               hasta: cargo.hasta ?? null,
             })),
           }
-          return await contexto.personas.crearPersona(args.datos, ingreso)
+          return await contexto.personas.crearPersona(alcanceDe(contexto), args.datos, ingreso)
         } catch (error) {
           // Yoga enmascara todo lo que no sea un GraphQLError: sin esta
           // traduccion, el formulario recibe "Unexpected error." en vez del
@@ -192,6 +236,118 @@ export function registrarSchema(builder: Builder): void {
           throw error
         }
       },
+    }),
+  )
+  /** Las cuatro operaciones de plantel. Todas reciben el actor y no el
+   *  alcance: quién puede nombrar a quién es una pregunta de función -jefatura
+   *  y Secretaría en su grupo, autoridades diocesanas en la diócesis-, y la
+   *  responde `personas` con sus políticas puras. */
+  const JefeRef = builder.objectRef<JefeDeGrupo>('JefeDeGrupo').implement({
+    description: 'Quién conduce un grupo hoy, para el directorio de la asociación.',
+    fields: (t) => ({
+      grupoId: t.exposeID('grupoId'),
+      personaId: t.exposeID('personaId'),
+      nombres: t.exposeString('nombres'),
+      apellidos: t.exposeString('apellidos'),
+    }),
+  })
+
+  // Consulta suelta y no un campo de Grupo porque la flecha va en esta
+  // dirección: personas conoce a estructura, no al revés. La pantalla hace las
+  // dos consultas y cruza por id, igual que con `afiliadosEn`.
+  builder.queryField('jefesDeGrupos', (t) =>
+    t.field({
+      type: [JefeRef],
+      description:
+        'Quiénes conducen esos grupos el día dado. No filtra por alcance: es el ' +
+        'directorio de la asociación, no los datos de la gente de un grupo.',
+      args: {
+        grupoIds: t.arg.idList({ required: true }),
+        fecha: t.arg.string({ required: true }),
+      },
+      resolve: async (_padre, args, contexto) => [
+        ...(await contexto.personas.jefesDeGrupos(
+          alcanceDe(contexto),
+          args.grupoIds.map(String),
+          args.fecha,
+        )),
+      ],
+    }),
+  )
+
+  builder.mutationField('asignarCargo', (t) =>
+    t.field({
+      type: CargoRef,
+      description: 'Nombra a alguien en un cargo de su grupo, su distrito o la diócesis.',
+      args: {
+        personaId: t.arg.id({ required: true }),
+        cargo: t.arg({ type: TipoDeCargoRef, required: true }),
+        ambitoId: t.arg.id(),
+        desde: t.arg.string({ required: true }),
+        hasta: t.arg.string(),
+      },
+      resolve: async (_padre, args, contexto) =>
+        await traduciendo(() =>
+          contexto.personas.asignarCargoComo(alcanceDe(contexto).actor, {
+            personaId: String(args.personaId),
+            cargo: args.cargo as TipoDeCargo,
+            ambitoId: args.ambitoId === undefined ? null : String(args.ambitoId),
+            desde: args.desde,
+            hasta: args.hasta ?? null,
+          }),
+        ),
+    }),
+  )
+
+  builder.mutationField('revocarCargo', (t) =>
+    t.boolean({
+      description: 'Saca a alguien de un cargo. El acceso se pierde en el pedido siguiente.',
+      args: { cargoId: t.arg.id({ required: true }) },
+      resolve: async (_padre, args, contexto) =>
+        await traduciendo(async () => {
+          await contexto.personas.revocarCargo(alcanceDe(contexto).actor, String(args.cargoId))
+          return true
+        }),
+    }),
+  )
+
+  builder.mutationField('integrarEquipo', (t) =>
+    t.field({
+      type: IntegranteRef,
+      description: 'Suma a alguien a Secretaría de su grupo o a un equipo diocesano.',
+      args: {
+        personaId: t.arg.id({ required: true }),
+        tipo: t.arg({ type: TipoDeEquipoRef, required: true }),
+        ambitoId: t.arg.id(),
+        desde: t.arg.string({ required: true }),
+      },
+      resolve: async (_padre, args, contexto) =>
+        await traduciendo(() =>
+          contexto.personas.integrarEquipo(alcanceDe(contexto).actor, {
+            personaId: String(args.personaId),
+            tipo: args.tipo as TipoDeEquipo,
+            // Secretaría es del grupo; los otros dos son de la diócesis, que
+            // no apunta a ninguna entidad. Lo valida el servicio igual.
+            ambitoTipo: args.tipo === 'secretaria' ? 'grupo' : 'diocesis',
+            ambitoId: args.ambitoId === undefined ? null : String(args.ambitoId),
+            desde: args.desde,
+          }),
+        ),
+    }),
+  )
+
+  builder.mutationField('revocarIntegranteDeEquipo', (t) =>
+    t.boolean({
+      description: 'Saca a alguien de un equipo. El acceso se pierde en el pedido siguiente.',
+      args: { integranteId: t.arg.id({ required: true }) },
+      resolve: async (_padre, args, contexto) =>
+        await traduciendo(async () => {
+          await contexto.personas.revocarIntegranteDeEquipo(
+            alcanceDe(contexto).actor,
+            String(args.integranteId),
+          )
+          return true
+        }),
     }),
   )
 }

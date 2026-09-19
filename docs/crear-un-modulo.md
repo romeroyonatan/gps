@@ -353,7 +353,11 @@ que corre, lo cual es la misma razón por la que `Core.reloj` existe en primer l
 - **Olvidarse de correr `bun run schema` después de tocar el esquema** hace fallar CI: el
   `schema.gql` versionado queda desactualizado respecto del que el código compone, y esa
   discrepancia es justamente lo que la verificación de CI existe para detectar.
-- **Olvidarse de `Alcance` como primer parámetro de un método de repositorio** —cuando
-  exista `auth` y haya repositorios reales— filtra datos de otros grupos: sin ese filtro
-  obligatorio, una consulta que debería limitarse al grupo del actor puede devolver filas
-  de toda la asociación.
+- **Olvidarse de `Alcance` como primer parámetro** de un camino iniciado por un usuario
+  filtra datos de otros grupos: sin ese filtro obligatorio, una consulta que debería
+  limitarse al grupo del actor devuelve filas de toda la asociación. Hoy no compila, que
+  es justamente para lo que está la convención.
+- **Olvidarse de `accesoAlModulo`** no se puede: es un campo obligatorio de `Module`. Lo
+  que sí se puede es declararlo de más. La lista de roles permitidos es lo primero que
+  alguien lee para entender quién alcanza el módulo, así que conviene que sea corta y
+  que cada nombre esté ahí por una razón.

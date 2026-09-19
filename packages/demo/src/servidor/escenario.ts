@@ -6,15 +6,18 @@ import '@gps/estructura/servidor'
 import '@gps/personas/servidor'
 import '@gps/tesoreria/servidor'
 import '@gps/salidas/servidor'
+import '@gps/auth/servidor'
 import { YaDeclaroHoy } from '@gps/afiliacion/servidor'
-import type { Context } from '@gps/core'
+import { type Alcance, alcanceSinLimites, type Context } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import { RAMAS, type Rama, type SexoDeUnidad } from '@gps/estructura/dominio'
 import {
   ambitoDelCargo,
   type Categoria,
   type DatosDePersona,
+  normalizarNumero,
   type TipoDeCargo,
+  type TipoDeEquipo,
 } from '@gps/personas/dominio'
 
 /** La diocesis de la demostracion. Los grupos abren conjuntos distintos de
@@ -395,7 +398,7 @@ export async function sembrarEscenario(ctx: Context, ahora: Date): Promise<void>
   }
 
   const gruposPorNumero = new Map(
-    (await ctx.estructura.listarDistritos())
+    (await ctx.estructura.listarDistritos(alcanceSinLimites()))
       .flatMap((distrito) => distrito.grupos)
       .map((grupo) => [grupo.numero, grupo]),
   )
@@ -417,7 +420,7 @@ export async function sembrarEscenario(ctx: Context, ahora: Date): Promise<void>
     if (persona.rama !== null && !suya) {
       throw new Error(`El grupo ${persona.numeroDeGrupo} no tiene unidad de ${persona.rama}.`)
     }
-    const creada = await ctx.personas.crearPersona(persona.datos, {
+    const creada = await ctx.personas.crearPersona(alcanceSinLimites(), persona.datos, {
       grupoId: grupo.id,
       categoria: persona.categoria,
       unidadId: suya?.id ?? null,
@@ -449,7 +452,7 @@ export async function sembrarEscenario(ctx: Context, ahora: Date): Promise<void>
   const grupoDeLaExtraordinaria = gruposPorNumero.get(42)
   if (!grupoDeLaExtraordinaria) throw new Error('El escenario no tiene el grupo 42.')
   try {
-    await ctx.afiliacion.declararExtraordinaria(grupoDeLaExtraordinaria.id)
+    await ctx.afiliacion.declararExtraordinaria(alcanceSinLimites(), grupoDeLaExtraordinaria.id)
   } catch (error) {
     // Los dos dias del anio en que se siembra el demo justo en una fecha
     // ordinaria, la declaracion del dia ya la emitio el barrido de arriba y el
@@ -463,14 +466,14 @@ export async function sembrarEscenario(ctx: Context, ahora: Date): Promise<void>
   const declaraciones = await ctx.afiliacion.listarDeclaraciones()
   const ultima = declaraciones[0]
   if (ultima) {
-    await ctx.tesoreria.definirCuota(ultima.periodo, 20000)
-    await ctx.tesoreria.reconciliar()
+    await ctx.tesoreria.definirCuota(alcanceSinLimites(), ultima.periodo, 20000)
+    await ctx.tesoreria.reconciliar(alcanceSinLimites())
 
-    const [cuentaParcial, cuentaConFavor] = (await ctx.tesoreria.listarCuentas()).filter(
-      (cuenta) => cuenta.saldo > 0,
-    )
+    const [cuentaParcial, cuentaConFavor] = (
+      await ctx.tesoreria.listarCuentas(alcanceSinLimites())
+    ).filter((cuenta) => cuenta.saldo > 0)
     if (cuentaParcial) {
-      await ctx.tesoreria.registrarPago({
+      await ctx.tesoreria.registrarPago(alcanceSinLimites(), {
         grupoId: cuentaParcial.grupoId,
         fecha: ultima.fecha,
         importe: Math.max(1, Math.floor(cuentaParcial.saldo / 2)),
@@ -479,7 +482,7 @@ export async function sembrarEscenario(ctx: Context, ahora: Date): Promise<void>
       })
     }
     if (cuentaConFavor) {
-      await ctx.tesoreria.registrarPago({
+      await ctx.tesoreria.registrarPago(alcanceSinLimites(), {
         grupoId: cuentaConFavor.grupoId,
         fecha: ultima.fecha,
         importe: cuentaConFavor.saldo + 5000,
@@ -490,7 +493,90 @@ export async function sembrarEscenario(ctx: Context, ahora: Date): Promise<void>
   }
 
   await sembrarSalidas(ctx, grupoDeLaExtraordinaria, ahora)
+  await sembrarPerfilesDemo(ctx, [...gruposPorNumero.values()])
 }
+
+/** Los perfiles del proveedor `demo`: cuatro identidades sintéticas que entran
+ *  de un clic y recorren la misma autorización que una de Google.
+ *
+ *  Cada uno es una persona ya sembrada con sus cargos, más -para Secretaría y
+ *  Tesorería- la pertenencia al equipo que le da sus permisos. La identidad
+ *  se vincula por el mismo camino que la de una persona real: una invitación
+ *  de activación emitida y consumida acá mismo, con el proveedor demo del otro
+ *  lado. Ese `subject` es el que la pantalla manda como `?perfil=`.
+ *
+ *  El administrador queda designado pero **no elevado**: para tener alcance
+ *  global tiene que volver a autenticarse con otro clic, igual que uno real. */
+const PERFILES_DEMO = [
+  // Jefatura de grupo: administra su grupo y lee su cuenta, nada del vecino.
+  { subject: 'jefatura', documento: '33.207.415', equipo: null },
+  // Secretaría: los mismos permisos de grupo que la jefatura, pero salen del
+  // equipo y no de un cargo estatutario.
+  { subject: 'secretaria', documento: '20.447.195', equipo: 'secretaria' },
+  // Tesorería diocesana: la única que registra pagos, de cualquier grupo.
+  { subject: 'tesoreria', documento: '36.114.780', equipo: 'tesoreriaDiocesana' },
+  // Comisionada de distrito: alcanza los grupos de su distrito para firmar sus
+  // permisos de salida, pero no ve el padrón ni la cuenta de ninguno.
+  { subject: 'comisionado', documento: '28.904.331', equipo: null },
+  // La persona administradora. Entra con lo que le dan sus cargos -es jefe
+  // scout diocesano- y para el alcance global tiene que elevarse con otro
+  // clic, igual que una real.
+  { subject: 'administrador', documento: '35.208.774', equipo: null },
+] as const satisfies readonly {
+  subject: string
+  documento: string
+  equipo: TipoDeEquipo | null
+}[]
+
+async function sembrarPerfilesDemo(ctx: Context, grupos: readonly { id: string }[]): Promise<void> {
+  const elevado = alcanceSinLimites()
+  const gente = (
+    await Promise.all(grupos.map((grupo) => ctx.personas.listarPersonas(elevado, grupo.id)))
+  ).flat()
+
+  for (const perfil of PERFILES_DEMO) {
+    // El documento es la unica forma estable de encontrar a la persona: los
+    // ids los pone core.nuevoId al sembrar.
+    const persona = gente.find(
+      (una) => normalizarNumero(una.numeroDeDocumento) === normalizarNumero(perfil.documento),
+    )
+    if (!persona) throw new Error(`El escenario no tiene la persona ${perfil.documento}.`)
+
+    if (perfil.equipo) {
+      const esDeGrupo = perfil.equipo === 'secretaria'
+      await ctx.personas.integrarEquipo(elevado.actor, {
+        personaId: persona.id,
+        tipo: perfil.equipo,
+        ambitoTipo: esDeGrupo ? 'grupo' : 'diocesis',
+        ambitoId: esDeGrupo ? persona.pertenencia.grupoId : null,
+        desde: persona.pertenencia.desde,
+      })
+    }
+
+    const invitacion = await ctx.auth.emitirInvitacion(elevado.actor, {
+      tipo: 'activacion',
+      personaId: persona.id,
+    })
+    const inicio = ctx.auth.iniciarLogin('demo', 'web', enlaceDelPerfil(perfil.subject))
+    await ctx.auth.consumirActivacion(invitacion.secreto, {
+      transaccion: inicio.transaccion,
+      stateRecibido: stateDe(inicio.url),
+      code: 'demo',
+    })
+
+    if (perfil.subject === 'administrador') {
+      await ctx.auth.asignarAdministrador(persona.id)
+    }
+  }
+}
+
+/** El proveedor demo lee el perfil del `redirectUri`, que es lo unico que
+ *  recibe en las dos mitades del viaje. Al sembrar no hay request, asi que se
+ *  arma uno igual al que armaria la ruta. */
+const enlaceDelPerfil = (subject: string) =>
+  `http://demo.invalido/auth/demo/callback?perfil=${encodeURIComponent(subject)}`
+
+const stateDe = (url: string) => new URL(url).searchParams.get('state') ?? ''
 
 /** Tres permisos del grupo 42, uno por estado que la pantalla tiene que saber
  *  dibujar: un borrador a medio armar, uno emitido con una sola firma, y uno
@@ -502,9 +588,10 @@ export async function sembrarEscenario(ctx: Context, ahora: Date): Promise<void>
  *  veria nunca. */
 async function sembrarSalidas(
   ctx: Context,
-  grupo: { id: string; unidades: readonly { id: string; rama: string }[] },
+  grupo: { id: string; distritoId: string; unidades: readonly { id: string; rama: string }[] },
   ahora: Date,
 ) {
+  const distritoId = grupo.distritoId
   // `ahora` entra por parametro y no sale del sistema: es la regla de
   // portabilidad, y el plugin de Biome la hace cumplir tambien aca.
   const enDias = (dias: number) =>
@@ -512,7 +599,7 @@ async function sembrarSalidas(
 
   const tropas = grupo.unidades.filter((unidad) => unidad.rama === 'scouts').map((u) => u.id)
   const manada = grupo.unidades.find((unidad) => unidad.rama === 'lobatos')
-  const gente = await ctx.personas.listarPersonas(grupo.id)
+  const gente = await ctx.personas.listarPersonas(alcanceSinLimites(), grupo.id)
 
   /** Arma un permiso con las unidades y todo el que pueda ir. */
   async function armar(datos: {
@@ -522,19 +609,43 @@ async function sembrarSalidas(
     comoSeViaja?: string
     unidades: readonly string[]
   }) {
-    const permiso = await ctx.salidas.crearPermiso(grupo.id, {
+    const permiso = await ctx.salidas.crearPermiso(alcanceSinLimites(), grupo.id, {
       lugar: datos.lugar,
       desde: enDias(datos.dentroDe),
       hasta: enDias(datos.dentroDe + datos.dura),
       comoSeViaja: datos.comoSeViaja ?? null,
     })
-    await ctx.salidas.elegirUnidades(permiso.id, datos.unidades)
+    await ctx.salidas.elegirUnidades(alcanceSinLimites(), permiso.id, datos.unidades)
     for (const persona of gente) {
       const unidadId = persona.pertenencia.unidadId
       if (unidadId !== null && !datos.unidades.includes(unidadId)) continue
-      await ctx.salidas.agregarParticipante(permiso.id, persona.id)
+      await ctx.salidas.agregarParticipante(alcanceSinLimites(), permiso.id, persona.id)
     }
     return permiso
+  }
+
+  // Firmar en la app es lo unico que la elevacion no alcanza -seria falsificar
+  // una firma-, asi que la siembra se presenta como el ocupante del cargo.
+  const comoFirmante = (cargo: 'jefeDeGrupo' | 'director' | 'comisionadoDeDistrito'): Alcance => {
+    const delDistrito = cargo === 'comisionadoDeDistrito'
+    return {
+      actor: {
+        personaId: 'demo_firmante',
+        roles: [
+          {
+            rol: cargo === 'director' ? 'directorDeGrupo' : cargo,
+            ambito: delDistrito
+              ? { tipo: 'distrito', id: distritoId }
+              : { tipo: 'grupo', id: grupo.id },
+          },
+        ],
+        esAdministradorDesignado: false,
+        estaElevado: false,
+      },
+      gruposVisibles: [grupo.id],
+      distritosVisibles: [distritoId],
+      esAdministrador: false,
+    }
   }
 
   // Un garabato cualquiera: lo que importa es que se vea una firma dibujada.
@@ -568,8 +679,8 @@ async function sembrarSalidas(
     comoSeViaja: 'Micro contratado desde la parroquia',
     unidades: tropas,
   })
-  await ctx.salidas.emitir(emitido.id)
-  await ctx.salidas.firmarEnApp(emitido.id, 'jefeDeGrupo', firma)
+  await ctx.salidas.emitir(alcanceSinLimites(), emitido.id)
+  await ctx.salidas.firmarEnApp(comoFirmante('jefeDeGrupo'), emitido.id, 'jefeDeGrupo', firma)
 
   // Firmado por los tres, todos en la app: el escaneo de un papel necesitaria
   // una imagen de verdad en el paquete, y el caso mixto ya lo cubren los tests.
@@ -580,8 +691,8 @@ async function sembrarSalidas(
     comoSeViaja: 'Combis de las familias',
     unidades: tropas,
   })
-  await ctx.salidas.emitir(firmado.id)
+  await ctx.salidas.emitir(alcanceSinLimites(), firmado.id)
   for (const cargo of ['jefeDeGrupo', 'director', 'comisionadoDeDistrito'] as const) {
-    await ctx.salidas.firmarEnApp(firmado.id, cargo, firma)
+    await ctx.salidas.firmarEnApp(comoFirmante(cargo), firmado.id, cargo, firma)
   }
 }

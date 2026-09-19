@@ -1,4 +1,4 @@
-import type { Core } from '@gps/core'
+import type { Alcance, Core } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Estructura } from '@gps/estructura/dominio'
 import { eq } from 'drizzle-orm'
@@ -8,8 +8,9 @@ import {
   MEDIOS_DE_PAGO,
   type MedioDePago,
   type MovimientoDeTesoreria,
+  puedeRegistrarPagos,
 } from '../dominio'
-import { DatosDePagoInvalidos, PagoNoAnulable } from './errores'
+import { DatosDePagoInvalidos, OperacionDenegada, PagoNoAnulable } from './errores'
 import { movimientosDeTesoreria } from './tablas'
 
 /** Casos de uso sobre pagos externos: registrarlos y anularlos mediante un
@@ -17,14 +18,20 @@ import { movimientosDeTesoreria } from './tablas'
 export function crearOperacionesDePagos(core: Core, estructura: Estructura) {
   const limpiar = (valor?: string | null) => valor?.trim() || null
 
-  async function registrarPago(datos: {
-    grupoId: string
-    fecha: string
-    importe: number
-    medioDePago: MedioDePago
-    referencia?: string | null
-    observacion?: string | null
-  }): Promise<MovimientoDeTesoreria> {
+  async function registrarPago(
+    alcance: Alcance,
+    datos: {
+      grupoId: string
+      fecha: string
+      importe: number
+      medioDePago: MedioDePago
+      referencia?: string | null
+      observacion?: string | null
+    },
+  ): Promise<MovimientoDeTesoreria> {
+    if (!puedeRegistrarPagos(alcance.actor)) {
+      throw new OperacionDenegada('Sólo Tesorería diocesana registra pagos.')
+    }
     if (!importeEnPesosValido(datos.importe) || !fechaValida(datos.fecha)) {
       throw new DatosDePagoInvalidos('El importe o la fecha del pago no son válidos.')
     }
@@ -56,7 +63,10 @@ export function crearOperacionesDePagos(core: Core, estructura: Estructura) {
     return pago
   }
 
-  async function anularPago(pagoId: string): Promise<MovimientoDeTesoreria> {
+  async function anularPago(alcance: Alcance, pagoId: string): Promise<MovimientoDeTesoreria> {
+    if (!puedeRegistrarPagos(alcance.actor)) {
+      throw new OperacionDenegada('Sólo Tesorería diocesana anula pagos.')
+    }
     const pago = core.bd
       .select()
       .from(movimientosDeTesoreria)

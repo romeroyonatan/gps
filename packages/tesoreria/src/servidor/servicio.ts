@@ -1,5 +1,5 @@
 import type { Afiliacion, Declaracion } from '@gps/afiliacion/dominio'
-import type { Core } from '@gps/core'
+import type { Alcance, Core } from '@gps/core'
 import type { Estructura } from '@gps/estructura/dominio'
 import type {
   CuentaDeGrupo,
@@ -14,26 +14,30 @@ import { crearConsultasDeTesoreria } from './consultas'
 import { crearOperacionesDeCuotas } from './cuotas'
 import { crearOperacionesDePagos } from './pagos'
 
-export { CuotaUtilizada, DatosDePagoInvalidos, PagoNoAnulable } from './errores'
+export { CuotaUtilizada, DatosDePagoInvalidos, OperacionDenegada, PagoNoAnulable } from './errores'
 
 export interface ServicioDeTesoreria {
-  definirCuota(periodo: number, importe: number): Promise<CuotaDeAfiliacion>
+  definirCuota(alcance: Alcance, periodo: number, importe: number): Promise<CuotaDeAfiliacion>
   listarCuotas(): Promise<readonly CuotaDeAfiliacion[]>
-  listarPeriodosConfigurables(): Promise<readonly number[]>
+  listarPeriodosConfigurables(alcance: Alcance): Promise<readonly number[]>
+  /** Interno: lo dispara el evento `AfiliacionDeclarada`, no un usuario. */
   generarCargo(declaracion: Declaracion): Promise<MovimientoDeTesoreria | null>
-  resumenDePendientes(): Promise<ResumenDePendientes>
-  reconciliar(): Promise<ResultadoDeReconciliacion>
-  registrarPago(datos: {
-    grupoId: string
-    fecha: string
-    importe: number
-    medioDePago: MedioDePago
-    referencia?: string | null
-    observacion?: string | null
-  }): Promise<MovimientoDeTesoreria>
-  anularPago(pagoId: string): Promise<MovimientoDeTesoreria>
-  listarMovimientos(grupoId: string): Promise<readonly MovimientoDeTesoreria[]>
-  listarCuentas(): Promise<readonly CuentaDeGrupo[]>
+  resumenDePendientes(alcance: Alcance): Promise<ResumenDePendientes>
+  reconciliar(alcance: Alcance): Promise<ResultadoDeReconciliacion>
+  registrarPago(
+    alcance: Alcance,
+    datos: {
+      grupoId: string
+      fecha: string
+      importe: number
+      medioDePago: MedioDePago
+      referencia?: string | null
+      observacion?: string | null
+    },
+  ): Promise<MovimientoDeTesoreria>
+  anularPago(alcance: Alcance, pagoId: string): Promise<MovimientoDeTesoreria>
+  listarMovimientos(alcance: Alcance, grupoId: string): Promise<readonly MovimientoDeTesoreria[]>
+  listarCuentas(alcance: Alcance): Promise<readonly CuentaDeGrupo[]>
 }
 
 /** Compone los casos de uso del módulo. Las dependencias llegan ya

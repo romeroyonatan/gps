@@ -1,11 +1,13 @@
 import type { Afiliacion, Declaracion } from '@gps/afiliacion/dominio'
-import type { Core } from '@gps/core'
+import type { Alcance, Core } from '@gps/core'
 import { eq, isNotNull } from 'drizzle-orm'
 import type {
   MovimientoDeTesoreria,
   ResultadoDeReconciliacion,
   ResumenDePendientes,
 } from '../dominio'
+import { puedeRegistrarPagos, puedeVerTesoreriaDeLaDiocesis } from '../dominio'
+import { OperacionDenegada } from './errores'
 import { cuotasDeAfiliacion, movimientosDeTesoreria } from './tablas'
 
 /** Casos de uso que convierten declaraciones de Afiliación en cargos de
@@ -82,7 +84,10 @@ export function crearOperacionesDeCargos(core: Core, afiliacion: Afiliacion) {
     return pendientes
   }
 
-  async function resumenDePendientes(): Promise<ResumenDePendientes> {
+  async function resumenDePendientes(alcance: Alcance): Promise<ResumenDePendientes> {
+    if (!puedeVerTesoreriaDeLaDiocesis(alcance.actor)) {
+      throw new OperacionDenegada('El panorama de deuda de la diócesis es de Tesorería.')
+    }
     const pendientes = await declaracionesPendientes()
     const periodosConCuota = new Set(
       core.bd
@@ -103,12 +108,15 @@ export function crearOperacionesDeCargos(core: Core, afiliacion: Afiliacion) {
     }
   }
 
-  async function reconciliar(): Promise<ResultadoDeReconciliacion> {
+  async function reconciliar(alcance: Alcance): Promise<ResultadoDeReconciliacion> {
+    if (!puedeRegistrarPagos(alcance.actor)) {
+      throw new OperacionDenegada('Sólo Tesorería diocesana genera los cargos pendientes.')
+    }
     let creados = 0
     for (const declaracion of await declaracionesPendientes()) {
       if (await generarCargo(declaracion)) creados++
     }
-    return { ...(await resumenDePendientes()), creados }
+    return { ...(await resumenDePendientes(alcance)), creados }
   }
 
   return { generarCargo, resumenDePendientes, reconciliar }
