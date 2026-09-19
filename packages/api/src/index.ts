@@ -1,12 +1,18 @@
 export { useAfiliadosEn, useDeclaraciones, useDeclararAfiliacion } from './afiliacion'
+export { useCerrarSesion, useInvitar, usePersonaActual, useRevocarInvitacion } from './auth'
+export type { AlmacenDelCache, ParticionDelCache } from './cache'
+export { almacenPorPersona, useParticionDelCache } from './cache'
 export { useDistritos } from './estructura'
 export type {
+  AmbitoDeRol,
   CrearPersonaMutationVariables,
   DeclaracionesQuery,
   DistritosQuery,
   MedioDePago,
   PermisosQuery,
+  PersonaActualQuery,
   PersonasQuery,
+  Rol,
   TipoDeCargo,
   VersionQuery,
 } from './generated/graphql'

@@ -49,9 +49,9 @@
 
 - [x] 7.1 Exponer operaciones/rutas mínimas para iniciar y completar OAuth, consultar la persona actual, cerrar sesión, vincular proveedor, elevarse, invitar y recuperar; regenerar `schema.gql` y el cliente con `bun run schema` y `bun run --filter @gps/api codegen`.
 - [x] 7.2 Adaptar `Transporte` para cookie web y bearer mobile, y manejar errores distinguibles de no autenticado/sin permiso; verificar tests HTTP de headers, credenciales y mensajes.
-- [ ] 7.3 Implementar login web con Google/Apple y cookie HttpOnly, más cierre de sesión y retorno al destino original; verificar manualmente el flujo con proveedor falso/local.
+- [x] 7.3 Implementar login web con Google/Apple y cookie HttpOnly, más cierre de sesión y retorno al destino original; verificar manualmente el flujo con proveedor falso/local.
 - [ ] 7.4 Implementar login mobile con navegador del sistema, deep link y sesión en `expo-secure-store`, nunca AsyncStorage; verificar retorno exitoso, cancelación y reinicio de la app.
-- [ ] 7.5 Particionar el cache persistido por `personaId` y purgarlo al cerrar sesión, recuperar identidad o cambiar de persona; verificar que dos sesiones consecutivas no compartan datos cacheados.
+- [x] 7.5 Particionar el cache persistido por `personaId` y purgarlo al cerrar sesión, recuperar identidad o cambiar de persona; verificar que dos sesiones consecutivas no compartan datos cacheados.
 - [ ] 7.6 Implementar en web y mobile la gestión mínima de plantel/equipos, creación/revocación de enlaces y compartir por Share API o copiar enlace; verificar a 375 px los flujos de Jefatura, Secretaría y autoridad diocesana.
 - [ ] 7.7 Implementar activación y recuperación desde deep link mostrando persona y ámbito antes de confirmar; verificar enlace usado, vencido, revocado y recuperación que obliga a iniciar una sesión nueva.
 - [ ] 7.8 Implementar activación visual de sudo, cuenta regresiva y salida automática del modo elevado; verificar que las acciones globales desaparezcan y sean rechazadas al vencer.
