@@ -471,11 +471,19 @@ Ninguna de las dos se implementa en la iteración 1, pero la autorización impon
 convenciones que son gratis hoy y carísimas de retrofitear una vez que existan ocho
 módulos consultando la base. Por eso el modelo se fija acá.
 
+> **Al implementarse cambió una cosa de esta sección: no hay `Usuario`.** La identidad
+> interna es la `Persona`, que ya existe y que todo operador de GPS tiene igual; una
+> entidad aparte sólo duplicaba identidad y exigía sincronizarlas. Donde abajo dice
+> `usuarioId`, hoy es `personaId`, y donde dice la tabla `usuarios`, hoy no hay tabla.
+> El resto del modelo —roles con ámbito, las tres capas, el alcance como primer
+> parámetro— quedó como está escrito. Ver
+> `openspec/changes/agregar-autenticacion-y-autorizacion/`.
+
 ### 8.1 Autenticación: un módulo más, sin nada especial
 
-`auth` es un módulo normal. Posee sus tablas (`usuarios`, `identidades_externas`,
-`sesiones`), expone las mutations de login con Google y Apple ID, y valida el token de
-sesión en cada request.
+`auth` es un módulo normal. Posee sus tablas (`identidades_externas`, `sesiones`,
+`invitaciones`, `administrador_del_sistema`, `eventos_de_seguridad`), expone el login
+con Google y Apple ID, y valida el secreto de sesión en cada request.
 
 La costura necesaria ya existe y no requiere abstracción nueva: el `context.ts` del
 backend le pregunta al servicio de `auth` quién llama, antes de que corra cualquier
@@ -492,7 +500,7 @@ grupo, autoridades— que es el dominio del módulo Estructura.
 
 La responsabilidad se reparte así:
 
-- **`auth` dice quién sos.** Un `Usuario` con identidad verificada.
+- **`auth` dice quién sos.** Una `Persona` con identidad externa verificada.
 - **`estructura` dice qué cargo ocupás.** Cae naturalmente, porque Estructura ya modela
   distritos, grupos y autoridades: un rol no es un concepto abstracto de permisos, es un
   hecho estructural de la asociación.
@@ -505,7 +513,7 @@ La identidad no alcanza; importa el rol y sobre qué:
 
     // packages/core/src/actor.ts
     export interface Actor {
-      usuarioId: string
+      personaId: string
       roles: RolConAmbito[]
     }
 

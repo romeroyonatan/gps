@@ -62,10 +62,14 @@ Un módulo no sabe si lo está ejecutando el servidor o el teléfono.
     |     |                                                          |
     |     +-- /graphql --> GraphQL Yoga                              |
     |     |                   |                                      |
+    |     |                   +-- auditoria.ts                      |
+    |     |                   |     audita toda escritura elevada    |
     |     |                   +-- envelop.ts            (futuro)     |
-    |     |                         auditoria                        |
     |     |                         rate limiting                    |
     |     |                         cache de respuestas              |
+    |     |                                                          |
+    |     +-- /auth/:proveedor/iniciar   --> arranca el login             |
+    |     +-- /auth/:proveedor/callback  --> cookie web / deep link mobile |
     |     |                                                          |
     |     +-- /health  --> chequeo                                   |
     |     |                                                          |
@@ -121,7 +125,7 @@ impuesto por el linter, no por convención.
     packages/personas/
       |
       +-- /dominio     modelos, validaciones, reglas puras, publico.ts,
-      |                politicas.ts (futuro)
+      |                politicas.ts
       |                    ^              ^                  ^               ^
       |                    |              |                  |               |
       |                 apps/web      apps/mobile    services/backend  otros modulos
@@ -224,15 +228,15 @@ sólo el registro que evita crearlo dos veces, que es plomería y por eso vive e
        v
     respuesta
 
-## 6. Autorización (futuro)
+## 6. Autenticación y autorización
 
     request
        |
        v
-    auth        quien sos      -->  Actor { usuarioId, roles[] }
+    auth        quien sos      -->  Actor { personaId, roles[] }
        |
        v
-    estructura  que alcanzas   -->  Alcance { gruposVisibles, distritosVisibles }
+    estructura  que alcanzas   -->  Alcance { actor, gruposVisibles, distritosVisibles }
        |
        +----------------------------+
        |                            |
@@ -245,9 +249,21 @@ sólo el registro que evita crearlo dos veces, que es plomería y por eso vive e
     filas que el actor puede ver
 
 Dos garantías salen de este dibujo. La primera: `alcance` es el **primer parámetro
-obligatorio** de todo repositorio, así que una consulta que se olvide de filtrar no
-compila. La segunda: las políticas son las **mismas funciones** en el servidor y en la
-pantalla, así que la interfaz no puede ofrecer algo que el servidor vaya a rechazar.
+obligatorio** de todo camino iniciado por un usuario, así que una consulta que se olvide
+de filtrar no compila. La segunda: las políticas son las **mismas funciones** en el
+servidor y en la pantalla, así que la interfaz no puede ofrecer algo que el servidor
+vaya a rechazar.
+
+`Alcance` lleva adentro al `Actor` porque las dos preguntas viajan siempre juntas: qué
+filas se ven —`gruposVisibles`— y qué puede hacer quien pregunta, que es lo que deciden
+las políticas. Separarlas obligaría a dos parámetros en cada firma, y a que alguna se
+olvidara.
+
+Arriba de las dos hay una tercera capa, que es la primera que corre: cada `Module`
+declara `accesoAlModulo`, y `componerEsquema` se lo cuelga a cada campo raíz que ese
+módulo registra. Es obligatorio en la interfaz —un módulo nuevo no compila sin
+decidirlo— y un campo raíz sin módulo dueño aborta el arranque, en vez de quedar
+publicado abierto.
 
 Un grupo se subdivide en **unidades**: la Manada, las dos Tropas, el Clan. La rama sigue
 siendo el catálogo —el tramo de edad, y cómo se llama el tipo de unidad que le
@@ -274,14 +290,15 @@ La persona pertenece a una unidad y no a una rama: la rama sale de la unidad. A 
 pone en cuál lo deciden los dirigentes; el sistema no lo valida ni lo sugiere, y `Persona`
 no guarda sexo.
 
-Quien ocupa cada cargo lo dice `personas`, no `estructura` — ver §7. Cuando llegue
-`auth`, la cadena de dependencias va a ser `auth` → `personas` → `estructura`.
+Quien ocupa cada cargo lo dice `personas`, no `estructura` — ver §7. La cadena de
+dependencias es `auth` → `personas` → `estructura`; `auth` también depende de
+`estructura` directo, para poder nombrar el grupo de un enlace de invitación.
 
 ## 7. Dependencias entre módulos
 
-`Actor` y `Alcance` son tipos de `core`; `estructura` va a aportar, cuando exista `auth`,
-la implementación que expande los roles en un alcance concreto. Eso es ortogonal a la
-dependencia de módulo que ya existe hoy: `personas` depende de `estructura`.
+`Actor` y `Alcance` son tipos de `core`; `estructura` aporta `expandirAlcance`, que
+expande los roles de un actor en un alcance concreto. Eso es ortogonal a la dependencia
+de módulo: `personas` depende de `estructura`.
 
     core                        plomeria; todos dependen de el
 
@@ -294,6 +311,8 @@ dependencia de módulo que ya existe hoy: `personas` depende de `estructura`.
        |  +--+-- salidas    depende de las tres: personas, estructura y archivos
        |
        +-- salud
+       |
+       +-- auth        depende de personas y de estructura
        |
     afiliacion      depende tambien de estructura, directo y no solo via personas
        ^
