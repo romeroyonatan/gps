@@ -210,6 +210,16 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
       )
     },
 
+    async nombreDe(personaId) {
+      return (
+        core.bd
+          .select({ nombres: personas.nombres, apellidos: personas.apellidos })
+          .from(personas)
+          .where(eq(personas.id, personaId))
+          .get() ?? null
+      )
+    },
+
     async grupoVigenteDe(personaId, fecha) {
       return (
         core.bd

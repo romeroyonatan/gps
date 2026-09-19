@@ -1,5 +1,6 @@
 import type { Actor, Core } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
+import type { Estructura } from '@gps/estructura/dominio'
 import {
   type Personas,
   puedeAdministrarEquiposDiocesanos,
@@ -72,6 +73,17 @@ export class InvitacionInvalida extends Error {
   }
 }
 
+/** Lo que la pantalla de un enlace muestra antes de confirmar. */
+export interface VistaDeInvitacion {
+  readonly estado: 'valida' | 'vencida' | 'usada' | 'revocada'
+  readonly tipo: 'activacion' | 'recuperacion' | null
+  readonly persona: { readonly nombres: string; readonly apellidos: string } | null
+  /** El grupo de esa persona hoy, ya con nombre: es el ámbito que la pantalla
+   *  muestra antes de que alguien confirme el enlace. */
+  readonly grupo: string | null
+  readonly proveedorAReemplazar: ProveedorDeIdentidad | null
+}
+
 export class ElevacionDenegada extends Error {
   constructor() {
     super('Sólo la persona administradora designada puede elevarse.')
@@ -142,6 +154,16 @@ export interface ServicioDeAuth extends Auth {
 
   revocarInvitacion(actor: Actor, invitacionId: string): Promise<void>
 
+  /** Mira una invitación sin consumirla, para que la pantalla pueda mostrar a
+   *  quién le da acceso antes de que alguien confirme. No pide sesión: el
+   *  secreto es la autorización, y quien lo tiene ya podría consumirlo.
+   *
+   *  Devuelve el estado en vez de lanzar, porque "venció" y "ya se usó" son
+   *  cosas distintas para quien abrió el enlace y las dos hay que poder
+   *  explicarlas. Un secreto que no existe se responde igual que uno vencido:
+   *  contestar distinto dejaría probar secretos. */
+  mirarInvitacion(secreto: string): Promise<VistaDeInvitacion>
+
   /** Consume una invitación de activación: vincula el proveedor nuevo a la
    *  persona de la invitación y abre sesión. */
   consumirActivacion(
@@ -183,8 +205,17 @@ export interface ServicioDeAuth extends Auth {
 export function crearServicioDeAuth(
   core: Core,
   personas: Personas,
+  estructura: Estructura,
   proveedores: Partial<Record<ProveedorDeIdentidad, ProveedorOidc>>,
 ): ServicioDeAuth {
+  /** El ámbito que muestra un enlace antes de confirmarlo: "Grupo Scout Nº42 -
+   *  Ceferino Namuncurá" dice mucho más que un id. */
+  async function nombreDelGrupoDe(personaId: string, fecha: string): Promise<string | null> {
+    const grupoId = await personas.grupoVigenteDe(personaId, fecha)
+    const grupo = grupoId ? await estructura.obtenerGrupo(grupoId) : null
+    return grupo ? `Grupo Scout Nº${grupo.numero} - ${grupo.nombre}` : null
+  }
+
   function proveedorDe(nombre: ProveedorDeIdentidad): ProveedorOidc {
     const proveedor = proveedores[nombre]
     if (!proveedor) throw new TransaccionDeLoginInvalida(`${nombre} no está configurado`)
@@ -452,6 +483,52 @@ export function crearServicioDeAuth(
         .where(eq(invitaciones.id, invitacionId))
         .run()
       registrarEvento('invitacion.revocar', actor.personaId, fila.personaId, { invitacionId })
+    },
+
+    async mirarInvitacion(secreto) {
+      const ahora = core.reloj.ahora()
+      const invitacion = core.bd
+        .select({
+          tipo: invitaciones.tipo,
+          personaId: invitaciones.personaId,
+          proveedorAReemplazar: invitaciones.proveedorAReemplazar,
+          expiraEn: invitaciones.expiraEn,
+          consumidaEn: invitaciones.consumidaEn,
+          revocadaEn: invitaciones.revocadaEn,
+        })
+        .from(invitaciones)
+        .where(eq(invitaciones.hashDelSecreto, core.hash(secreto)))
+        .get()
+
+      // Un secreto inexistente se contesta igual que uno vencido: distinguirlos
+      // dejaría probar secretos contra esta consulta, que no pide sesión.
+      const nada = {
+        estado: 'vencida',
+        tipo: null,
+        persona: null,
+        grupo: null,
+        proveedorAReemplazar: null,
+      } as const
+      if (!invitacion) return nada
+
+      const estado = invitacion.revocadaEn
+        ? ('revocada' as const)
+        : invitacion.consumidaEn
+          ? ('usada' as const)
+          : invitacion.expiraEn <= ahora
+            ? ('vencida' as const)
+            : ('valida' as const)
+      // Un enlace que ya no sirve no dice de quién era: no hace falta para
+      // explicar que no sirve, y evita usarlo para averiguar.
+      if (estado !== 'valida') return { ...nada, estado }
+
+      return {
+        estado,
+        tipo: invitacion.tipo,
+        persona: await personas.nombreDe(invitacion.personaId),
+        grupo: await nombreDelGrupoDe(invitacion.personaId, aFechaDeCalendario(ahora)),
+        proveedorAReemplazar: invitacion.proveedorAReemplazar,
+      }
     },
 
     async consumirActivacion(secreto, datos) {

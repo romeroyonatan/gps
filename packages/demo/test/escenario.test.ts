@@ -88,7 +88,10 @@ function montarContexto(hora: Date | (() => Date) = HORA, entorno: Entorno = 'de
     sesionId: null,
     config: core.config,
     estructura: servicioDeEstructura,
-    auth: auth.createServices(core, { personas: servicioDePersonas }),
+    auth: auth.createServices(core, {
+      personas: servicioDePersonas,
+      estructura: servicioDeEstructura,
+    }),
     personas: servicioDePersonas,
     afiliacion: servicioDeAfiliacion,
     tesoreria: tesoreria.createServices(core, {

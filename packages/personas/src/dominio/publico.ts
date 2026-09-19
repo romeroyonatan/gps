@@ -35,6 +35,12 @@ export interface Personas {
    *  vincular una identidad externa. */
   personaExiste(personaId: string): Promise<boolean>
 
+  /** Nombre y apellido, para mostrar de quién es algo. Sólo eso: el documento
+   *  y la fecha de nacimiento no salen de personas sin una razón. Lo usa el
+   *  enlace de invitación, que muestra a quién le da acceso antes de que
+   *  alguien lo confirme. */
+  nombreDe(personaId: string): Promise<{ nombres: string; apellidos: string } | null>
+
   /** El grupo al que pertenecía la persona ese día, o null. */
   grupoVigenteDe(personaId: string, fecha: string): Promise<string | null>
 

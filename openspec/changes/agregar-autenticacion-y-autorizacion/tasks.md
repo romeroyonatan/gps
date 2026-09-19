@@ -53,7 +53,7 @@
 - [x] 7.4 Implementar login mobile con navegador del sistema, deep link y sesión en `expo-secure-store`, nunca AsyncStorage; verificar retorno exitoso, cancelación y reinicio de la app.
 - [x] 7.5 Particionar el cache persistido por `personaId` y purgarlo al cerrar sesión, recuperar identidad o cambiar de persona; verificar que dos sesiones consecutivas no compartan datos cacheados.
 - [ ] 7.6 Implementar en web y mobile la gestión mínima de plantel/equipos, creación/revocación de enlaces y compartir por Share API o copiar enlace; verificar a 375 px los flujos de Jefatura, Secretaría y autoridad diocesana.
-- [ ] 7.7 Implementar activación y recuperación desde deep link mostrando persona y ámbito antes de confirmar; verificar enlace usado, vencido, revocado y recuperación que obliga a iniciar una sesión nueva.
+- [x] 7.7 Implementar activación y recuperación desde deep link mostrando persona y ámbito antes de confirmar; verificar enlace usado, vencido, revocado y recuperación que obliga a iniciar una sesión nueva.
 - [x] 7.8 Implementar activación visual de sudo, cuenta regresiva y salida automática del modo elevado; verificar que las acciones globales desaparezcan y sean rechazadas al vencer.
 
 ## 8. Demo, documentación y verificación final

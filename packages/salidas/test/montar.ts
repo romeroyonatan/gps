@@ -178,6 +178,7 @@ export function montar(opciones: { reloj?: Reloj; mundo?: Mundo } = {}) {
   }
 
   const personas: Personas = {
+    nombreDe: async () => null,
     personaExiste: async (personaId) =>
       mundo.miembros.some(({ persona }) => persona.id === personaId),
     grupoVigenteDe: async (personaId) =>

@@ -8,6 +8,7 @@ import {
   crearBusDeEventos,
   type Module,
 } from '@gps/core'
+import type { Estructura } from '@gps/estructura/dominio'
 import type { Personas } from '@gps/personas/dominio'
 import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
@@ -25,7 +26,14 @@ const GRUPOS_DE_PERSONA: Record<string, string> = {
   persona_2: 'grupo_2',
 }
 
+/** auth sólo le pregunta el nombre de un grupo, para mostrar el ámbito de un
+ *  enlace de invitación. */
+const estructuraFalsa = {
+  obtenerGrupo: async () => null,
+} as unknown as Estructura
+
 const personas: Personas = {
+  nombreDe: async () => null,
   personaExiste: async (id) => id in GRUPOS_DE_PERSONA,
   grupoVigenteDe: async (id) => GRUPOS_DE_PERSONA[id] ?? null,
   funcionesVigentes: async () => [],
@@ -83,7 +91,9 @@ function montar(subject = 'subject-nuevo') {
     registerSchema: () => {},
   }
   aplicarMigraciones(core, [modulo])
-  const servicio = crearServicioDeAuth(core, personas, { google: proveedorFalso(subject) })
+  const servicio = crearServicioDeAuth(core, personas, estructuraFalsa, {
+    google: proveedorFalso(subject),
+  })
   return {
     bd,
     servicio,
@@ -261,5 +271,70 @@ describe('consumirRecuperacion', () => {
       sql`SELECT revocada_en FROM sesiones WHERE id = 'sesion_vieja'`,
     )
     expect(sesionVieja[0]?.revocada_en).not.toBeNull()
+  })
+})
+
+describe('mirarInvitacion', () => {
+  test('un enlace válido dice de quién es antes de consumirlo', async () => {
+    const { servicio } = montar()
+    const invitacion = await servicio.emitirInvitacion(jefeDeGrupo1, {
+      tipo: 'activacion',
+      personaId: 'persona_1',
+    })
+
+    const vista = await servicio.mirarInvitacion(invitacion.secreto)
+    expect(vista).toMatchObject({ estado: 'valida', tipo: 'activacion' })
+
+    // Y sigue sirviendo: mirar no es consumir.
+    expect((await servicio.mirarInvitacion(invitacion.secreto)).estado).toBe('valida')
+  })
+
+  test('usado, revocado y vencido se distinguen, y ninguno dice de quién era', async () => {
+    const { servicio, avanzarA } = montar()
+    const login = () => ({
+      transaccion: servicio.iniciarLogin('google', 'web', 'https://gps.test/callback').transaccion,
+      stateRecibido: 'state-real',
+      code: 'c',
+    })
+
+    const usada = await servicio.emitirInvitacion(jefeDeGrupo1, {
+      tipo: 'activacion',
+      personaId: 'persona_1',
+    })
+    await servicio.consumirActivacion(usada.secreto, login())
+    expect(await servicio.mirarInvitacion(usada.secreto)).toEqual({
+      estado: 'usada',
+      tipo: null,
+      persona: null,
+      grupo: null,
+      proveedorAReemplazar: null,
+    })
+
+    const revocada = await servicio.emitirInvitacion(jefeDeGrupo1, {
+      tipo: 'activacion',
+      personaId: 'persona_1',
+    })
+    await servicio.revocarInvitacion(jefeDeGrupo1, revocada.invitacionId)
+    expect((await servicio.mirarInvitacion(revocada.secreto)).estado).toBe('revocada')
+
+    const vencida = await servicio.emitirInvitacion(jefeDeGrupo1, {
+      tipo: 'activacion',
+      personaId: 'persona_1',
+    })
+    avanzarA('1970-01-09T00:00:00Z')
+    expect((await servicio.mirarInvitacion(vencida.secreto)).estado).toBe('vencida')
+  })
+
+  test('un secreto inventado se contesta igual que uno vencido', async () => {
+    // Distinguirlos dejaría probar secretos contra una consulta que no pide
+    // sesión.
+    const { servicio } = montar()
+    expect(await servicio.mirarInvitacion('no-existe')).toEqual({
+      estado: 'vencida',
+      tipo: null,
+      persona: null,
+      grupo: null,
+      proveedorAReemplazar: null,
+    })
   })
 })

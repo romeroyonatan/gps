@@ -104,6 +104,57 @@ export function registrarSchema(builder: Builder): void {
     }),
   )
 
+  const EstadoRef = builder.enumType('EstadoDeInvitacion', {
+    description: 'Si el enlace sirve, y si no, por qué.',
+    values: ['valida', 'vencida', 'usada', 'revocada'] as const,
+  })
+
+  const VistaRef = builder
+    .objectRef<{
+      estado: 'valida' | 'vencida' | 'usada' | 'revocada'
+      tipo: TipoDeInvitacion | null
+      persona: string | null
+      grupo: string | null
+      proveedorAReemplazar: ProveedorDeIdentidad | null
+    }>('Invitacion')
+    .implement({
+      description:
+        'Lo que muestra un enlace de activación o recuperación antes de que ' +
+        'alguien lo confirme. Un enlace que ya no sirve no dice de quién era.',
+      fields: (t) => ({
+        estado: t.field({ type: EstadoRef, resolve: (vista) => vista.estado }),
+        tipo: t.field({
+          type: TipoDeInvitacionRef,
+          nullable: true,
+          resolve: (vista) => vista.tipo,
+        }),
+        persona: t.exposeString('persona', { nullable: true }),
+        grupo: t.exposeString('grupo', { nullable: true }),
+        proveedorAReemplazar: t.field({
+          type: ProveedorRef,
+          nullable: true,
+          resolve: (vista) => vista.proveedorAReemplazar,
+        }),
+      }),
+    })
+
+  builder.queryField('invitacion', (t) =>
+    t.field({
+      type: VistaRef,
+      description:
+        'Mira un enlace sin consumirlo. No pide sesión: el secreto es la ' +
+        'autorización, y quien lo tiene ya podría consumirlo.',
+      args: { secreto: t.arg.id({ required: true }) },
+      resolve: async (_padre, args, contexto) => {
+        const vista = await contexto.auth.mirarInvitacion(String(args.secreto))
+        return {
+          ...vista,
+          persona: vista.persona ? `${vista.persona.nombres} ${vista.persona.apellidos}` : null,
+        }
+      },
+    }),
+  )
+
   builder.mutationField('cerrarSesion', (t) =>
     t.boolean({
       description: 'Revoca la sesión de este pedido. El cliente borra su secreto.',

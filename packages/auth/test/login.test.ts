@@ -1,6 +1,7 @@
 import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
 import { aplicarMigraciones, type Bd, type Core, crearBusDeEventos, type Module } from '@gps/core'
+import type { Estructura } from '@gps/estructura/dominio'
 import type { Personas } from '@gps/personas/dominio'
 import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
@@ -13,7 +14,14 @@ import {
   TransaccionDeLoginInvalida,
 } from '../src/servidor/servicio'
 
+/** auth sólo le pregunta el nombre de un grupo, para mostrar el ámbito de un
+ *  enlace de invitación. */
+const estructuraFalsa = {
+  obtenerGrupo: async () => null,
+} as unknown as Estructura
+
 const personas: Personas = {
+  nombreDe: async () => null,
   personaExiste: async () => true,
   grupoVigenteDe: async () => null,
   funcionesVigentes: async () => [],
@@ -72,7 +80,9 @@ function montar(subject = 'subject-1') {
     registerSchema: () => {},
   }
   aplicarMigraciones(core, [modulo])
-  const servicio = crearServicioDeAuth(core, personas, { google: proveedorFalso(subject) })
+  const servicio = crearServicioDeAuth(core, personas, estructuraFalsa, {
+    google: proveedorFalso(subject),
+  })
   return { bd, servicio }
 }
 

@@ -6,10 +6,11 @@ import {
   usePersonaActual,
   useVersion,
 } from '@gps/api'
-import { Route, Switch } from 'wouter'
+import { Route, Switch, useRoute } from 'wouter'
 import { Afiliacion } from './pantallas/Afiliacion'
 import { ConfiguracionDeCuotas } from './pantallas/ConfiguracionDeCuotas'
 import { CuentaDeGrupo } from './pantallas/CuentaDeGrupo'
+import { Enlace } from './pantallas/Enlace'
 import { Estructura } from './pantallas/Estructura'
 import { Grupo } from './pantallas/Grupo'
 import { Ingreso } from './pantallas/Ingreso'
@@ -75,6 +76,17 @@ export function App(props: { particion: ParticionDelCache }) {
   useParticionDelCache(props.particion)
   const quien = sesion.data?.personaActual ?? null
 
+  // Los enlaces de invitación van antes de la puerta: son justamente para
+  // quien todavía no tiene sesión, y esperar a saber quién es sólo agrega una
+  // pantalla en blanco.
+  const [esActivacion, activacion] = useRoute('/activacion/:secreto')
+  const [esRecuperacion, recuperacion] = useRoute('/recuperacion/:secreto')
+  const enlace = esActivacion
+    ? ({ tipo: 'activacion', secreto: activacion.secreto } as const)
+    : esRecuperacion
+      ? ({ tipo: 'recuperacion', secreto: recuperacion.secreto } as const)
+      : null
+
   return (
     <main className="min-h-dvh bg-slate-50 px-4 py-10 text-slate-900">
       <div className="mx-auto w-full max-w-md sm:max-w-2xl">
@@ -88,7 +100,7 @@ export function App(props: { particion: ParticionDelCache }) {
 
         {!sesion.isPending && !quien && <Ingreso entorno={version.data?.version.entorno ?? ''} />}
 
-        {quien && (
+        {!enlace && quien && (
           <>
             <BarraDeSesion roles={quien.roles} />
             <ModoElevado entorno={version.data?.version.entorno ?? ''} />

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import {
   CerrarSesionDocument,
+  InvitacionDocument,
   InvitarDocument,
   PersonaActualDocument,
   RevocarInvitacionDocument,
@@ -26,6 +27,17 @@ export function usePersonaActual() {
 
 /** Cierra la sesión en el servidor y tira todo el cache: lo que quedó adentro
  *  son datos que esta persona podía ver, y la siguiente puede no poder. */
+/** Mira un enlace de activación o recuperación sin consumirlo, para mostrar a
+ *  quién le da acceso antes de que alguien confirme. */
+export function useInvitacion(secreto: string) {
+  const transporte = useTransporte()
+  return useQuery({
+    queryKey: ['invitacion', secreto],
+    queryFn: () => transporte.ejecutar(InvitacionDocument, { secreto }),
+    retry: false,
+  })
+}
+
 export function useCerrarSesion() {
   const transporte = useTransporte()
   const clienteDeQueries = useQueryClient()

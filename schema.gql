@@ -180,6 +180,16 @@ type EstadoDeFirma {
 }
 
 """
+Si el enlace sirve, y si no, por qué.
+"""
+enum EstadoDeInvitacion {
+  revocada
+  usada
+  valida
+  vencida
+}
+
+"""
 Por donde va un permiso de salida.
 """
 enum EstadoDePermiso {
@@ -210,6 +220,17 @@ type Grupo {
   De menor a mayor edad y, dentro de una rama, por nombre. Vacia si el grupo no abrio ninguna.
   """
   unidades: [Unidad!]!
+}
+
+"""
+Lo que muestra un enlace de activación o recuperación antes de que alguien lo confirme. Un enlace que ya no sirve no dice de quién era.
+"""
+type Invitacion {
+  estado: EstadoDeInvitacion!
+  grupo: String
+  persona: String
+  proveedorAReemplazar: ProveedorDeIdentidad
+  tipo: TipoDeInvitacion
 }
 
 """
@@ -453,6 +474,11 @@ type Query {
   El arbol de la diocesis: distritos, sus grupos y sus unidades.
   """
   distritos: [Distrito!]!
+
+  """
+  Mira un enlace sin consumirlo. No pide sesión: el secreto es la autorización, y quien lo tiene ya podría consumirlo.
+  """
+  invitacion(secreto: ID!): Invitacion!
   movimientosDeTesoreria(grupoId: ID!): [MovimientoDeTesoreria!]!
   periodosConfigurablesDeAfiliacion: [Int!]!
   permiso(id: ID!): Permiso

@@ -1,4 +1,5 @@
 import type { Module } from '@gps/core'
+import type { Estructura } from '@gps/estructura/dominio'
 import type { Personas } from '@gps/personas/dominio'
 import { accesoAlModulo } from '../dominio'
 import { crearProveedorDemo } from './demo'
@@ -14,10 +15,10 @@ declare module '@gps/core' {
   }
 }
 
-export const auth: Module<ServicioDeAuth, { personas: Personas }> = {
+export const auth: Module<ServicioDeAuth, { personas: Personas; estructura: Estructura }> = {
   name: 'auth',
   accesoAlModulo,
-  dependencies: ['personas'],
+  dependencies: ['personas', 'estructura'],
   migraciones,
   createServices: (core, dependencias) => {
     const config = core.config.auth
@@ -32,13 +33,13 @@ export const auth: Module<ServicioDeAuth, { personas: Personas }> = {
     // sin esta linea no hay proveedor que resolver, asi que no hay ruta ni
     // servicio que lo acepte.
     if (core.config.entorno === 'demo') proveedores.demo = crearProveedorDemo(core)
-    return crearServicioDeAuth(core, dependencias.personas, proveedores)
+    return crearServicioDeAuth(core, dependencias.personas, dependencias.estructura, proveedores)
   },
   registerSchema: registrarSchema,
 }
 
 export type { Plataforma, ProveedorOidc } from './oidc'
-export type { ServicioDeAuth } from './servicio'
+export type { ServicioDeAuth, VistaDeInvitacion } from './servicio'
 export {
   AutoridadInsuficiente,
   ElevacionDenegada,

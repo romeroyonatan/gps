@@ -53,6 +53,9 @@ function personasFalsas(miembros: readonly Miembro[]): Personas {
     async personaExiste() {
       throw new Error('afiliacion no deberia llamar a personaExiste')
     },
+    async nombreDe() {
+      throw new Error('afiliacion no deberia llamar a nombreDe')
+    },
     async grupoVigenteDe() {
       throw new Error('afiliacion no deberia llamar a grupoVigenteDe')
     },

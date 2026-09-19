@@ -1,6 +1,7 @@
 export { useAfiliadosEn, useDeclaraciones, useDeclararAfiliacion } from './afiliacion'
 export {
   useCerrarSesion,
+  useInvitacion,
   useInvitar,
   usePersonaActual,
   useRefrescarSesion,
