@@ -23,7 +23,14 @@ export type {
   TipoDeCargo,
   VersionQuery,
 } from './generated/graphql'
-export { useCrearPersona, usePersonasDelGrupo } from './personas'
+export {
+  useAsignarCargo,
+  useCrearPersona,
+  useIntegrarEquipo,
+  usePersonasDelGrupo,
+  useRevocarCargo,
+  useRevocarIntegranteDeEquipo,
+} from './personas'
 export { crearQueryClient, ProveedorDeApi, useTransporte } from './proveedor'
 export {
   useAgregarParticipante,

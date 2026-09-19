@@ -2,6 +2,7 @@ import type { Marcas } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { TipoDeCargo } from './cargos'
 import type { Categoria } from './categorias'
+import type { IntegranteDeEquipo } from './equipos'
 import type { Persona } from './modelos'
 
 /** La pertenencia de una persona a un grupo. Es un hecho propio y continuo, con
@@ -59,6 +60,10 @@ export interface Cargo extends Marcas {
 export interface PersonaConVinculos extends Persona {
   readonly pertenencia: Pertenencia
   readonly cargos: readonly Cargo[]
+  /** Los equipos que integra hoy. Van acá y no en una consulta aparte porque
+   *  el plantel es exactamente esto: quién está, con qué cargo y en qué
+   *  equipo. Secretaría no es un cargo, y sin esto no se vería. */
+  readonly equipos: readonly IntegranteDeEquipo[]
 }
 
 /** Lo propio de un cargo en el alta. No lleva `desde`: el del cargo es el de la

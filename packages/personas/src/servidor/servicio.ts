@@ -508,7 +508,8 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
         }
       })
 
-      return { ...persona, pertenencia, cargos: cargosDeLaPersona }
+      // Recién creada: todavía no integra ningún equipo.
+      return { ...persona, pertenencia, cargos: cargosDeLaPersona, equipos: [] }
     },
 
     async miembrosDelGrupo(grupoId, fecha) {
@@ -650,6 +651,15 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
         .where(eq(tablaDeCargos.ambitoId, grupoId))
         .all()
 
+      // Los equipos de ese grupo -hoy sólo Secretaría- más los diocesanos de
+      // su gente: los dos son plantel para quien mira la pantalla.
+      const filasDeEquipos = core.bd
+        .select({ integrante: integrantesDeEquipo })
+        .from(integrantesDeEquipo)
+        .innerJoin(equipos, eq(equipos.id, integrantesDeEquipo.equipoId))
+        .where(isNull(integrantesDeEquipo.revocadoEn))
+        .all()
+
       const cargosPorPersona = new Map<string, Cargo[]>()
       for (const cargo of filasDeCargos) {
         const suyos = cargosPorPersona.get(cargo.personaId) ?? []
@@ -657,11 +667,19 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
         cargosPorPersona.set(cargo.personaId, suyos)
       }
 
+      const equiposPorPersona = new Map<string, IntegranteDeEquipo[]>()
+      for (const { integrante } of filasDeEquipos) {
+        const suyos = equiposPorPersona.get(integrante.personaId) ?? []
+        suyos.push(integrante)
+        equiposPorPersona.set(integrante.personaId, suyos)
+      }
+
       return filas
         .map((fila) => ({
           ...fila.personas,
           pertenencia: fila.pertenencias,
           cargos: cargosPorPersona.get(fila.personas.id) ?? [],
+          equipos: equiposPorPersona.get(fila.personas.id) ?? [],
         }))
         .sort(
           (una, otra) =>

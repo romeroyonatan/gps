@@ -593,3 +593,51 @@ describe('gruposAbiertosEn', () => {
     expect(await servicio.gruposAbiertosEn('2999-12-31')).toContain(grupo.id)
   })
 })
+
+describe('listarDistritos y el alcance', () => {
+  test('un jefe de grupo ve su grupo, con el distrito que lo contiene', async () => {
+    // Su alcance tiene el grupo pero no el distrito: sin esto el árbol le
+    // llegaría vacío y la app se vería sin nada.
+    const servicio = montar()
+    const norte = await servicio.crearDistrito({ numero: 1, zona: 'Norte' })
+    const sur = await servicio.crearDistrito({ numero: 2, zona: 'Sur' })
+    const suyo = await servicio.crearGrupo({ numero: 1, nombre: 'Uno', distritoId: norte.id })
+    await servicio.crearGrupo({ numero: 2, nombre: 'Dos', distritoId: norte.id })
+    await servicio.crearGrupo({ numero: 3, nombre: 'Tres', distritoId: sur.id })
+
+    const arbol = await servicio.listarDistritos({
+      actor: {
+        personaId: 'persona_1',
+        roles: [{ rol: 'jefeDeGrupo', ambito: { tipo: 'grupo', id: suyo.id } }],
+        esAdministradorDesignado: false,
+        estaElevado: false,
+      },
+      gruposVisibles: [suyo.id],
+      distritosVisibles: [],
+      esAdministrador: false,
+    })
+
+    expect(arbol).toHaveLength(1)
+    expect(arbol[0]?.id).toBe(norte.id)
+    expect(arbol[0]?.grupos.map((grupo) => grupo.id)).toEqual([suyo.id])
+  })
+
+  test('un distrito sin grupos visibles no aparece', async () => {
+    const servicio = montar()
+    const norte = await servicio.crearDistrito({ numero: 1, zona: 'Norte' })
+    await servicio.crearGrupo({ numero: 1, nombre: 'Uno', distritoId: norte.id })
+
+    const arbol = await servicio.listarDistritos({
+      actor: {
+        personaId: 'persona_1',
+        roles: [],
+        esAdministradorDesignado: false,
+        estaElevado: false,
+      },
+      gruposVisibles: [],
+      distritosVisibles: [],
+      esAdministrador: false,
+    })
+    expect(arbol).toEqual([])
+  })
+})

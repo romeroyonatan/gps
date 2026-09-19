@@ -44,6 +44,7 @@ type Cargo {
   Vacía si no tiene fin previsto. Puede estar en el futuro: un mandato dura cuatro años.
   """
   hasta: String
+  id: ID!
 }
 
 """
@@ -223,6 +224,16 @@ type Grupo {
 }
 
 """
+La pertenencia de una persona a un equipo, con su periodo.
+"""
+type IntegranteDeEquipo {
+  desde: String!
+  equipoId: ID!
+  hasta: String
+  id: ID!
+}
+
+"""
 Lo que muestra un enlace de activación o recuperación antes de que alguien lo confirme. Un enlace que ya no sirve no dice de quién era.
 """
 type Invitacion {
@@ -262,6 +273,17 @@ type Mutation {
   agregarParticipante(permisoId: ID!, personaId: ID!): Permiso!
   anularPago(pagoId: ID!): MovimientoDeTesoreria!
   anularPermiso(permisoId: ID!): Permiso!
+
+  """
+  Nombra a alguien en un cargo de su grupo, su distrito o la diócesis.
+  """
+  asignarCargo(
+    ambitoId: ID
+    cargo: TipoDeCargo!
+    desde: String!
+    hasta: String
+    personaId: ID!
+  ): Cargo!
 
   """
   Revoca la sesión de este pedido. El cliente borra su secreto.
@@ -305,6 +327,16 @@ type Mutation {
   generarDeudasPendientes: ResultadoDeReconciliacion!
 
   """
+  Suma a alguien a Secretaría de su grupo o a un equipo diocesano.
+  """
+  integrarEquipo(
+    ambitoId: ID
+    desde: String!
+    personaId: ID!
+    tipo: TipoDeEquipo!
+  ): IntegranteDeEquipo!
+
+  """
   Emite un enlace de activación o de recuperación para una persona del propio ámbito.
   """
   invitar(
@@ -331,6 +363,16 @@ type Mutation {
     observacion: String
     referencia: String
   ): MovimientoDeTesoreria!
+
+  """
+  Saca a alguien de un cargo. El acceso se pierde en el pedido siguiente.
+  """
+  revocarCargo(cargoId: ID!): Boolean!
+
+  """
+  Saca a alguien de un equipo. El acceso se pierde en el pedido siguiente.
+  """
+  revocarIntegranteDeEquipo(integranteId: ID!): Boolean!
 
   """
   Anula un enlace que todavía no se consumió.
@@ -404,6 +446,11 @@ type Persona {
   Todos, también los vencidos: la vigencia la decide el cliente.
   """
   cargos: [Cargo!]!
+
+  """
+  Los equipos que integra hoy. Secretaría no es un cargo: es esto.
+  """
+  equipos: [IntegranteDeEquipo!]!
 
   """
   Fecha de calendario en formato aaaa-mm-dd, sin hora ni zona horaria.
@@ -586,6 +633,15 @@ Tipos de documento que la asociacion acepta.
 enum TipoDeDocumento {
   dni
   pasaporte
+}
+
+"""
+Los equipos funcionales que la autorización conoce.
+"""
+enum TipoDeEquipo {
+  administracionDiocesana
+  secretaria
+  tesoreriaDiocesana
 }
 
 """

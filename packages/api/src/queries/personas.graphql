@@ -13,9 +13,49 @@ query Personas($grupoId: ID!) {
       desde
     }
     cargos {
+      id
       cargo
       desde
       hasta
     }
+    equipos {
+      id
+      equipoId
+      desde
+      hasta
+    }
   }
+}
+
+mutation AsignarCargo(
+  $personaId: ID!
+  $cargo: TipoDeCargo!
+  $ambitoId: ID
+  $desde: String!
+  $hasta: String
+) {
+  asignarCargo(
+    personaId: $personaId
+    cargo: $cargo
+    ambitoId: $ambitoId
+    desde: $desde
+    hasta: $hasta
+  ) {
+    id
+    cargo
+  }
+}
+
+mutation RevocarCargo($cargoId: ID!) {
+  revocarCargo(cargoId: $cargoId)
+}
+
+mutation IntegrarEquipo($personaId: ID!, $tipo: TipoDeEquipo!, $ambitoId: ID, $desde: String!) {
+  integrarEquipo(personaId: $personaId, tipo: $tipo, ambitoId: $ambitoId, desde: $desde) {
+    id
+  }
+}
+
+mutation RevocarIntegranteDeEquipo($integranteId: ID!) {
+  revocarIntegranteDeEquipo(integranteId: $integranteId)
 }

@@ -250,14 +250,18 @@ export function crearServicioDeEstructura(core: Core): ServicioDeEstructura {
         gruposPorDistrito.set(grupo.distritoId, delDistrito)
       }
 
+      // Un distrito se ve si el alcance lo alcanza -comisionado, diocesanas- o
+      // si alguno de sus grupos se ve: un jefe de grupo no tiene el distrito en
+      // su alcance, pero su grupo cuelga de uno, y sin el distrito el árbol le
+      // llegaría vacío.
       return filasDistritos
-        .filter((distrito) => puedeVerDistrito(alcance, distrito.id))
         .map((distrito) => ({
           ...distrito,
           grupos: (gruposPorDistrito.get(distrito.id) ?? []).filter((grupo) =>
             puedeVerGrupo(alcance, grupo.id),
           ),
         }))
+        .filter((distrito) => puedeVerDistrito(alcance, distrito.id) || distrito.grupos.length > 0)
     },
 
     async distritoEstaAbierto(distritoId) {

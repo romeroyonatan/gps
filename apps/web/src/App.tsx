@@ -15,6 +15,7 @@ import { Estructura } from './pantallas/Estructura'
 import { Grupo } from './pantallas/Grupo'
 import { Ingreso } from './pantallas/Ingreso'
 import { ModoElevado } from './pantallas/ModoElevado'
+import { Plantel } from './pantallas/Plantel'
 import { Salidas } from './pantallas/Salidas'
 import { Tesoreria } from './pantallas/Tesoreria'
 
@@ -62,6 +63,7 @@ function Rutas() {
       <Route path="/tesoreria" component={Tesoreria} />
       <Route path="/grupos/:id/afiliacion">{(params) => <Afiliacion grupoId={params.id} />}</Route>
       <Route path="/grupos/:id/salidas">{(params) => <Salidas grupoId={params.id} />}</Route>
+      <Route path="/grupos/:id/plantel">{(params) => <Plantel grupoId={params.id} />}</Route>
       <Route path="/grupos/:id">{(params) => <Grupo id={params.id} />}</Route>
       <Route>
         <p className="mt-8 text-sm text-slate-500">No hay nada en esta dirección.</p>
