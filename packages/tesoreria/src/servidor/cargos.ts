@@ -1,7 +1,11 @@
 import type { Afiliacion, Declaracion } from '@gps/afiliacion/dominio'
 import type { Core } from '@gps/core'
 import { eq, isNotNull } from 'drizzle-orm'
-import type { MovimientoDeTesoreria, ResultadoDeReconciliacion, ResumenDePendientes } from '../dominio'
+import type {
+  MovimientoDeTesoreria,
+  ResultadoDeReconciliacion,
+  ResumenDePendientes,
+} from '../dominio'
 import { cuotasDeAfiliacion, movimientosDeTesoreria } from './tablas'
 
 /** Casos de uso que convierten declaraciones de Afiliación en cargos de

@@ -72,11 +72,7 @@ export function crearOperacionesDeCuotas(core: Core, afiliacion: Afiliacion) {
   }
 
   async function listarCuotas(): Promise<readonly CuotaDeAfiliacion[]> {
-    return core.bd
-      .select()
-      .from(cuotasDeAfiliacion)
-      .orderBy(desc(cuotasDeAfiliacion.periodo))
-      .all()
+    return core.bd.select().from(cuotasDeAfiliacion).orderBy(desc(cuotasDeAfiliacion.periodo)).all()
   }
 
   return { definirCuota, listarCuotas, listarPeriodosConfigurables }
