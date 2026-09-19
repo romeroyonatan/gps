@@ -31,6 +31,7 @@ function coreDePrueba(bd: Bd): Core {
     hash: (contenido: Uint8Array | string) =>
       `hash:${typeof contenido === 'string' ? contenido : contenido.join(',')}`,
     nuevoId: (prefijo) => `${prefijo}_fijo`,
+    nuevoSecreto: () => 'secreto_fijo',
   }
 }
 
@@ -96,7 +97,15 @@ describe('pertenencias y cargos', () => {
     const nombres = bd
       .values<[string]>(sql`SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name`)
       .map(([nombre]) => nombre)
-    expect(nombres).toEqual(['cargos', 'migraciones', 'personas', 'pertenencias'])
+    expect(nombres).toEqual([
+      'cargos',
+      'equipos',
+      'eventos_de_autoridad',
+      'integrantes_de_equipo',
+      'migraciones',
+      'personas',
+      'pertenencias',
+    ])
   })
 
   test('una persona no puede tener dos pertenencias vigentes, ni siquiera en grupos distintos', () => {
@@ -119,6 +128,32 @@ describe('pertenencias y cargos', () => {
     expect(() => insertarPertenencia('pe3', 'p1', 'grupo_1', null)).not.toThrow()
   })
 
+  test('un equipo de secretaria admite varios integrantes', () => {
+    insertar('p1', 'dni', '30111222')
+    insertar('p2', 'dni', '30111223')
+    bd.run(sql`INSERT INTO equipos VALUES ('e1', 'secretaria', 'grupo', 'grupo_1', 0, 0)`)
+    bd.run(
+      sql`INSERT INTO integrantes_de_equipo VALUES
+          ('i1', 'e1', 'p1', '2026-03-01', NULL, NULL, 0, 0)`,
+    )
+    expect(() =>
+      bd.run(
+        sql`INSERT INTO integrantes_de_equipo VALUES
+            ('i2', 'e1', 'p2', '2026-03-01', NULL, NULL, 0, 0)`,
+      ),
+    ).not.toThrow()
+  })
+
+  test('los equipos exigen un ambito coherente y no se duplican', () => {
+    expect(() =>
+      bd.run(sql`INSERT INTO equipos VALUES ('e1', 'secretaria', 'grupo', NULL, 0, 0)`),
+    ).toThrow()
+    bd.run(sql`INSERT INTO equipos VALUES ('e2', 'secretaria', 'grupo', 'grupo_1', 0, 0)`)
+    expect(() =>
+      bd.run(sql`INSERT INTO equipos VALUES ('e3', 'secretaria', 'grupo', 'grupo_1', 0, 0)`),
+    ).toThrow()
+  })
+
   test('el mismo cargo no se puede cargar dos veces con la misma fecha', () => {
     // Lo que ataja es el doble click en Guardar. El solapamiento de periodos
     // SQLite no lo puede expresar sin un trigger; ver §7.3 de la spec.
@@ -126,6 +161,7 @@ describe('pertenencias y cargos', () => {
     const insertarCargo = (id: string) =>
       bd.run(
         sql`INSERT INTO cargos
+            (id, persona_id, ambito_id, cargo, desde, hasta, creado_en, actualizado_en)
             VALUES (${id}, 'p1', 'grupo_1', 'jefeDeGrupo', '2026-03-01', NULL, 0, 0)`,
       )
     insertarCargo('c1')
@@ -204,7 +240,9 @@ describe('pertenencias y cargos', () => {
     insertar('p1', 'dni', '30111222')
     expect(() =>
       bd.run(
-        sql`INSERT INTO cargos VALUES ('c1', 'p1', NULL, 'jefeScoutDiocesano', '2026-03-01', NULL, 0, 0)`,
+        sql`INSERT INTO cargos
+            (id, persona_id, ambito_id, cargo, desde, hasta, creado_en, actualizado_en)
+            VALUES ('c1', 'p1', NULL, 'jefeScoutDiocesano', '2026-03-01', NULL, 0, 0)`,
       ),
     ).not.toThrow()
   })
@@ -245,6 +283,8 @@ describe('pertenencias y cargos', () => {
       '0003_baja_rama_de_pertenencia',
       '0004_cargo_con_ambito',
       '0005_baja_grupo_de_cargo',
+      '0006_equipos_y_revocacion',
+      '0007_eventos_de_autoridad',
     ])
   })
 })

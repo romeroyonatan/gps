@@ -64,6 +64,57 @@ export class UnidadInvalida extends Error {
  *  telefono sin tocar a ningun consumidor. */
 export function crearServicioDeEstructura(core: Core): ServicioDeEstructura {
   return {
+    async expandirAlcance(actor) {
+      const todosLosDistritos = () =>
+        core.bd
+          .select({ id: distritos.id })
+          .from(distritos)
+          .where(isNull(distritos.cerradoEn))
+          .all()
+          .map(({ id }) => id)
+      const todosLosGrupos = () =>
+        core.bd
+          .select({ id: grupos.id })
+          .from(grupos)
+          .where(isNull(grupos.cerradoEn))
+          .all()
+          .map(({ id }) => id)
+
+      if (actor.estaElevado) {
+        return {
+          distritosVisibles: todosLosDistritos(),
+          gruposVisibles: todosLosGrupos(),
+          esAdministrador: true,
+        }
+      }
+
+      const distritosVisibles = new Set<string>()
+      const gruposVisibles = new Set<string>()
+      for (const { ambito } of actor.roles) {
+        if (ambito.tipo === 'grupo' && ambito.id) gruposVisibles.add(ambito.id)
+        if (ambito.tipo === 'distrito' && ambito.id) distritosVisibles.add(ambito.id)
+        if (ambito.tipo === 'diocesis') {
+          for (const id of todosLosDistritos()) distritosVisibles.add(id)
+          for (const id of todosLosGrupos()) gruposVisibles.add(id)
+        }
+      }
+      if (distritosVisibles.size > 0) {
+        const filas = core.bd
+          .select({ id: grupos.id, distritoId: grupos.distritoId })
+          .from(grupos)
+          .where(isNull(grupos.cerradoEn))
+          .all()
+        for (const grupo of filas) {
+          if (distritosVisibles.has(grupo.distritoId)) gruposVisibles.add(grupo.id)
+        }
+      }
+      return {
+        distritosVisibles: [...distritosVisibles],
+        gruposVisibles: [...gruposVisibles],
+        esAdministrador: false,
+      }
+    },
+
     async crearDistrito(datos) {
       const ahora = core.reloj.ahora()
       const distrito = {

@@ -39,6 +39,15 @@ interface Miembro {
  *  constructor, asi que el test no necesita levantar el otro modulo. */
 function personasFalsas(miembros: readonly Miembro[]): Personas {
   return {
+    async personaExiste() {
+      throw new Error('afiliacion no deberia llamar a personaExiste')
+    },
+    async grupoVigenteDe() {
+      throw new Error('afiliacion no deberia llamar a grupoVigenteDe')
+    },
+    async funcionesVigentes() {
+      throw new Error('afiliacion no deberia llamar a funcionesVigentes')
+    },
     // Mismo criterio que obtenerGrupo mas abajo: afiliacion no pregunta por
     // cargos, y si algun dia empieza a hacerlo el test tiene que enterarse.
     async ocupantesDelCargo() {
@@ -75,6 +84,9 @@ function estructuraFalsa(
   grupos: readonly { id: string; cerradoEn?: string }[] = [{ id: 'grupo_7' }],
 ): Estructura {
   return {
+    async expandirAlcance() {
+      throw new Error('afiliacion no deberia llamar a expandirAlcance')
+    },
     async obtenerGrupo() {
       throw new Error('afiliacion no deberia llamar a obtenerGrupo')
     },
@@ -104,7 +116,7 @@ function montar(
 
   let contador = 0
   const core: Core = {
-    config: { version: '0.0.0', entorno: 'prueba', puerto: 0 },
+    config: { version: '0.0.0', entorno: 'prueba', puerto: 0, auth: null },
     logger: { info: () => {}, error: () => {} },
     reloj: opciones.reloj ?? { ahora: () => HORA },
     bd,
@@ -126,6 +138,7 @@ function montar(
     hash: (contenido: Uint8Array | string) =>
       `hash:${typeof contenido === 'string' ? contenido : contenido.join(',')}`,
     nuevoId: (prefijo) => `${prefijo}_${++contador}`,
+    nuevoSecreto: () => `secreto_${++contador}`,
   }
 
   const modulo: Module<object> = {

@@ -55,6 +55,7 @@ function montar(opciones: { reloj?: Reloj; autorizadores?: Record<string, Autori
     conversorDeImagenes: { aJpeg: async () => new Uint8Array([74, 80, 71]) },
     hash: (contenido) => `hash:${typeof contenido === 'string' ? contenido : contenido.join(',')}`,
     nuevoId: (prefijo) => `${prefijo}_${++contador}`,
+    nuevoSecreto: () => `secreto_${++contador}`,
   }
 
   const modulo: Module<object> = {

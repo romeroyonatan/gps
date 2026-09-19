@@ -1,13 +1,22 @@
 import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
-import { aplicarMigraciones, type Bd, type Core, type Module, type Reloj } from '@gps/core'
+import {
+  type Actor,
+  aplicarMigraciones,
+  type Bd,
+  type Core,
+  type Module,
+  type Reloj,
+} from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Estructura, GrupoConUnidades, Rama, Unidad } from '@gps/estructura/dominio'
+import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import type { DatosDePersona } from '../src/dominio/modelos'
 import type { DatosDeIngreso } from '../src/dominio/vinculos'
 import { migraciones } from '../src/servidor/migraciones'
 import {
+  CambioDeAutoridadDenegado,
   CargoInvalido,
   crearServicioDePersonas,
   DatosInvalidos,
@@ -50,6 +59,11 @@ const DISTRITOS_ABIERTOS = new Set(['distrito_1'])
 
 function estructuraFalsa(grupos: readonly GrupoConUnidades[] = [GRUPO]): Estructura {
   return {
+    expandirAlcance: async () => ({
+      gruposVisibles: grupos.map(({ id }) => id),
+      distritosVisibles: [],
+      esAdministrador: false,
+    }),
     obtenerGrupo: async (id) => grupos.find((grupo) => grupo.id === id) ?? null,
     distritoEstaAbierto: async (id) => DISTRITOS_ABIERTOS.has(id),
     // Personas no usa gruposAbiertosEn: se implementa solo para satisfacer la
@@ -69,10 +83,10 @@ function estructuraFalsa(grupos: readonly GrupoConUnidades[] = [GRUPO]): Estruct
 /** Un servicio con la base migrada y un Core de ids fijos, para poder afirmar
  *  valores exactos. El reloj se fija en epoch 1970 para que una hora del sistema
  *  colada se distinga de un vistazo en vez de parecer plausible. */
-function montar(
+function montarConBd(
   reloj: Reloj = { ahora: () => HORA },
   estructura: Estructura = estructuraFalsa(),
-): ServicioDePersonas {
+): { servicio: ServicioDePersonas; bd: Bd } {
   const base = new Database(':memory:')
   base.exec('PRAGMA foreign_keys = ON')
   const bd: Bd = drizzle(base)
@@ -101,6 +115,7 @@ function montar(
     hash: (contenido: Uint8Array | string) =>
       `hash:${typeof contenido === 'string' ? contenido : contenido.join(',')}`,
     nuevoId: (prefijo) => `${prefijo}_${++contador}`,
+    nuevoSecreto: () => `secreto_${++contador}`,
   }
 
   const modulo: Module<object> = {
@@ -111,7 +126,14 @@ function montar(
     registerSchema: () => {},
   }
   aplicarMigraciones(core, [modulo])
-  return crearServicioDePersonas(core, estructura)
+  return { servicio: crearServicioDePersonas(core, estructura), bd }
+}
+
+function montar(
+  reloj: Reloj = { ahora: () => HORA },
+  estructura: Estructura = estructuraFalsa(),
+): ServicioDePersonas {
+  return montarConBd(reloj, estructura).servicio
 }
 
 /** El reloj de los tests esta en 1970, asi que una fecha de nacimiento valida
@@ -124,6 +146,20 @@ const valida: DatosDePersona = {
   apellidos: 'Fernández Ruiz',
   fechaDeNacimiento: '1950-05-01',
 }
+
+const actor = (rol: 'jefeDeGrupo' | 'secretariaDeGrupo', grupoId = 'grupo_1'): Actor => ({
+  personaId: 'actor',
+  roles: [{ rol, ambito: { tipo: 'grupo', id: grupoId } }],
+  esAdministradorDesignado: false,
+  estaElevado: false,
+})
+
+const actorDiocesano = (rol: 'jefeScoutDiocesano' | 'administracionDiocesana' | null): Actor => ({
+  personaId: 'actor',
+  roles: rol ? [{ rol, ambito: { tipo: 'diocesis', id: null } }] : [],
+  esAdministradorDesignado: false,
+  estaElevado: rol === null,
+})
 
 const ingreso: DatosDeIngreso = {
   grupoId: 'grupo_1',
@@ -162,6 +198,7 @@ describe('crearPersona con ingreso', () => {
         // misma fecha dos veces.
         desde: '1969-03-01',
         hasta: '1973-03-01',
+        revocadoEn: null,
         creadoEn: HORA,
         actualizadoEn: HORA,
       },
@@ -384,6 +421,193 @@ describe('miembrosActivos', () => {
       { ...ingreso, desde: '1969-05-01' },
     )
     expect(await servicio.miembrosActivos('1969-05-01')).toHaveLength(1)
+  })
+})
+
+describe('funcionesVigentes', () => {
+  test('deriva pertenencia, cargo y equipo sin confiar en roles almacenados', async () => {
+    const { servicio, bd } = montarConBd()
+    await servicio.crearPersona(valida, {
+      ...ingreso,
+      categoria: 'activo',
+      unidadId: 'unidad_lob',
+      cargos: [{ cargo: 'jefeDeGrupo', hasta: null }],
+    })
+    bd.run(sql`INSERT INTO equipos VALUES ('equipo_1', 'secretaria', 'grupo', 'grupo_1', 0, 0)`)
+    bd.run(
+      sql`INSERT INTO integrantes_de_equipo VALUES
+          ('integrante_1', 'equipo_1', 'persona_1', '1969-01-01', NULL, NULL, 0, 0)`,
+    )
+
+    expect(await servicio.personaExiste('persona_1')).toBe(true)
+    expect(await servicio.personaExiste('otra')).toBe(false)
+    expect(await servicio.grupoVigenteDe('persona_1', '1970-01-01')).toBe('grupo_1')
+    expect(await servicio.funcionesVigentes('persona_1', '1970-01-01')).toEqual([
+      { rol: 'dirigente', ambito: { tipo: 'grupo', id: 'grupo_1' } },
+      { rol: 'jefeDeGrupo', ambito: { tipo: 'grupo', id: 'grupo_1' } },
+      { rol: 'secretariaDeGrupo', ambito: { tipo: 'grupo', id: 'grupo_1' } },
+    ])
+  })
+
+  test('la revocacion corta el acceso sin borrar la historia', async () => {
+    const { servicio, bd } = montarConBd()
+    await servicio.crearPersona(valida, {
+      ...ingreso,
+      cargos: [{ cargo: 'director', hasta: null }],
+    })
+    bd.run(sql`UPDATE cargos SET revocado_en = 1 WHERE persona_id = 'persona_1'`)
+
+    expect(await servicio.funcionesVigentes('persona_1', '1970-01-01')).toEqual([])
+    expect(
+      bd.all<{ cantidad: number }>(sql`SELECT count(*) AS cantidad FROM cargos`)[0]?.cantidad,
+    ).toBe(1)
+  })
+})
+
+describe('administración de autoridades', () => {
+  test('Jefatura agrega varios secretarios de su grupo y cualquiera puede nombrar jefatura', async () => {
+    const servicio = montar()
+    const una = await servicio.crearPersona(valida, ingreso)
+    const otra = await servicio.crearPersona(
+      { ...valida, numeroDeDocumento: '30111223', nombres: 'Ana' },
+      ingreso,
+    )
+    await servicio.integrarEquipo(actor('jefeDeGrupo'), {
+      personaId: una.id,
+      tipo: 'secretaria',
+      ambitoTipo: 'grupo',
+      ambitoId: 'grupo_1',
+      desde: '1970-01-01',
+    })
+    await servicio.integrarEquipo(actor('jefeDeGrupo'), {
+      personaId: otra.id,
+      tipo: 'secretaria',
+      ambitoTipo: 'grupo',
+      ambitoId: 'grupo_1',
+      desde: '1970-01-01',
+    })
+
+    const cargo = await servicio.asignarCargoComo(actor('secretariaDeGrupo'), {
+      personaId: otra.id,
+      cargo: 'jefeDeGrupo',
+      ambitoId: 'grupo_1',
+      desde: '1970-01-01',
+    })
+    expect(cargo.cargo).toBe('jefeDeGrupo')
+  })
+
+  test('falla cerrado fuera del grupo y la revocación quita acceso inmediatamente', async () => {
+    const servicio = montar()
+    const persona = await servicio.crearPersona(valida, ingreso)
+    await expect(
+      servicio.integrarEquipo(actor('jefeDeGrupo', 'grupo_2'), {
+        personaId: persona.id,
+        tipo: 'secretaria',
+        ambitoTipo: 'grupo',
+        ambitoId: 'grupo_1',
+        desde: '1970-01-01',
+      }),
+    ).rejects.toThrow(CambioDeAutoridadDenegado)
+
+    const integrante = await servicio.integrarEquipo(actor('jefeDeGrupo'), {
+      personaId: persona.id,
+      tipo: 'secretaria',
+      ambitoTipo: 'grupo',
+      ambitoId: 'grupo_1',
+      desde: '1970-01-01',
+    })
+    await servicio.revocarIntegranteDeEquipo(actor('jefeDeGrupo'), integrante.id)
+    expect(await servicio.funcionesVigentes(persona.id, '1970-01-01')).not.toContainEqual({
+      rol: 'secretariaDeGrupo',
+      ambito: { tipo: 'grupo', id: 'grupo_1' },
+    })
+  })
+
+  test('se puede remover a la última jefatura', async () => {
+    const servicio = montar()
+    const persona = await servicio.crearPersona(valida, ingreso)
+    const cargo = await servicio.asignarCargoComo(actor('secretariaDeGrupo'), {
+      personaId: persona.id,
+      cargo: 'jefeDeGrupo',
+      ambitoId: 'grupo_1',
+      desde: '1970-01-01',
+    })
+    await servicio.revocarCargo(actor('secretariaDeGrupo'), cargo.id)
+    expect(await servicio.funcionesVigentes(persona.id, '1970-01-01')).toEqual([])
+  })
+
+  test('cada cambio de autoridad queda auditado con actor, objetivo, ambito e instante', async () => {
+    const { servicio, bd } = montarConBd()
+    const persona = await servicio.crearPersona(valida, ingreso)
+    const cargo = await servicio.asignarCargoComo(actor('secretariaDeGrupo'), {
+      personaId: persona.id,
+      cargo: 'jefeDeGrupo',
+      ambitoId: 'grupo_1',
+      desde: '1970-01-01',
+    })
+    await servicio.revocarCargo(actor('jefeDeGrupo'), cargo.id)
+
+    const eventos = bd.all<{ tipo: string; actor_persona_id: string; objetivo_persona_id: string }>(
+      sql`SELECT tipo, actor_persona_id, objetivo_persona_id FROM eventos_de_autoridad ORDER BY creado_en, tipo`,
+    )
+    expect(eventos).toEqual([
+      {
+        tipo: 'cargo.jefeDeGrupo.asignar',
+        actor_persona_id: 'actor',
+        objetivo_persona_id: persona.id,
+      },
+      {
+        tipo: 'cargo.jefeDeGrupo.revocar',
+        actor_persona_id: 'actor',
+        objetivo_persona_id: persona.id,
+      },
+    ])
+  })
+})
+
+describe('administración de equipos diocesanos', () => {
+  test('jefatura scout y administración diocesana pueden nombrarse y remover Tesorería entre sí', async () => {
+    const servicio = montar()
+    const persona = await servicio.crearPersona(valida, ingreso)
+
+    await servicio.integrarEquipo(actorDiocesano('jefeScoutDiocesano'), {
+      personaId: persona.id,
+      tipo: 'administracionDiocesana',
+      ambitoTipo: 'diocesis',
+      ambitoId: null,
+      desde: '1970-01-01',
+    })
+    const tesorero = await servicio.integrarEquipo(actorDiocesano('administracionDiocesana'), {
+      personaId: persona.id,
+      tipo: 'tesoreriaDiocesana',
+      ambitoTipo: 'diocesis',
+      ambitoId: null,
+      desde: '1970-01-01',
+    })
+    await servicio.revocarIntegranteDeEquipo(actorDiocesano('jefeScoutDiocesano'), tesorero.id)
+
+    expect(await servicio.funcionesVigentes(persona.id, '1970-01-01')).toContainEqual({
+      rol: 'administracionDiocesana',
+      ambito: { tipo: 'diocesis', id: null },
+    })
+    expect(await servicio.funcionesVigentes(persona.id, '1970-01-01')).not.toContainEqual({
+      rol: 'tesoreriaDiocesana',
+      ambito: { tipo: 'diocesis', id: null },
+    })
+  })
+
+  test('una autoridad diocesana vacante se recupera con elevación', async () => {
+    const servicio = montar()
+    const persona = await servicio.crearPersona(valida, ingreso)
+    await expect(
+      servicio.integrarEquipo(actorDiocesano(null), {
+        personaId: persona.id,
+        tipo: 'administracionDiocesana',
+        ambitoTipo: 'diocesis',
+        ambitoId: null,
+        desde: '1970-01-01',
+      }),
+    ).resolves.toBeTruthy()
   })
 })
 

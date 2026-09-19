@@ -1,4 +1,4 @@
-import type { Config, Entorno } from '@gps/core'
+import type { Config, ConfigDeAuth, Entorno } from '@gps/core'
 import paquete from '../../../package.json'
 import { crearAlmacenamientoEnDisco, crearAlmacenamientoEnMemoria } from './almacenamiento'
 import { crearBd } from './bd'
@@ -87,11 +87,60 @@ export function leerPuerto(valor: string | undefined): number {
   return puerto
 }
 
+const VARIABLES_DE_AUTH = [
+  'ORIGEN_PUBLICO',
+  'GOOGLE_CLIENTE_WEB_ID',
+  'GOOGLE_CLIENTE_IOS_ID',
+  'GOOGLE_CLIENTE_ANDROID_ID',
+  'GOOGLE_CLIENTE_SECRETO',
+  'APPLE_SERVICIO_ID',
+  'APPLE_BUNDLE_ID',
+  'APPLE_EQUIPO_ID',
+  'APPLE_CLAVE_ID',
+  'APPLE_CLAVE_PRIVADA',
+] as const
+
+export function leerConfigDeAuth(
+  entorno: Entorno,
+  variables: Record<string, string | undefined>,
+): ConfigDeAuth | null {
+  const faltantes = VARIABLES_DE_AUTH.filter((nombre) => !variables[nombre])
+  if (faltantes.length === VARIABLES_DE_AUTH.length && entorno !== 'produccion') return null
+  if (faltantes.length > 0) {
+    throw new Error(`Faltan variables de auth: ${faltantes.join(', ')}`)
+  }
+
+  const origenPublico = variables.ORIGEN_PUBLICO as string
+  const origen = new URL(origenPublico)
+  if (entorno === 'produccion' && origen.protocol !== 'https:') {
+    throw new Error('ORIGEN_PUBLICO tiene que usar https en produccion.')
+  }
+
+  return {
+    origenPublico: origen.origin,
+    google: {
+      clienteWebId: variables.GOOGLE_CLIENTE_WEB_ID as string,
+      clienteIosId: variables.GOOGLE_CLIENTE_IOS_ID as string,
+      clienteAndroidId: variables.GOOGLE_CLIENTE_ANDROID_ID as string,
+      clienteSecreto: variables.GOOGLE_CLIENTE_SECRETO as string,
+    },
+    apple: {
+      servicioId: variables.APPLE_SERVICIO_ID as string,
+      bundleId: variables.APPLE_BUNDLE_ID as string,
+      equipoId: variables.APPLE_EQUIPO_ID as string,
+      claveId: variables.APPLE_CLAVE_ID as string,
+      clavePrivada: (variables.APPLE_CLAVE_PRIVADA as string).replaceAll('\\n', '\n'),
+    },
+  }
+}
+
 export function leerConfig(): Config {
+  const entorno = leerEntorno(process.env.ENTORNO)
   return {
     version: paquete.version,
-    entorno: leerEntorno(process.env.ENTORNO),
+    entorno,
     puerto: leerPuerto(process.env.PUERTO),
+    auth: leerConfigDeAuth(entorno, process.env),
   }
 }
 

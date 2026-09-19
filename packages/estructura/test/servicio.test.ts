@@ -29,7 +29,7 @@ function montarConBd(reloj: Reloj = { ahora: () => HORA }): {
 
   let contador = 0
   const core: Core = {
-    config: { version: '0.0.0', entorno: 'prueba', puerto: 0 },
+    config: { version: '0.0.0', entorno: 'prueba', puerto: 0, auth: null },
     logger: { info: () => {}, error: () => {} },
     reloj,
     bd,
@@ -51,6 +51,7 @@ function montarConBd(reloj: Reloj = { ahora: () => HORA }): {
     hash: (contenido: Uint8Array | string) =>
       `hash:${typeof contenido === 'string' ? contenido : contenido.join(',')}`,
     nuevoId: (prefijo) => `${prefijo}_${++contador}`,
+    nuevoSecreto: () => `secreto_${++contador}`,
   }
 
   const modulo: Module<object> = {
@@ -81,6 +82,43 @@ describe('crearDistrito', () => {
       cerradoEn: null,
       creadoEn: HORA,
       actualizadoEn: HORA,
+    })
+  })
+})
+
+describe('expandirAlcance', () => {
+  test('expande grupo, distrito y sudo sin dar poder al administrador no elevado', async () => {
+    const servicio = montar()
+    const distrito1 = await servicio.crearDistrito({ numero: 1, zona: 'Norte' })
+    const distrito2 = await servicio.crearDistrito({ numero: 2, zona: 'Sur' })
+    const grupo1 = await servicio.crearGrupo({ numero: 1, nombre: 'Uno', distritoId: distrito1.id })
+    const grupo2 = await servicio.crearGrupo({ numero: 2, nombre: 'Dos', distritoId: distrito2.id })
+    const actor = {
+      personaId: 'persona_1',
+      roles: [
+        {
+          rol: 'comisionadoDeDistrito' as const,
+          ambito: { tipo: 'distrito' as const, id: distrito1.id },
+        },
+      ],
+      esAdministradorDesignado: true,
+      estaElevado: false,
+    }
+
+    expect(await servicio.expandirAlcance(actor)).toEqual({
+      distritosVisibles: [distrito1.id],
+      gruposVisibles: [grupo1.id],
+      esAdministrador: false,
+    })
+    expect(await servicio.expandirAlcance({ ...actor, roles: [] })).toEqual({
+      distritosVisibles: [],
+      gruposVisibles: [],
+      esAdministrador: false,
+    })
+    expect(await servicio.expandirAlcance({ ...actor, roles: [], estaElevado: true })).toEqual({
+      distritosVisibles: [distrito1.id, distrito2.id],
+      gruposVisibles: [grupo1.id, grupo2.id],
+      esAdministrador: true,
     })
   })
 })

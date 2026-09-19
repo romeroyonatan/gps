@@ -8,7 +8,7 @@ import { crearSellador } from '../src/sellador'
 
 const sellador = crearSellador({ prueba: 'una-clave' }, 'prueba')
 
-const config: Config = { version: '1.2.3', entorno: 'prueba', puerto: 0 }
+const config: Config = { version: '1.2.3', entorno: 'prueba', puerto: 0, auth: null }
 
 const core = () =>
   crearCore(
@@ -35,6 +35,13 @@ describe('crearCore', () => {
     const uno = core()
     const generados = Array.from({ length: 1000 }, () => uno.nuevoId('grupo'))
     expect(generados).toEqual([...generados].sort())
+  })
+
+  test('genera secretos de la cantidad pedida y no los repite', () => {
+    const uno = core()
+    expect(uno.nuevoSecreto(16)).toMatch(/^[0-9a-f]{32}$/)
+    expect(uno.nuevoSecreto()).not.toBe(uno.nuevoSecreto())
+    expect(() => uno.nuevoSecreto(0)).toThrow('entero positivo')
   })
 
   test('expone la base que le pasaron', () => {

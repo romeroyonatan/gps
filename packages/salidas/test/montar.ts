@@ -109,6 +109,7 @@ export function montar(opciones: { reloj?: Reloj; mundo?: Mundo } = {}) {
     conversorDeImagenes: { aJpeg: async (contenido) => contenido },
     hash: (contenido) => `hash:${typeof contenido === 'string' ? contenido : contenido.length}`,
     nuevoId: (prefijo) => `${prefijo}_${++contador}`,
+    nuevoSecreto: () => `secreto_${++contador}`,
   }
 
   const modulo = (name: string, suyas: typeof migraciones): Module<object> => ({
@@ -131,12 +132,22 @@ export function montar(opciones: { reloj?: Reloj; mundo?: Mundo } = {}) {
   const archivos = moduloDeArchivos.createServices(core, {})
 
   const estructura: Estructura = {
+    expandirAlcance: async () => ({
+      gruposVisibles: mundo.grupos.map(({ id }) => id),
+      distritosVisibles: [DISTRITO_ID],
+      esAdministrador: false,
+    }),
     obtenerGrupo: async (id) => mundo.grupos.find((grupo) => grupo.id === id) ?? null,
     distritoEstaAbierto: async (id) => id === DISTRITO_ID,
     gruposAbiertosEn: async () => new Set(mundo.grupos.map((grupo) => grupo.id)),
   }
 
   const personas: Personas = {
+    personaExiste: async (personaId) =>
+      mundo.miembros.some(({ persona }) => persona.id === personaId),
+    grupoVigenteDe: async (personaId) =>
+      mundo.miembros.some(({ persona }) => persona.id === personaId) ? GRUPO_ID : null,
+    funcionesVigentes: async () => [],
     miembrosActivos: async () => [],
     miembrosDelGrupo: async (grupoId) => (grupoId === GRUPO_ID ? mundo.miembros : []),
     ocupantesDelCargo: async (cargo: TipoDeCargo, ambitoId) =>

@@ -23,7 +23,7 @@ function montarContexto(hora = HORA): Context {
 
   let contador = 0
   const core: Core = {
-    config: { version: '0.0.0', entorno: 'demo', puerto: 0 },
+    config: { version: '0.0.0', entorno: 'demo', puerto: 0, auth: null },
     logger: { info: () => {}, error: () => {} },
     // El demo siembra personas con fechas de nacimiento reales, asi que el reloj
     // no puede estar en 1970: con esa hora, nacer en 2020 seria nacer en el
@@ -52,6 +52,7 @@ function montarContexto(hora = HORA): Context {
     hash: (contenido: Uint8Array | string) =>
       `hash:${typeof contenido === 'string' ? contenido : contenido.join(',')}`,
     nuevoId: (prefijo) => `${prefijo}_${++contador}`,
+    nuevoSecreto: () => `secreto_${++contador}`,
   }
 
   aplicarMigraciones(core, [estructura, personas, afiliacion, archivos, salidas])
@@ -66,6 +67,7 @@ function montarContexto(hora = HORA): Context {
   const servicioDeArchivos = archivos.createServices(core, {})
   return {
     actor: null,
+    alcance: null,
     estructura: servicioDeEstructura,
     personas: servicioDePersonas,
     afiliacion: afiliacion.createServices(core, {

@@ -4,7 +4,7 @@ import { crearServicioDeSistema } from '../src/servidor/servicio'
 
 function coreFalso(parcial: Partial<Core> = {}): Core {
   return {
-    config: { version: '9.9.9', entorno: 'prueba', puerto: 0 },
+    config: { version: '9.9.9', entorno: 'prueba', puerto: 0, auth: null },
     logger: { info: () => {}, error: () => {} },
     reloj: { ahora: () => new Date('1970-01-01T00:00:00Z') },
     // sistema no consulta la base ni genera ids: el fake no los provee, y si
@@ -28,6 +28,9 @@ function coreFalso(parcial: Partial<Core> = {}): Core {
       `hash:${typeof contenido === 'string' ? contenido : contenido.join(',')}`,
     nuevoId: () => {
       throw new Error('sistema no deberia generar ids')
+    },
+    nuevoSecreto: () => {
+      throw new Error('sistema no deberia generar secretos')
     },
     modulos: ['sistema'],
     ...parcial,

@@ -43,6 +43,20 @@
       "when": 1789767781972,
       "tag": "0005_baja_grupo_de_cargo",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789775927670,
+      "tag": "0006_equipos_y_revocacion",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1789777708664,
+      "tag": "0007_eventos_de_autoridad",
+      "breakpoints": true
     }
   ]
 }

@@ -4,6 +4,7 @@ export type {
   Almacenamiento,
   Bd,
   Config,
+  ConfigDeAuth,
   ConversorDeImagenes,
   Core,
   Entorno,

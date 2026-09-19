@@ -49,6 +49,9 @@ export interface Cargo extends Marcas {
    *  Pertenencia, este puede estar en el futuro: un mandato dura cuatro anios y
    *  su fin se conoce el dia que empieza. */
   readonly hasta: string | null
+  /** Remocion efectiva inmediata. El periodo se conserva como historia, pero
+   *  un cargo revocado ya no concede acceso ni permite firmar. */
+  readonly revocadoEn: Date | null
 }
 
 /** Una persona con sus vinculos vigentes: lo que devuelve el servicio y lo que
@@ -60,7 +63,10 @@ export interface PersonaConVinculos extends Persona {
 
 /** Lo propio de un cargo en el alta. No lleva `desde`: el del cargo es el de la
  *  pertenencia, asi el formulario no pide la misma fecha cinco veces. */
-export type DatosDeCargo = Omit<Cargo, 'id' | 'personaId' | 'ambitoId' | 'desde' | keyof Marcas>
+export type DatosDeCargo = Omit<
+  Cargo,
+  'id' | 'personaId' | 'ambitoId' | 'desde' | 'revocadoEn' | keyof Marcas
+>
 
 /** Lo que entra por el alta ademas de los datos personales. Derivado de
  *  Pertenencia por la misma razon que DatosDePersona sale de Persona: agregar un
@@ -82,4 +88,12 @@ export interface DatosDeIngreso
 export function estaVigente(vinculo: { desde: string; hasta: string | null }, hoy: Date): boolean {
   const dia = aFechaDeCalendario(hoy)
   return vinculo.desde <= dia && (vinculo.hasta === null || dia <= vinculo.hasta)
+}
+
+/** Para autorizacion importa tambien una remocion ocurrida dentro del dia. */
+export function estaVigenteParaAcceso(
+  vinculo: { desde: string; hasta: string | null; revocadoEn: Date | null },
+  hoy: Date,
+): boolean {
+  return vinculo.revocadoEn === null && estaVigente(vinculo, hoy)
 }

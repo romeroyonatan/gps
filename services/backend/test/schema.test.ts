@@ -10,7 +10,7 @@ const sellador = crearSellador({ prueba: 'una-clave' }, 'prueba')
 
 import { componer } from '../src/composicion'
 
-const config: Config = { version: '1.2.3', entorno: 'prueba', puerto: 0 }
+const config: Config = { version: '1.2.3', entorno: 'prueba', puerto: 0, auth: null }
 
 async function consultar(consulta: string) {
   const { esquema, contexto } = await componer(
@@ -40,12 +40,12 @@ describe('esquema compuesto', () => {
     const resultado = await consultar('{ version { modulos } }')
     expect(resultado.data).toEqual({
       version: {
-        modulos: ['sistema', 'estructura', 'personas', 'afiliacion', 'archivos', 'salidas'],
+        modulos: ['sistema', 'estructura', 'personas', 'auth', 'afiliacion', 'archivos', 'salidas'],
       },
     })
   })
 
-  test('el contexto expone actor en null: auth todavia no existe', async () => {
+  test('el contexto base es anónimo y sin alcance', async () => {
     const { contexto } = await componer(
       config,
       crearBd(':memory:'),
@@ -54,6 +54,7 @@ describe('esquema compuesto', () => {
       crearConversorDeImagenes(),
     )
     expect(contexto.actor).toBeNull()
+    expect(contexto.alcance).toBeNull()
   })
 
   test('expone el arbol de la diocesis, vacio si no hay datos', async () => {
