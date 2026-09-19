@@ -1,6 +1,14 @@
 import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
-import { aplicarMigraciones, type Bd, type Core, type Module, type Reloj } from '@gps/core'
+import type { Declaracion } from '@gps/afiliacion/dominio'
+import {
+  aplicarMigraciones,
+  type Bd,
+  type Core,
+  crearBusDeEventos,
+  type Module,
+  type Reloj,
+} from '@gps/core'
 import type { Estructura } from '@gps/estructura/dominio'
 import type { MiembroActivo, Personas } from '@gps/personas/dominio'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
@@ -78,6 +86,9 @@ function estructuraFalsa(
     async obtenerGrupo() {
       throw new Error('afiliacion no deberia llamar a obtenerGrupo')
     },
+    async listarGrupos() {
+      throw new Error('afiliacion no deberia llamar a listarGrupos')
+    },
     async distritoEstaAbierto() {
       throw new Error('afiliacion no deberia llamar a distritoEstaAbierto')
     },
@@ -96,6 +107,8 @@ function montar(
     miembros?: readonly Miembro[]
     grupos?: readonly { id: string; cerradoEn?: string }[]
     reloj?: Reloj
+    suscriptor?: (declaracion: Declaracion) => void | Promise<void>
+    alError?: (mensaje: string) => void
   } = {},
 ): ServicioDeAfiliacion {
   const base = new Database(':memory:')
@@ -105,9 +118,10 @@ function montar(
   let contador = 0
   const core: Core = {
     config: { version: '0.0.0', entorno: 'prueba', puerto: 0 },
-    logger: { info: () => {}, error: () => {} },
+    logger: { info: () => {}, error: (mensaje) => opciones.alError?.(mensaje) },
     reloj: opciones.reloj ?? { ahora: () => HORA },
     bd,
+    eventos: crearBusDeEventos(),
     modulos: ['estructura', 'personas', 'afiliacion'],
     // Falso pero con el comportamiento que importa: sellar y verificar cierran
     // entre si, y un dato alterado no verifica.
@@ -136,6 +150,7 @@ function montar(
     registerSchema: () => {},
   }
   aplicarMigraciones(core, [modulo])
+  if (opciones.suscriptor) core.eventos.suscribir('AfiliacionDeclarada', opciones.suscriptor)
 
   return crearServicioDeAfiliacion(
     core,
@@ -201,6 +216,36 @@ describe('declarar', () => {
       'Pedro',
       'Juan',
     ])
+  })
+
+  test('publica cada declaracion despues de guardarla', async () => {
+    const recibidas: string[] = []
+    const servicio = montar({
+      miembros: ESCENARIO,
+      suscriptor: (declaracion) => {
+        recibidas.push(declaracion.id)
+      },
+    })
+
+    const [declaracion] = await servicio.declarar('1969-05-01')
+
+    expect(recibidas).toEqual([declaracion?.id ?? ''])
+  })
+
+  test('un suscriptor fallido no revierte ni hace fallar la declaracion', async () => {
+    const errores: string[] = []
+    const servicio = montar({
+      miembros: ESCENARIO,
+      suscriptor: () => {
+        throw new Error('tesoreria caida')
+      },
+      alError: (mensaje) => errores.push(mensaje),
+    })
+
+    const [declaracion] = await servicio.declarar('1969-05-01')
+
+    expect(await servicio.listarAfiliados(declaracion?.id ?? '')).toHaveLength(2)
+    expect(errores).toEqual(['No se pudo procesar AfiliacionDeclarada'])
   })
 
   test('la nomina va ordenada por apellido, con Intl y no con ORDER BY', async () => {
@@ -466,6 +511,19 @@ describe('listarDeclaraciones', () => {
     const servicio = montar({ miembros: ESCENARIO })
     await servicio.declarar('1969-05-01')
     expect(await servicio.listarDeclaraciones('grupo_12')).toEqual([])
+  })
+
+  test('sin grupo devuelve todas para los modulos consumidores', async () => {
+    const servicio = montar({
+      miembros: [JUAN, { ...PEDRO, grupoId: 'grupo_12', desde: '1969-03-01' }],
+      grupos: [{ id: 'grupo_7' }, { id: 'grupo_12' }],
+    })
+    await servicio.declarar('1969-05-01')
+
+    expect((await servicio.listarDeclaraciones()).map((una) => una.grupoId).sort()).toEqual([
+      'grupo_12',
+      'grupo_7',
+    ])
   })
 })
 

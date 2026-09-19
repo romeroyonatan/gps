@@ -1,0 +1,212 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "3700777a-4682-4ff9-8ec6-0d45a65682d0",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+    "cuotas_de_afiliacion": {
+      "name": "cuotas_de_afiliacion",
+      "columns": {
+        "periodo": {
+          "name": "periodo",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "importe": {
+          "name": "importe",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "actualizado_en": {
+          "name": "actualizado_en",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "cuota_importe_positivo": {
+          "name": "cuota_importe_positivo",
+          "value": "\"cuotas_de_afiliacion\".\"importe\" > 0"
+        }
+      }
+    },
+    "movimientos_de_tesoreria": {
+      "name": "movimientos_de_tesoreria",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "grupo_id": {
+          "name": "grupo_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fecha": {
+          "name": "fecha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "importe": {
+          "name": "importe",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "periodo": {
+          "name": "periodo",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "declaracion_id": {
+          "name": "declaracion_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "cantidad": {
+          "name": "cantidad",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "cuota": {
+          "name": "cuota",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "medio_de_pago": {
+          "name": "medio_de_pago",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "referencia": {
+          "name": "referencia",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "observacion": {
+          "name": "observacion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "anula_a": {
+          "name": "anula_a",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "actualizado_en": {
+          "name": "actualizado_en",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "cargo_por_declaracion": {
+          "name": "cargo_por_declaracion",
+          "columns": ["declaracion_id"],
+          "isUnique": true
+        },
+        "anulacion_por_pago": {
+          "name": "anulacion_por_pago",
+          "columns": ["anula_a"],
+          "isUnique": true
+        },
+        "movimientos_por_grupo": {
+          "name": "movimientos_por_grupo",
+          "columns": ["grupo_id", "fecha"],
+          "isUnique": false
+        },
+        "cargos_por_periodo": {
+          "name": "cargos_por_periodo",
+          "columns": ["periodo"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "movimientos_de_tesoreria_anula_a_movimientos_de_tesoreria_id_fk": {
+          "name": "movimientos_de_tesoreria_anula_a_movimientos_de_tesoreria_id_fk",
+          "tableFrom": "movimientos_de_tesoreria",
+          "tableTo": "movimientos_de_tesoreria",
+          "columnsFrom": ["anula_a"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "movimiento_campos_por_tipo": {
+          "name": "movimiento_campos_por_tipo",
+          "value": "(\n        \"movimientos_de_tesoreria\".\"tipo\" = 'cargo_afiliacion' AND \"movimientos_de_tesoreria\".\"importe\" > 0\n          AND \"movimientos_de_tesoreria\".\"declaracion_id\" IS NOT NULL AND \"movimientos_de_tesoreria\".\"periodo\" IS NOT NULL\n          AND \"movimientos_de_tesoreria\".\"cantidad\" > 0 AND \"movimientos_de_tesoreria\".\"cuota\" > 0\n          AND \"movimientos_de_tesoreria\".\"medio_de_pago\" IS NULL AND \"movimientos_de_tesoreria\".\"anula_a\" IS NULL\n      ) OR (\n        \"movimientos_de_tesoreria\".\"tipo\" = 'pago' AND \"movimientos_de_tesoreria\".\"importe\" < 0\n          AND \"movimientos_de_tesoreria\".\"declaracion_id\" IS NULL AND \"movimientos_de_tesoreria\".\"periodo\" IS NULL\n          AND \"movimientos_de_tesoreria\".\"cantidad\" IS NULL AND \"movimientos_de_tesoreria\".\"cuota\" IS NULL\n          AND \"movimientos_de_tesoreria\".\"medio_de_pago\" IN ('transferencia', 'efectivo', 'otro')\n          AND \"movimientos_de_tesoreria\".\"anula_a\" IS NULL\n      ) OR (\n        \"movimientos_de_tesoreria\".\"tipo\" = 'anulacion_pago' AND \"movimientos_de_tesoreria\".\"importe\" > 0\n          AND \"movimientos_de_tesoreria\".\"declaracion_id\" IS NULL AND \"movimientos_de_tesoreria\".\"periodo\" IS NULL\n          AND \"movimientos_de_tesoreria\".\"cantidad\" IS NULL AND \"movimientos_de_tesoreria\".\"cuota\" IS NULL\n          AND \"movimientos_de_tesoreria\".\"medio_de_pago\" IS NULL AND \"movimientos_de_tesoreria\".\"anula_a\" IS NOT NULL\n      )"
+        }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

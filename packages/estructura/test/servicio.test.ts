@@ -1,6 +1,13 @@
 import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
-import { aplicarMigraciones, type Bd, type Core, type Module, type Reloj } from '@gps/core'
+import {
+  aplicarMigraciones,
+  type Bd,
+  type Core,
+  crearBusDeEventos,
+  type Module,
+  type Reloj,
+} from '@gps/core'
 import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import type { Rama } from '../src/dominio/ramas'
@@ -33,6 +40,7 @@ function montarConBd(reloj: Reloj = { ahora: () => HORA }): {
     logger: { info: () => {}, error: () => {} },
     reloj,
     bd,
+    eventos: crearBusDeEventos(),
     modulos: ['estructura'],
     // Falso pero con el comportamiento que importa: sellar y verificar cierran
     // entre si, y un dato alterado no verifica.
@@ -481,6 +489,21 @@ describe('cerrarGrupo', () => {
     expect(
       servicio.crearGrupo({ numero: 42, nombre: 'Otro', distritoId: distrito.id }),
     ).rejects.toThrow()
+  })
+})
+
+describe('listarGrupos', () => {
+  test('incluye los cerrados para que sus cuentas no desaparezcan', async () => {
+    const servicio = montar()
+    const distrito = await servicio.crearDistrito({ numero: 1, zona: 'San Isidro' })
+    const grupo = await servicio.crearGrupo({
+      numero: 7,
+      nombre: 'San Jorge',
+      distritoId: distrito.id,
+    })
+    await servicio.cerrarGrupo(grupo.id)
+
+    expect((await servicio.listarGrupos()).map((uno) => uno.id)).toEqual([grupo.id])
   })
 })
 

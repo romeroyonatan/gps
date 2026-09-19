@@ -1,6 +1,13 @@
 import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
-import { aplicarMigraciones, type Bd, type Core, type Module, type Reloj } from '@gps/core'
+import {
+  aplicarMigraciones,
+  type Bd,
+  type Core,
+  crearBusDeEventos,
+  type Module,
+  type Reloj,
+} from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Estructura, GrupoConUnidades, Rama, Unidad } from '@gps/estructura/dominio'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
@@ -51,6 +58,7 @@ const DISTRITOS_ABIERTOS = new Set(['distrito_1'])
 function estructuraFalsa(grupos: readonly GrupoConUnidades[] = [GRUPO]): Estructura {
   return {
     obtenerGrupo: async (id) => grupos.find((grupo) => grupo.id === id) ?? null,
+    listarGrupos: async () => grupos,
     distritoEstaAbierto: async (id) => DISTRITOS_ABIERTOS.has(id),
     // Personas no usa gruposAbiertosEn: se implementa solo para satisfacer la
     // interfaz. Los GrupoConUnidades de este archivo tienen cerradoEn: null.
@@ -83,6 +91,7 @@ function montar(
     logger: { info: () => {}, error: () => {} },
     reloj,
     bd,
+    eventos: crearBusDeEventos(),
     modulos: ['estructura', 'personas'],
     // Falso pero con el comportamiento que importa: sellar y verificar cierran
     // entre si, y un dato alterado no verifica.

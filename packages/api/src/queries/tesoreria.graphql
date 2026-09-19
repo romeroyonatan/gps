@@ -1,0 +1,76 @@
+query Tesoreria {
+  cuentasDeGrupos {
+    grupoId
+    numero
+    nombre
+    cerrado
+    saldo
+  }
+  cuotasDeAfiliacion {
+    periodo
+    importe
+  }
+  periodosConfigurablesDeAfiliacion
+  deudasPendientes {
+    cantidad
+    periodosSinCuota
+  }
+}
+
+query CuentaDeGrupo($grupoId: ID!) {
+  movimientosDeTesoreria(grupoId: $grupoId) {
+    id
+    fecha
+    tipo
+    importe
+    periodo
+    declaracionId
+    cantidad
+    cuota
+    medioDePago
+    referencia
+    observacion
+    anulaA
+  }
+}
+
+mutation DefinirCuotaDeAfiliacion($periodo: Int!, $importe: Int!) {
+  definirCuotaDeAfiliacion(periodo: $periodo, importe: $importe) {
+    periodo
+    importe
+  }
+}
+
+mutation RegistrarPago(
+  $grupoId: ID!
+  $fecha: String!
+  $importe: Int!
+  $medioDePago: MedioDePago!
+  $referencia: String
+  $observacion: String
+) {
+  registrarPago(
+    grupoId: $grupoId
+    fecha: $fecha
+    importe: $importe
+    medioDePago: $medioDePago
+    referencia: $referencia
+    observacion: $observacion
+  ) {
+    id
+  }
+}
+
+mutation AnularPago($pagoId: ID!) {
+  anularPago(pagoId: $pagoId) {
+    id
+  }
+}
+
+mutation GenerarDeudasPendientes {
+  generarDeudasPendientes {
+    creados
+    cantidad
+    periodosSinCuota
+  }
+}

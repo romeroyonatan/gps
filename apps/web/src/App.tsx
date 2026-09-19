@@ -2,9 +2,12 @@
 import { useVersion } from '@gps/api'
 import { Route, Switch } from 'wouter'
 import { Afiliacion } from './pantallas/Afiliacion'
+import { ConfiguracionDeCuotas } from './pantallas/ConfiguracionDeCuotas'
+import { CuentaDeGrupo } from './pantallas/CuentaDeGrupo'
 import { Estructura } from './pantallas/Estructura'
 import { Grupo } from './pantallas/Grupo'
 import { Salidas } from './pantallas/Salidas'
+import { Tesoreria } from './pantallas/Tesoreria'
 
 export function App() {
   const version = useVersion()
@@ -17,6 +20,11 @@ export function App() {
 
         <Switch>
           <Route path="/" component={Estructura} />
+          <Route path="/tesoreria/grupos/:id">
+            {(params) => <CuentaDeGrupo grupoId={params.id} />}
+          </Route>
+          <Route path="/tesoreria/configuracion" component={ConfiguracionDeCuotas} />
+          <Route path="/tesoreria" component={Tesoreria} />
           <Route path="/grupos/:id/afiliacion">
             {(params) => <Afiliacion grupoId={params.id} />}
           </Route>

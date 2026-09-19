@@ -1,4 +1,12 @@
-import type { Almacenamiento, Bd, Config, ConversorDeImagenes, Core, Sellador } from '@gps/core'
+import {
+  type Almacenamiento,
+  type Bd,
+  type Config,
+  type ConversorDeImagenes,
+  type Core,
+  crearBusDeEventos,
+  type Sellador,
+} from '@gps/core'
 
 export function crearCore(
   config: Config,
@@ -12,6 +20,7 @@ export function crearCore(
     config,
     modulos,
     bd,
+    eventos: crearBusDeEventos(),
     sellador,
     almacenamiento,
     conversorDeImagenes,

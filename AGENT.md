@@ -136,9 +136,10 @@ Auth, `Alcance` real, `politicas.ts`, rate limiting, auditoría,
 `packages/local`, base en el dispositivo. Cada uno tiene su diseño en la spec y llega
 con su primer consumidor real. No agregarlos por adelantado.
 
-Bus de eventos tampoco, pero ya tiene un consumidor a la vista: cuando llegue Tesorería,
-`afiliacion.declarar` va a emitir `AfiliacionDeclarada` y va a ser Tesorería quien
-calcule la deuda a partir de ese evento, sin que Afiliación la conozca.
+El bus de eventos ya existe en `Core`: es en proceso, sincrónico y tipado. Afiliación
+emite `AfiliacionDeclarada` después de guardar la foto y Tesorería intenta generar el
+cargo sin bloquear la declaración; si falla o falta la cuota, la reconciliación manual
+recupera la deuda pendiente.
 
 Tampoco hay baja ni edición de personas (las columnas `hasta` existen y el historial se
 puede escribir, pero por ahora sólo se llena con altas), ni cargos de equipo, ni equipos, ni

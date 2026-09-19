@@ -12,6 +12,8 @@ export type {
   Sellador,
   Sello,
 } from './core'
+export type { BusDeEventos, Eventos } from './eventos'
+export { crearBusDeEventos } from './eventos'
 export type { Marcas } from './marcas'
 export type { Migracion } from './migraciones'
 export { aplicarMigraciones } from './migraciones'

@@ -1,4 +1,5 @@
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
+import type { BusDeEventos } from './eventos'
 
 export type Entorno = 'desarrollo' | 'produccion' | 'prueba' | 'demo'
 
@@ -80,6 +81,7 @@ export interface Core {
   readonly logger: Logger
   readonly reloj: Reloj
   readonly bd: Bd
+  readonly eventos: BusDeEventos
   readonly sellador: Sellador
   readonly almacenamiento: Almacenamiento
   readonly conversorDeImagenes: ConversorDeImagenes
