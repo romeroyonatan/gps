@@ -1,0 +1,150 @@
+# packages/api/src/queries/salidas.graphql
+fragment DatosDelPermiso on Permiso {
+  id
+  estado
+  lugar
+  desde
+  hasta
+  comoSeViaja
+  pdfId
+  reemplazaA
+  unidadIds
+  participantes {
+    personaId
+    marca
+  }
+  emitidos {
+    personaId
+    marca
+    nombres
+    apellidos
+    numeroDeDocumento
+    unidad
+  }
+  firmas {
+    cargo
+    nombreDelCargo
+    quien
+    firmada
+    modo
+    fecha
+    verificada
+  }
+  adjuntos {
+    id
+    archivoId
+    nombre
+    tipo
+    url
+  }
+}
+
+query Permisos($grupoId: ID!) {
+  permisos(grupoId: $grupoId) {
+    ...DatosDelPermiso
+  }
+}
+
+mutation CrearPermiso(
+  $grupoId: ID!
+  $lugar: String!
+  $desde: String!
+  $hasta: String!
+  $comoSeViaja: String
+) {
+  crearPermiso(
+    grupoId: $grupoId
+    lugar: $lugar
+    desde: $desde
+    hasta: $hasta
+    comoSeViaja: $comoSeViaja
+  ) {
+    ...DatosDelPermiso
+  }
+}
+
+mutation ElegirUnidades($permisoId: ID!, $unidadIds: [ID!]!) {
+  elegirUnidades(permisoId: $permisoId, unidadIds: $unidadIds) {
+    ...DatosDelPermiso
+  }
+}
+
+mutation AgregarParticipante($permisoId: ID!, $personaId: ID!) {
+  agregarParticipante(permisoId: $permisoId, personaId: $personaId) {
+    ...DatosDelPermiso
+  }
+}
+
+mutation QuitarParticipante($permisoId: ID!, $personaId: ID!) {
+  quitarParticipante(permisoId: $permisoId, personaId: $personaId) {
+    ...DatosDelPermiso
+  }
+}
+
+mutation EmitirPermiso($permisoId: ID!) {
+  emitirPermiso(permisoId: $permisoId) {
+    permiso {
+      ...DatosDelPermiso
+    }
+    avisos
+  }
+}
+
+mutation FirmarEnApp($permisoId: ID!, $cargo: TipoDeCargo!, $trazos: String!) {
+  firmarEnApp(permisoId: $permisoId, cargo: $cargo, trazos: $trazos) {
+    ...DatosDelPermiso
+  }
+}
+
+mutation FirmarEnPapel($permisoId: ID!, $cargos: [TipoDeCargo!]!, $escaneoId: ID!) {
+  firmarEnPapel(permisoId: $permisoId, cargos: $cargos, escaneoId: $escaneoId) {
+    ...DatosDelPermiso
+  }
+}
+
+mutation AnularPermiso($permisoId: ID!) {
+  anularPermiso(permisoId: $permisoId) {
+    ...DatosDelPermiso
+  }
+}
+
+mutation ReEmitirPermiso($permisoId: ID!) {
+  reEmitirPermiso(permisoId: $permisoId) {
+    ...DatosDelPermiso
+  }
+}
+
+mutation QuitarAdjunto($permisoId: ID!, $adjuntoId: ID!) {
+  quitarAdjuntoDePermiso(permisoId: $permisoId, adjuntoId: $adjuntoId) {
+    ...DatosDelPermiso
+  }
+}
+
+mutation AdjuntarAPermiso($permisoId: ID!, $archivoId: ID!) {
+  adjuntarAPermiso(permisoId: $permisoId, archivoId: $archivoId) {
+    ...DatosDelPermiso
+  }
+}
+
+mutation SolicitarSubida(
+  $nombre: String!
+  $tipo: String!
+  $tamano: Int!
+  $modulo: String!
+  $recursoId: ID!
+) {
+  solicitarSubida(
+    nombre: $nombre
+    tipo: $tipo
+    tamano: $tamano
+    modulo: $modulo
+    recursoId: $recursoId
+  ) {
+    id
+    url
+  }
+}
+
+mutation ConfirmarSubida($id: ID!) {
+  confirmarSubida(id: $id)
+}

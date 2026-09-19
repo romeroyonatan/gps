@@ -1,0 +1,1 @@
+DROP TABLE `ramas_del_grupo`;

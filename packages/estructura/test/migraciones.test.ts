@@ -15,6 +15,22 @@ function coreDePrueba(bd: Bd): Core {
     bd,
     eventos: crearBusDeEventos(),
     modulos: ['estructura'],
+    // Falso pero con el comportamiento que importa: sellar y verificar cierran
+    // entre si, y un dato alterado no verifica.
+    sellador: {
+      sellar: (datos: string) => ({ sello: `sellado:${datos}`, claveId: 'prueba' }),
+      verificar: (datos: string, sello: { sello: string; claveId: string }) =>
+        sello.claveId === 'prueba' && sello.sello === `sellado:${datos}`,
+    },
+    almacenamiento: {
+      guardar: async () => {},
+      leer: async () => new Uint8Array(),
+      eliminar: async () => {},
+    },
+    conversorDeImagenes: { aJpeg: async (contenido: Uint8Array) => contenido },
+    // Falso pero estable y sensible al contenido, que es lo que los tests miran.
+    hash: (contenido: Uint8Array | string) =>
+      `hash:${typeof contenido === 'string' ? contenido : contenido.join(',')}`,
     nuevoId: (prefijo) => `${prefijo}_fijo`,
   }
 }
@@ -52,7 +68,7 @@ describe('migraciones de estructura', () => {
     const nombres = bd
       .values<[string]>(sql`SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name`)
       .map(([nombre]) => nombre)
-    expect(nombres).toEqual(['distritos', 'grupos', 'migraciones', 'ramas_del_grupo'])
+    expect(nombres).toEqual(['distritos', 'grupos', 'migraciones', 'unidades'])
   })
 
   test('un grupo no puede colgar de un distrito inexistente', () => {
@@ -73,18 +89,43 @@ describe('migraciones de estructura', () => {
     expect(() => insertarGrupo('d2', 'g2', 42)).toThrow()
   })
 
-  test('el mismo grupo no puede abrir dos veces la misma rama', () => {
+  const insertarUnidad = (
+    id: string,
+    rama: string,
+    nombre: string,
+    cerradaEn: number | null = null,
+  ) =>
+    bd.run(
+      sql`INSERT INTO unidades VALUES (${id}, 'g1', ${rama}, 'mixta', ${nombre}, ${cerradaEn}, 0, 0)`,
+    )
+
+  test('el mismo grupo no puede tener dos unidades abiertas de la misma rama y nombre', () => {
     insertarDistrito()
     insertarGrupo('d1')
-    bd.run(sql`INSERT INTO ramas_del_grupo VALUES ('g1', 'lobatos', 0)`)
-    expect(() => bd.run(sql`INSERT INTO ramas_del_grupo VALUES ('g1', 'lobatos', 0)`)).toThrow()
+    insertarUnidad('u1', 'scouts', 'San Jorge')
+    expect(() => insertarUnidad('u2', 'scouts', 'San Jorge')).toThrow()
   })
 
-  test('el mismo grupo si puede abrir ramas distintas', () => {
+  test('el mismo grupo si puede tener dos unidades de la misma rama con nombres distintos', () => {
+    // Es el caso que ramas_del_grupo hacia imposible: dos tropas scout.
     insertarDistrito()
     insertarGrupo('d1')
-    bd.run(sql`INSERT INTO ramas_del_grupo VALUES ('g1', 'lobatos', 0)`)
-    expect(() => bd.run(sql`INSERT INTO ramas_del_grupo VALUES ('g1', 'scouts', 0)`)).not.toThrow()
+    insertarUnidad('u1', 'scouts', 'San Jorge')
+    expect(() => insertarUnidad('u2', 'scouts', 'Santa Juana')).not.toThrow()
+  })
+
+  test('el mismo nombre se puede repetir en otra rama', () => {
+    insertarDistrito()
+    insertarGrupo('d1')
+    insertarUnidad('u1', 'scouts', 'San Jorge')
+    expect(() => insertarUnidad('u2', 'raiders', 'San Jorge')).not.toThrow()
+  })
+
+  test('una unidad cerrada libera su nombre: el UNIQUE es solo entre las abiertas', () => {
+    insertarDistrito()
+    insertarGrupo('d1')
+    insertarUnidad('u1', 'scouts', 'San Jorge', 0)
+    expect(() => insertarUnidad('u2', 'scouts', 'San Jorge')).not.toThrow()
   })
 
   test('agrega la columna cerrado_en a distritos y a grupos', () => {
@@ -98,10 +139,41 @@ describe('migraciones de estructura', () => {
     expect(columnasGrupos).toContain('cerrado_en')
   })
 
-  test('aplica las dos migraciones del modulo', () => {
+  test('convierte cada rama abierta en una unidad, con su tipo de nombre', () => {
+    // La base arranca ya migrada, asi que el caso se arma al reves: se levanta
+    // una base con las migraciones hasta 0001, se siembran ramas y recien ahi
+    // se aplican las dos que faltan. Es la unica forma de probar la conversion.
+    const base = new Database(':memory:')
+    base.exec('PRAGMA foreign_keys = ON')
+    const vieja: Bd = drizzle(base)
+    aplicarMigraciones(coreDePrueba(vieja), [
+      { ...moduloFalso, migraciones: migraciones.slice(0, 2) },
+    ])
+    vieja.run(sql`INSERT INTO distritos VALUES ('d1', 1, 'San Isidro', 0, 0, NULL)`)
+    vieja.run(sql`INSERT INTO grupos VALUES ('g1', 42, 'Ceferino', 'd1', 0, 0, NULL)`)
+    vieja.run(sql`INSERT INTO ramas_del_grupo VALUES ('g1', 'lobatos', 111)`)
+    vieja.run(sql`INSERT INTO ramas_del_grupo VALUES ('g1', 'scouts', 222)`)
+
+    aplicarMigraciones(coreDePrueba(vieja), [moduloFalso])
+
+    const filas = vieja.values<[string, string, string, string, string, number | null, number]>(
+      sql`SELECT id, grupo_id, rama, sexo, nombre, cerrada_en, creado_en FROM unidades ORDER BY rama`,
+    )
+    expect(filas).toEqual([
+      ['unidad_g1_lobatos', 'g1', 'lobatos', 'mixta', 'Manada', null, 111],
+      ['unidad_g1_scouts', 'g1', 'scouts', 'mixta', 'Tropa scout', null, 222],
+    ])
+  })
+
+  test('aplica las migraciones del modulo', () => {
     const aplicadas = bd
       .values<[string]>(sql`SELECT nombre FROM migraciones ORDER BY nombre`)
       .map(([nombre]) => nombre)
-    expect(aplicadas).toEqual(['0000_inicial', '0001_cierre'])
+    expect(aplicadas).toEqual([
+      '0000_inicial',
+      '0001_cierre',
+      '0002_unidades',
+      '0003_baja_ramas_del_grupo',
+    ])
   })
 })

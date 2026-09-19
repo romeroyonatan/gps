@@ -1,11 +1,24 @@
 import { describe, expect, test } from 'bun:test'
 import type { Config } from '@gps/core'
+import { crearAlmacenamientoEnMemoria } from '../src/almacenamiento'
 import { crearBd } from '../src/bd'
+import { crearConversorDeImagenes } from '../src/conversor'
 import { crearCore } from '../src/core'
+import { crearSellador } from '../src/sellador'
+
+const sellador = crearSellador({ prueba: 'una-clave' }, 'prueba')
 
 const config: Config = { version: '1.2.3', entorno: 'prueba', puerto: 0 }
 
-const core = () => crearCore(config, ['sistema'], crearBd(':memory:'))
+const core = () =>
+  crearCore(
+    config,
+    ['sistema'],
+    crearBd(':memory:'),
+    sellador,
+    crearAlmacenamientoEnMemoria(),
+    crearConversorDeImagenes(),
+  )
 
 describe('crearCore', () => {
   test('nuevoId prefija un UUID version 7 con el nombre de la entidad', () => {
@@ -26,6 +39,15 @@ describe('crearCore', () => {
 
   test('expone la base que le pasaron', () => {
     const bd = crearBd(':memory:')
-    expect(crearCore(config, [], bd).bd).toBe(bd)
+    expect(
+      crearCore(
+        config,
+        [],
+        bd,
+        sellador,
+        crearAlmacenamientoEnMemoria(),
+        crearConversorDeImagenes(),
+      ).bd,
+    ).toBe(bd)
   })
 })

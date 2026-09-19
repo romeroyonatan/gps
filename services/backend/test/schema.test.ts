@@ -1,13 +1,25 @@
 import { describe, expect, test } from 'bun:test'
 import type { Config } from '@gps/core'
 import { execute, parse } from 'graphql'
+import { crearAlmacenamientoEnMemoria } from '../src/almacenamiento'
 import { crearBd } from '../src/bd'
+import { crearConversorDeImagenes } from '../src/conversor'
+import { crearSellador } from '../src/sellador'
+
+const sellador = crearSellador({ prueba: 'una-clave' }, 'prueba')
+
 import { componer } from '../src/composicion'
 
 const config: Config = { version: '1.2.3', entorno: 'prueba', puerto: 0 }
 
 async function consultar(consulta: string) {
-  const { esquema, contexto } = await componer(config, crearBd(':memory:'))
+  const { esquema, contexto } = await componer(
+    config,
+    crearBd(':memory:'),
+    sellador,
+    crearAlmacenamientoEnMemoria(),
+    crearConversorDeImagenes(),
+  )
   return execute({
     schema: esquema,
     document: parse(consulta),
@@ -27,12 +39,28 @@ describe('esquema compuesto', () => {
   test('lista los modulos efectivamente registrados', async () => {
     const resultado = await consultar('{ version { modulos } }')
     expect(resultado.data).toEqual({
-      version: { modulos: ['sistema', 'estructura', 'personas', 'afiliacion', 'tesoreria'] },
+      version: {
+        modulos: [
+          'sistema',
+          'estructura',
+          'personas',
+          'afiliacion',
+          'tesoreria',
+          'archivos',
+          'salidas',
+        ],
+      },
     })
   })
 
   test('el contexto expone actor en null: auth todavia no existe', async () => {
-    const { contexto } = await componer(config, crearBd(':memory:'))
+    const { contexto } = await componer(
+      config,
+      crearBd(':memory:'),
+      sellador,
+      crearAlmacenamientoEnMemoria(),
+      crearConversorDeImagenes(),
+    )
     expect(contexto.actor).toBeNull()
   })
 
@@ -63,7 +91,13 @@ describe('tesoreria en el esquema compuesto', () => {
   })
 
   test('define y consulta una cuota', async () => {
-    const { esquema, contexto } = await componer(config, crearBd(':memory:'))
+    const { esquema, contexto } = await componer(
+      config,
+      crearBd(':memory:'),
+      sellador,
+      crearAlmacenamientoEnMemoria(),
+      crearConversorDeImagenes(),
+    )
     const [periodo] = await contexto.tesoreria.listarPeriodosConfigurables()
     const mutacion = await execute({
       schema: esquema,

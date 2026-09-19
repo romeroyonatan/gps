@@ -1,7 +1,7 @@
 import { periodoDe } from '@gps/afiliacion/dominio'
 import { useAfiliadosEn, useDistritos, usePersonasDelGrupo } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
-import { etiquetaDeEdades, RAMAS } from '@gps/estructura/dominio'
+import { etiquetaDeEdades, ramaDelCatalogo } from '@gps/estructura/dominio'
 import {
   calcularEdad,
   estaVigente,
@@ -134,18 +134,24 @@ export default function Pantalla() {
             <Link href={`/grupos/${id}/afiliacion`} className="mt-2 text-sm text-slate-500">
               Afiliación →
             </Link>
+            <Link href={`/grupos/${id}/salidas`} className="mt-2 text-sm text-slate-500">
+              Salidas →
+            </Link>
 
-            {/* En el orden del catalogo, de menor a mayor edad, y con los
-                dirigentes antes que los beneficiarios: son los que uno busca
-                cuando abre la rama. Una rama abierta sin nadie se muestra
-                vacia, porque es informacion. */}
-            {RAMAS.filter((rama) => grupo.ramas.includes(rama.id)).map((rama) => {
-              const suyas = personas.filter((persona) => persona.pertenencia.rama === rama.id)
+            {/* Ya vienen ordenadas por el servidor: por catalogo y, dentro de
+                una rama, por nombre. Los dirigentes antes que los beneficiarios,
+                que son los que uno busca cuando abre la unidad. Una unidad
+                abierta sin nadie se muestra vacia, porque es informacion. */}
+            {grupo.unidades.map((unidad) => {
+              const suyas = personas.filter((persona) => persona.pertenencia.unidadId === unidad.id)
+              const rama = ramaDelCatalogo(unidad.rama)
               return (
                 <Seccion
-                  key={rama.id}
-                  titulo={rama.nombre}
-                  detalle={etiquetaDeEdades(rama)}
+                  key={unidad.id}
+                  titulo={unidad.nombre}
+                  detalle={
+                    rama ? `${rama.nombre} · ${etiquetaDeEdades(rama)} · ${unidad.sexo}` : undefined
+                  }
                   personas={[
                     ...suyas.filter((p) => p.pertenencia.categoria === 'activo'),
                     ...suyas.filter((p) => p.pertenencia.categoria === 'beneficiario'),
@@ -156,10 +162,10 @@ export default function Pantalla() {
               )
             })}
 
-            {grupo.ramas.length === 0 && (
+            {grupo.unidades.length === 0 && (
               <View className="mt-6 rounded-lg bg-white p-4">
                 <Text className="text-sm text-slate-500">
-                  El grupo todavía no abrió ninguna rama.
+                  El grupo todavía no abrió ninguna unidad.
                 </Text>
               </View>
             )}
@@ -171,7 +177,7 @@ export default function Pantalla() {
               afiliados={afiliados}
             />
 
-            <AltaDePersona grupoId={id} ramasAbiertas={grupo.ramas} />
+            <AltaDePersona grupoId={id} unidadesAbiertas={grupo.unidades} />
           </>
         )}
       </ScrollView>

@@ -1,0 +1,227 @@
+import type { Core } from '@gps/core'
+import type { Estructura } from '@gps/estructura/dominio'
+import type { Personas } from '@gps/personas/dominio'
+import { and, eq, inArray } from 'drizzle-orm'
+import type { Permiso } from '../dominio/modelos'
+import {
+  candidatos,
+  marcaSegunCategoria,
+  type Problema,
+  sePuedeEditar,
+  validarDatos,
+} from '../dominio/permisos'
+import { participantes, permisos, unidadesDelPermiso } from './tablas'
+
+/** Los datos del permiso no pasan las reglas de /dominio. Lleva los problemas
+ *  adentro para que el resolver los pueda publicar campo por campo, igual que
+ *  DatosInvalidos en personas. */
+export class PermisoInvalido extends Error {
+  readonly problemas: readonly Problema[]
+
+  constructor(problemas: readonly Problema[]) {
+    super(problemas.map((problema) => problema.mensaje).join(' '))
+    this.name = 'PermisoInvalido'
+    this.problemas = problemas
+  }
+}
+
+/** El permiso no existe, o esta en un estado que no admite lo que se pidio. */
+export class PermisoNoEditable extends Error {
+  constructor(motivo: string) {
+    super(motivo)
+    this.name = 'PermisoNoEditable'
+  }
+}
+
+export interface DatosDelPermiso {
+  readonly lugar: string
+  readonly desde: string
+  readonly hasta: string
+  readonly comoSeViaja?: string | null
+}
+
+export function crearOperacionesDeBorrador(core: Core, personas: Personas, estructura: Estructura) {
+  /** El permiso, o un error si no existe. Devolver null obligaria a cada
+   *  llamador a decidir el mensaje, y todos dirian lo mismo. */
+  function permisoDe(permisoId: string): Permiso {
+    const fila = core.bd.select().from(permisos).where(eq(permisos.id, permisoId)).get()
+    if (!fila) throw new PermisoNoEditable('No hay ningun permiso con ese id.')
+    return fila
+  }
+
+  function exigirBorrador(permisoId: string): Permiso {
+    const permiso = permisoDe(permisoId)
+    if (!sePuedeEditar(permiso.estado)) {
+      throw new PermisoNoEditable(
+        `Un permiso ${permiso.estado} no se edita: lo que se firma tiene que seguir diciendo lo mismo. Anulalo y re-emitilo.`,
+      )
+    }
+    return permiso
+  }
+
+  /** Las unidades elegidas, que son de donde salen los candidatos. */
+  function unidadesElegidas(permisoId: string): readonly string[] {
+    return core.bd
+      .select({ unidadId: unidadesDelPermiso.unidadId })
+      .from(unidadesDelPermiso)
+      .where(eq(unidadesDelPermiso.permisoId, permisoId))
+      .all()
+      .map((fila) => fila.unidadId)
+  }
+
+  /** Quienes pueden ir: los del grupo ese dia, filtrados por las unidades
+   *  elegidas con la regla del dominio -que deja pasar a los adultos sin
+   *  unidad-. La pantalla llama a la misma funcion pura con la misma lista. */
+  async function quienesPuedenIr(grupoId: string, fecha: string, unidades: readonly string[]) {
+    const delGrupo = await personas.miembrosDelGrupo(grupoId, fecha)
+    return candidatos(
+      delGrupo.map((uno) => ({
+        ...uno,
+        pertenencia: { unidadId: uno.unidadId, categoria: uno.categoria },
+      })),
+      unidades,
+    )
+  }
+
+  return {
+    permisoDe,
+    exigirBorrador,
+    unidadesElegidas,
+    quienesPuedenIr,
+
+    async crearPermiso(grupoId: string, datos: DatosDelPermiso): Promise<Permiso> {
+      // Primero el grupo: sin el no tiene sentido validar lo demas. Que exista
+      // y este abierto lo dice estructura, no una foreign key.
+      if (!(await estructura.obtenerGrupo(grupoId))) {
+        throw new PermisoNoEditable('El grupo no existe o esta cerrado.')
+      }
+      const problemas = validarDatos(datos)
+      if (problemas.length > 0) throw new PermisoInvalido(problemas)
+
+      const ahora = core.reloj.ahora()
+      const permiso: Permiso = {
+        id: core.nuevoId('permiso'),
+        grupoId,
+        estado: 'borrador',
+        lugar: datos.lugar.trim(),
+        desde: datos.desde,
+        hasta: datos.hasta,
+        comoSeViaja: datos.comoSeViaja?.trim() || null,
+        pdfId: null,
+        hashDelPdf: null,
+        reemplazaA: null,
+        creadoEn: ahora,
+        actualizadoEn: ahora,
+      }
+      core.bd.insert(permisos).values(permiso).run()
+      return permiso
+    },
+
+    async editarPermiso(permisoId: string, datos: DatosDelPermiso): Promise<Permiso> {
+      exigirBorrador(permisoId)
+      const problemas = validarDatos(datos)
+      if (problemas.length > 0) throw new PermisoInvalido(problemas)
+
+      const ahora = core.reloj.ahora()
+      core.bd
+        .update(permisos)
+        .set({
+          lugar: datos.lugar.trim(),
+          desde: datos.desde,
+          hasta: datos.hasta,
+          comoSeViaja: datos.comoSeViaja?.trim() || null,
+          actualizadoEn: ahora,
+        })
+        .where(eq(permisos.id, permisoId))
+        .run()
+      return permisoDe(permisoId)
+    },
+
+    /** Reemplaza las unidades que van. Reemplaza y no agrega porque es lo que
+     *  hace la pantalla: se marcan y desmarcan casillas y se guarda el
+     *  resultado.
+     *
+     *  Quita tambien a los participantes que quedaron fuera de las unidades
+     *  elegidas: si no, desmarcar una tropa dejaria a su gente en la lista y el
+     *  PDF diria algo que la pantalla no muestra. */
+    async elegirUnidades(permisoId: string, unidadIds: readonly string[]): Promise<void> {
+      const permiso = exigirBorrador(permisoId)
+      const grupo = await estructura.obtenerGrupo(permiso.grupoId)
+      if (!grupo) throw new PermisoNoEditable('El grupo del permiso ya no esta abierto.')
+
+      const abiertas = new Set(grupo.unidades.map((unidad) => unidad.id))
+      const ajenas = unidadIds.filter((id) => !abiertas.has(id))
+      if (ajenas.length > 0) {
+        throw new PermisoInvalido([
+          { campo: 'unidades', mensaje: 'Elegiste una unidad que no es de este grupo.' },
+        ])
+      }
+
+      const ahora = core.reloj.ahora()
+      const elegidas = [...new Set(unidadIds)]
+      const admitidos = new Set(
+        (await quienesPuedenIr(permiso.grupoId, permiso.desde, elegidas)).map(
+          (uno) => uno.persona.id,
+        ),
+      )
+
+      core.bd.transaction((tx) => {
+        tx.delete(unidadesDelPermiso).where(eq(unidadesDelPermiso.permisoId, permisoId)).run()
+        if (elegidas.length > 0) {
+          tx.insert(unidadesDelPermiso)
+            .values(elegidas.map((unidadId) => ({ permisoId, unidadId, creadoEn: ahora })))
+            .run()
+        }
+
+        const puestos = tx
+          .select({ personaId: participantes.personaId })
+          .from(participantes)
+          .where(eq(participantes.permisoId, permisoId))
+          .all()
+          .map((fila) => fila.personaId)
+        const sobran = puestos.filter((personaId) => !admitidos.has(personaId))
+        if (sobran.length > 0) {
+          tx.delete(participantes)
+            .where(
+              and(eq(participantes.permisoId, permisoId), inArray(participantes.personaId, sobran)),
+            )
+            .run()
+        }
+      })
+    },
+
+    /** Suma a alguien. La marca no se elige: sale de su categoria. */
+    async agregarParticipante(permisoId: string, personaId: string): Promise<void> {
+      const permiso = exigirBorrador(permisoId)
+      const suyo = (
+        await quienesPuedenIr(permiso.grupoId, permiso.desde, unidadesElegidas(permisoId))
+      ).find((uno) => uno.persona.id === personaId)
+      if (!suyo) {
+        throw new PermisoInvalido([
+          {
+            campo: 'participantes',
+            mensaje: 'Esa persona no está en el grupo o su unidad no va a esta salida.',
+          },
+        ])
+      }
+
+      core.bd
+        .insert(participantes)
+        .values({
+          permisoId,
+          personaId,
+          marca: marcaSegunCategoria(suyo.categoria),
+          creadoEn: core.reloj.ahora(),
+        })
+        .run()
+    },
+
+    async quitarParticipante(permisoId: string, personaId: string): Promise<void> {
+      exigirBorrador(permisoId)
+      core.bd
+        .delete(participantes)
+        .where(and(eq(participantes.permisoId, permisoId), eq(participantes.personaId, personaId)))
+        .run()
+    },
+  }
+}

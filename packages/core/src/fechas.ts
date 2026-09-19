@@ -18,3 +18,22 @@ export function aFechaDeCalendario(instante: Date): string {
   const dia = `${instante.getDate()}`.padStart(2, '0')
   return `${instante.getFullYear()}-${mes}-${dia}`
 }
+
+/** Que la cadena sea una fecha real del almanaque, y no solo que tenga la
+ *  forma. Sin el ida y vuelta por Date, "2010-02-30" pasaria la expresion
+ *  regular.
+ *
+ *  `new Date(...)` con valores explicitos es determinista y no consulta el
+ *  reloj, asi que no toca la regla de portabilidad.
+ *
+ *  Vive aca por la misma razon que aFechaDeCalendario: la necesitan varios
+ *  modulos -personas para el ingreso, salidas para las fechas de la salida- y
+ *  los modulos no se pueden importar entre si. */
+export function esFechaDeCalendario(texto: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(texto)) return false
+  const [anio = 0, mes = 0, dia = 0] = texto.split('-').map(Number)
+  const fecha = new Date(Date.UTC(anio, mes - 1, dia))
+  return (
+    fecha.getUTCFullYear() === anio && fecha.getUTCMonth() === mes - 1 && fecha.getUTCDate() === dia
+  )
+}

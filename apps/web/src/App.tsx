@@ -6,6 +6,7 @@ import { ConfiguracionDeCuotas } from './pantallas/ConfiguracionDeCuotas'
 import { CuentaDeGrupo } from './pantallas/CuentaDeGrupo'
 import { Estructura } from './pantallas/Estructura'
 import { Grupo } from './pantallas/Grupo'
+import { Salidas } from './pantallas/Salidas'
 import { Tesoreria } from './pantallas/Tesoreria'
 
 export function App() {
@@ -27,6 +28,7 @@ export function App() {
           <Route path="/grupos/:id/afiliacion">
             {(params) => <Afiliacion grupoId={params.id} />}
           </Route>
+          <Route path="/grupos/:id/salidas">{(params) => <Salidas grupoId={params.id} />}</Route>
           <Route path="/grupos/:id">{(params) => <Grupo id={params.id} />}</Route>
           <Route>
             <p className="mt-8 text-sm text-slate-500">No hay nada en esta dirección.</p>

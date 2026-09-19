@@ -27,6 +27,17 @@ describe('catalogo de RAMAS', () => {
   test('solo la ultima rama no tiene tope: Adultos es abierta hacia arriba', () => {
     expect(RAMAS.filter((rama) => rama.hasta === null).map((rama) => rama.id)).toEqual(['adultos'])
   })
+
+  test('cada rama sabe como se llama su unidad', () => {
+    expect(RAMAS.map((rama) => rama.unidad)).toEqual([
+      'Colonia',
+      'Manada',
+      'Tropa scout',
+      'Tropa raider',
+      'Clan',
+      'Tropa',
+    ])
+  })
 })
 
 describe('etiquetaDeEdades', () => {
@@ -44,6 +55,7 @@ describe('ramaDelCatalogo', () => {
       nombre: 'Lobatos',
       desde: 7,
       hasta: 10,
+      unidad: 'Manada',
     })
   })
 

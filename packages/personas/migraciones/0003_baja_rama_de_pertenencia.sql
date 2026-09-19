@@ -1,0 +1,1 @@
+ALTER TABLE `pertenencias` DROP COLUMN `rama`;

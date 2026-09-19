@@ -107,12 +107,12 @@ const HOY_INGRESO = new Date(1970, 0, 1, 12)
 const ingreso: DatosDeIngreso = {
   grupoId: 'grupo_1',
   categoria: 'beneficiario',
-  rama: 'lobatos',
+  unidadId: 'unidad_lob',
   desde: '1969-03-01',
   cargos: [],
 }
 
-const ABIERTAS = ['lobatos', 'scouts'] as const
+const ABIERTAS = [{ id: 'unidad_lob' }, { id: 'unidad_sco' }] as const
 
 const camposDeIngreso = (problemas: readonly { campo: string }[]) => problemas.map((p) => p.campo)
 
@@ -121,33 +121,44 @@ describe('validarIngreso', () => {
     expect(validarIngreso(ingreso, ABIERTAS, HOY_INGRESO)).toEqual([])
   })
 
-  test('un beneficiario sin rama es un dato incompleto', () => {
+  test('un beneficiario sin unidad es un dato incompleto', () => {
     expect(
-      camposDeIngreso(validarIngreso({ ...ingreso, rama: null }, ABIERTAS, HOY_INGRESO)),
-    ).toEqual(['rama'])
+      camposDeIngreso(validarIngreso({ ...ingreso, unidadId: null }, ABIERTAS, HOY_INGRESO)),
+    ).toEqual(['unidad'])
   })
 
-  test('un activo sin rama tambien: hasta el jefe de grupo da en alguna', () => {
-    const activo = { ...ingreso, categoria: 'activo' as const, rama: null }
-    expect(camposDeIngreso(validarIngreso(activo, ABIERTAS, HOY_INGRESO))).toEqual(['rama'])
+  test('un activo sin unidad tambien: hasta el jefe de grupo da en alguna', () => {
+    const activo = { ...ingreso, categoria: 'activo' as const, unidadId: null }
+    expect(camposDeIngreso(validarIngreso(activo, ABIERTAS, HOY_INGRESO))).toEqual(['unidad'])
   })
 
-  test('un adherente con rama es una contradiccion', () => {
+  test('un adherente con unidad es una contradiccion', () => {
     const adherente = { ...ingreso, categoria: 'adherente' as const }
-    expect(camposDeIngreso(validarIngreso(adherente, ABIERTAS, HOY_INGRESO))).toEqual(['rama'])
+    expect(camposDeIngreso(validarIngreso(adherente, ABIERTAS, HOY_INGRESO))).toEqual(['unidad'])
   })
 
-  test('un adherente sin rama esta bien', () => {
-    const adherente = { ...ingreso, categoria: 'adherente' as const, rama: null }
+  test('un adherente sin unidad esta bien', () => {
+    const adherente = { ...ingreso, categoria: 'adherente' as const, unidadId: null }
     expect(validarIngreso(adherente, ABIERTAS, HOY_INGRESO)).toEqual([])
   })
 
-  test('la rama tiene que estar abierta en ese grupo', () => {
+  test('la unidad tiene que estar abierta en ese grupo', () => {
     // Es la regla que el servidor no podia verificar antes de que un modulo
-    // pudiera alcanzar al otro.
+    // pudiera alcanzar al otro. Estar en la lista es a la vez existir, estar
+    // abierta y ser de este grupo: obtenerGrupo devuelve solo esas.
     expect(
-      camposDeIngreso(validarIngreso({ ...ingreso, rama: 'castores' }, ABIERTAS, HOY_INGRESO)),
-    ).toEqual(['rama'])
+      camposDeIngreso(
+        validarIngreso({ ...ingreso, unidadId: 'unidad_de_otro' }, ABIERTAS, HOY_INGRESO),
+      ),
+    ).toEqual(['unidad'])
+  })
+
+  test('a quien va en cual no lo decide el sistema', () => {
+    // Una unidad femenina y otra masculina admiten a cualquiera: Persona ni
+    // siquiera guarda sexo. Lo deciden los dirigentes.
+    expect(validarIngreso({ ...ingreso, unidadId: 'unidad_sco' }, ABIERTAS, HOY_INGRESO)).toEqual(
+      [],
+    )
   })
 
   test('la fecha de ingreso tiene que ser del almanaque', () => {
@@ -185,7 +196,10 @@ describe('validarIngreso', () => {
   })
 
   test('acumula: no corta en el primer problema', () => {
-    const roto = { ...ingreso, rama: 'castores' as const, desde: '1971-01-01' }
-    expect(camposDeIngreso(validarIngreso(roto, ABIERTAS, HOY_INGRESO))).toEqual(['rama', 'desde'])
+    const roto = { ...ingreso, unidadId: 'unidad_de_otro', desde: '1971-01-01' }
+    expect(camposDeIngreso(validarIngreso(roto, ABIERTAS, HOY_INGRESO))).toEqual([
+      'unidad',
+      'desde',
+    ])
   })
 })

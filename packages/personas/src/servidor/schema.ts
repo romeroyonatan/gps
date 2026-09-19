@@ -1,7 +1,6 @@
 import { type Builder, enumCompartido } from '@gps/core/graphql'
-import { RAMAS } from '@gps/estructura/dominio'
 import { GraphQLError } from 'graphql'
-import { TIPOS_DE_CARGO, type TipoDeCargo } from '../dominio/cargos'
+import { TIPOS_DE_CARGO } from '../dominio/cargos'
 import { CATEGORIAS, type Categoria } from '../dominio/categorias'
 import { TIPOS_DE_DOCUMENTO } from '../dominio/documentos'
 import type { DatosDePersona } from '../dominio/modelos'
@@ -31,22 +30,20 @@ export function registrarSchema(builder: Builder): void {
     'Tipos de documento que la asociacion acepta.',
   )
 
-  const RamaRef = enumCompartido(
-    builder,
-    'Rama',
-    RAMAS.map((rama) => rama.id),
-    'Ramas en que la asociacion divide a sus miembros por edad.',
-  )
-
   const CategoriaRef = builder.enumType('Categoria', {
     description: 'Como pertenece una persona a su grupo.',
     values: CATEGORIAS.map((categoria) => categoria.id) as unknown as readonly Categoria[],
   })
 
-  const TipoDeCargoRef = builder.enumType('TipoDeCargo', {
-    description: 'Los cargos de un grupo scout.',
-    values: TIPOS_DE_CARGO.map((cargo) => cargo.id) as unknown as readonly TipoDeCargo[],
-  })
+  // enumCompartido y no builder.enumType porque salidas declara el mismo enum
+  // para el cargo de cada firma, y Pothos aborta si un nombre se registra dos
+  // veces. La descripcion tiene que ser identica en los dos.
+  const TipoDeCargoRef = enumCompartido(
+    builder,
+    'TipoDeCargo',
+    TIPOS_DE_CARGO.map((cargo) => cargo.id),
+    'Los cargos de la asociacion.',
+  )
 
   // No expone grupoId: la query ya filtra por grupo, y devolverlo en cada fila
   // seria repetir el argumento de la consulta.
@@ -54,11 +51,10 @@ export function registrarSchema(builder: Builder): void {
     description: 'Como y desde cuando una persona pertenece a su grupo.',
     fields: (t) => ({
       categoria: t.field({ type: CategoriaRef, resolve: (p) => p.categoria }),
-      rama: t.field({
-        type: RamaRef,
+      unidadId: t.exposeID('unidadId', {
         nullable: true,
-        description: 'Vacía si y sólo si la categoría es adherente.',
-        resolve: (pertenencia) => pertenencia.rama,
+        description:
+          'La unidad del grupo. Vacía si y sólo si la categoría es adherente. La rama sale de la unidad, que la pantalla ya tiene del grupo.',
       }),
       desde: t.exposeString('desde', {
         description: 'Fecha de calendario en formato aaaa-mm-dd, sin hora ni zona horaria.',
@@ -136,7 +132,7 @@ export function registrarSchema(builder: Builder): void {
     fields: (t) => ({
       grupoId: t.id({ required: true }),
       categoria: t.field({ type: CategoriaRef, required: true }),
-      rama: t.field({ type: RamaRef, required: false }),
+      unidadId: t.id({ required: false }),
       desde: t.string({ required: true }),
       cargos: t.field({ type: [DatosDeCargoRef], required: true }),
     }),
@@ -169,7 +165,7 @@ export function registrarSchema(builder: Builder): void {
           const ingreso: DatosDeIngreso = {
             grupoId: String(args.ingreso.grupoId),
             categoria: args.ingreso.categoria,
-            rama: args.ingreso.rama ?? null,
+            unidadId: args.ingreso.unidadId === undefined ? null : String(args.ingreso.unidadId),
             desde: args.ingreso.desde,
             cargos: args.ingreso.cargos.map((cargo) => ({
               cargo: cargo.cargo,

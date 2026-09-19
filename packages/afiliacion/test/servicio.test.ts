@@ -47,6 +47,14 @@ interface Miembro {
  *  constructor, asi que el test no necesita levantar el otro modulo. */
 function personasFalsas(miembros: readonly Miembro[]): Personas {
   return {
+    // Mismo criterio que obtenerGrupo mas abajo: afiliacion no pregunta por
+    // cargos, y si algun dia empieza a hacerlo el test tiene que enterarse.
+    async ocupantesDelCargo() {
+      throw new Error('afiliacion no deberia llamar a ocupantesDelCargo')
+    },
+    async miembrosDelGrupo() {
+      throw new Error('afiliacion no deberia llamar a miembrosDelGrupo')
+    },
     async miembrosActivos(fecha) {
       return miembros
         .filter((uno) => uno.desde <= fecha && (uno.hasta === undefined || fecha <= uno.hasta))
@@ -81,6 +89,9 @@ function estructuraFalsa(
     async listarGrupos() {
       throw new Error('afiliacion no deberia llamar a listarGrupos')
     },
+    async distritoEstaAbierto() {
+      throw new Error('afiliacion no deberia llamar a distritoEstaAbierto')
+    },
     async gruposAbiertosEn(fecha) {
       return new Set(
         grupos
@@ -112,6 +123,22 @@ function montar(
     bd,
     eventos: crearBusDeEventos(),
     modulos: ['estructura', 'personas', 'afiliacion'],
+    // Falso pero con el comportamiento que importa: sellar y verificar cierran
+    // entre si, y un dato alterado no verifica.
+    sellador: {
+      sellar: (datos: string) => ({ sello: `sellado:${datos}`, claveId: 'prueba' }),
+      verificar: (datos: string, sello: { sello: string; claveId: string }) =>
+        sello.claveId === 'prueba' && sello.sello === `sellado:${datos}`,
+    },
+    almacenamiento: {
+      guardar: async () => {},
+      leer: async () => new Uint8Array(),
+      eliminar: async () => {},
+    },
+    conversorDeImagenes: { aJpeg: async (contenido: Uint8Array) => contenido },
+    // Falso pero estable y sensible al contenido, que es lo que los tests miran.
+    hash: (contenido: Uint8Array | string) =>
+      `hash:${typeof contenido === 'string' ? contenido : contenido.join(',')}`,
     nuevoId: (prefijo) => `${prefijo}_${++contador}`,
   }
 

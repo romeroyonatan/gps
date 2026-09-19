@@ -6,6 +6,13 @@ services:
     environment:
       ENTORNO: ${ENTORNO:-desarrollo}
       BD: /datos/gps.db
+      # Al volumen igual que la base: los escaneos y los PDF de los permisos
+      # tienen que sobrevivir a que el contenedor se recree.
+      DIRECTORIO_DE_ARCHIVOS: /datos/archivos
+      # En produccion no hay clave por defecto y el proceso no arranca sin
+      # esta: un sello hecho con una clave de desarrollo no prueba nada.
+      CLAVES_DE_SELLO: ${CLAVES_DE_SELLO:-}
+      CLAVE_DE_SELLO_ACTIVA: ${CLAVE_DE_SELLO_ACTIVA:-}
     volumes:
       - gps-datos:/datos
     healthcheck:

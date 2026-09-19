@@ -1,6 +1,17 @@
 export type { Actor, Alcance, Rol, RolConAmbito } from './actor'
 export type { Context } from './context'
-export type { Bd, Config, Core, Entorno, Logger, Reloj } from './core'
+export type {
+  Almacenamiento,
+  Bd,
+  Config,
+  ConversorDeImagenes,
+  Core,
+  Entorno,
+  Logger,
+  Reloj,
+  Sellador,
+  Sello,
+} from './core'
 export type { BusDeEventos, Eventos } from './eventos'
 export { crearBusDeEventos } from './eventos'
 export type { Marcas } from './marcas'

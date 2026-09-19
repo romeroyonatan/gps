@@ -1,10 +1,15 @@
+import { autorizadores } from '@gps/archivos/servidor'
 import {
+  type Almacenamiento,
   aplicarMigraciones,
   type Bd,
   type Config,
   type Context,
+  type ConversorDeImagenes,
   crearServicios,
+  type Logger,
   ordenarModulos,
+  type Sellador,
 } from '@gps/core'
 import { crearBuilder } from '@gps/core/graphql'
 import type { GraphQLSchema } from 'graphql'
@@ -13,15 +18,25 @@ import { modulos } from './modules'
 
 /** Raiz de composicion: ordena los modulos, arma el Core, crea los servicios
  *  de cada uno y compone el esquema. Si algo falta, no compila. */
+/** Recibe el sellador y el almacenamiento ya construidos, no las variables de
+ *  entorno con que se arman: de que forma vienen las claves o donde estan los
+ *  bytes es asunto de quien arranca el proceso, y asi el generador de schema y
+ *  los tests componen con implementaciones de juguete sin inventar un entorno. */
 export async function componer(
   config: Config,
   bd: Bd,
-): Promise<{ esquema: GraphQLSchema; contexto: Context }> {
+  sellador: Sellador,
+  almacenamiento: Almacenamiento,
+  conversorDeImagenes: ConversorDeImagenes,
+): Promise<{ esquema: GraphQLSchema; contexto: Context; logger: Logger }> {
   const ordenados = ordenarModulos(modulos)
   const core = crearCore(
     config,
     ordenados.map((modulo) => modulo.name),
     bd,
+    sellador,
+    almacenamiento,
+    conversorDeImagenes,
   )
   const builder = crearBuilder()
 
@@ -30,9 +45,14 @@ export async function componer(
   aplicarMigraciones(core, ordenados)
 
   const servicios = crearServicios(core, ordenados)
-  for (const modulo of ordenados) modulo.registerSchema(builder)
-
   const contexto = { actor: null, ...servicios } as Context
+
+  // `archivos` no puede depender de sus dueños -seria un ciclo-, asi que los
+  // dueños se registran aca, cuando sus servicios ya existen. Un archivo cuyo
+  // modulo no este en este registro no se entrega.
+  autorizadores.salidas = (recursoId, actor) =>
+    contexto.salidas.puedeVerArchivosDe(recursoId, actor)
+  for (const modulo of ordenados) modulo.registerSchema(builder)
 
   // La base del demo es siempre nueva y en memoria (ver leerRutaDeBd), asi que
   // no hace falta que la siembra sea idempotente.
@@ -40,8 +60,12 @@ export async function componer(
     // Dinamico: el escenario de ejemplo no tiene por que estar en memoria en
     // produccion.
     const { sembrarEscenario } = await import('@gps/demo/servidor')
-    await sembrarEscenario(contexto)
+    await sembrarEscenario(contexto, core.reloj.ahora())
   }
 
-  return { esquema: builder.toSchema(), contexto }
+  // El logger sale de aca y no del Context: el contexto es lo que ven los
+  // resolvers, y sumarle plomeria del servidor lo ensancha para todos los
+  // modulos. Quien sirve HTTP si lo necesita, para dejar rastro de lo que no
+  // supo traducir.
+  return { esquema: builder.toSchema(), contexto, logger: core.logger }
 }
