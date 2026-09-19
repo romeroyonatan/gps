@@ -329,6 +329,30 @@ describe('alcance entre grupos', () => {
     }
   })
 
+  test('el alcance viaja al cliente para que no ofrezca lo que no va a poder', async () => {
+    // La pantalla del directorio lista todos los grupos pero sólo enlaza los
+    // que se pueden abrir. Para decidirlo usa `puedeVerGrupo` con este mismo
+    // alcance, en vez de reimplementar la expansión de ámbitos.
+    const { consultar, entrar } = await montar()
+    const jefatura = await entrar('jefatura')
+    const tesoreria = await entrar('tesoreria')
+
+    const consulta = '{ personaActual { alcance { gruposVisibles esAdministrador } } }'
+    const suyo = await consultar(jefatura.secreto, consulta)
+    const diocesana = await consultar(tesoreria.secreto, consulta)
+
+    const gruposDe = (datos: unknown) =>
+      (datos as { personaActual?: { alcance: { gruposVisibles: string[] } } } | null)?.personaActual
+        ?.alcance.gruposVisibles ?? []
+
+    expect(gruposDe(suyo.data)).toHaveLength(1)
+    expect(gruposDe(diocesana.data).length).toBeGreaterThan(1)
+
+    // Y un anónimo no recibe alcance ninguno.
+    const anonimo = await consultar(null, consulta)
+    expect(anonimo.data).toEqual({ personaActual: null })
+  })
+
   test('sólo Tesorería diocesana registra un pago', async () => {
     const { consultar, entrar } = await montar()
     const jefatura = await entrar('jefatura')

@@ -1,6 +1,11 @@
-import { useDistritos, useJefesDeGrupos, useVersion } from '@gps/api'
+import { useAlcance, useDistritos, useJefesDeGrupos, useVersion } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
-import { etiquetaDeEdades, ramaDelCatalogo, type Unidad } from '@gps/estructura/dominio'
+import {
+  etiquetaDeEdades,
+  puedeVerGrupo,
+  ramaDelCatalogo,
+  type Unidad,
+} from '@gps/estructura/dominio'
 import { Link } from 'expo-router'
 import { Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native'
 import { BarraDeSesion } from '../src/BarraDeSesion'
@@ -24,27 +29,39 @@ function Grupo(props: {
   numero: number
   nombre: string
   jefes: readonly string[]
+  /** Si quien mira alcanza este grupo. El directorio los lista todos, pero el
+   *  detalle -su gente, su cuenta, sus salidas- es del ámbito de cada uno: un
+   *  grupo que no se va a poder abrir no se ofrece como enlace. */
+  seAbre: boolean
   unidades: readonly Pick<Unidad, 'id' | 'rama' | 'nombre'>[]
 }) {
+  const contenido = (
+    <>
+      <Text className={`text-sm font-medium ${props.seAbre ? 'text-slate-900' : 'text-slate-500'}`}>
+        <Text className="text-slate-400">Grupo Scout Nº{props.numero} -</Text> {props.nombre}
+      </Text>
+      {props.jefes.length > 0 && (
+        <Text className="mt-0.5 text-xs text-slate-500">{props.jefes.join(' · ')}</Text>
+      )}
+      {props.unidades.length === 0 ? (
+        <Text className="mt-1.5 text-xs text-slate-400">Todavía no abrió ninguna unidad</Text>
+      ) : (
+        <View className="mt-1.5 flex-row flex-wrap gap-1.5">
+          {props.unidades.map((unidad) => (
+            <EtiquetaDeUnidad key={unidad.id} unidad={unidad} />
+          ))}
+        </View>
+      )}
+    </>
+  )
+
+  if (!props.seAbre) {
+    return <View className="border-b border-slate-200 px-4 py-3">{contenido}</View>
+  }
+
   return (
     <Link href={`/grupos/${props.id}`} asChild>
-      <Pressable className="border-b border-slate-200 px-4 py-3">
-        <Text className="text-sm font-medium text-slate-900">
-          <Text className="text-slate-400">Grupo Scout Nº{props.numero} -</Text> {props.nombre}
-        </Text>
-        {props.jefes.length > 0 && (
-          <Text className="mt-0.5 text-xs text-slate-500">{props.jefes.join(' · ')}</Text>
-        )}
-        {props.unidades.length === 0 ? (
-          <Text className="mt-1.5 text-xs text-slate-400">Todavía no abrió ninguna unidad</Text>
-        ) : (
-          <View className="mt-1.5 flex-row flex-wrap gap-1.5">
-            {props.unidades.map((unidad) => (
-              <EtiquetaDeUnidad key={unidad.id} unidad={unidad} />
-            ))}
-          </View>
-        )}
-      </Pressable>
+      <Pressable className="border-b border-slate-200 px-4 py-3">{contenido}</Pressable>
     </Link>
   )
 }
@@ -59,6 +76,7 @@ export default function Pantalla() {
     distrito.grupos.map((grupo) => grupo.id),
   )
   const jefes = useJefesDeGrupos(grupos, aFechaDeCalendario(new Date()))
+  const alcance = useAlcance()
   const porGrupo = new Map<string, string[]>()
   for (const jefe of jefes.data?.jefesDeGrupos ?? []) {
     const suyos = porGrupo.get(jefe.grupoId) ?? []
@@ -106,6 +124,7 @@ export default function Pantalla() {
                   numero={grupo.numero}
                   nombre={grupo.nombre}
                   jefes={porGrupo.get(grupo.id) ?? []}
+                  seAbre={alcance !== null && puedeVerGrupo(alcance, grupo.id)}
                   unidades={grupo.unidades}
                 />
               ))}

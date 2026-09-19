@@ -1,8 +1,8 @@
 import {
+  useActor,
   useAsignarCargo,
   useIntegrarEquipo,
   useInvitar,
-  usePersonaActual,
   usePersonasDelGrupo,
   useRevocarCargo,
   useRevocarIntegranteDeEquipo,
@@ -68,7 +68,7 @@ function Enlace(props: { personaId: string; nombre: string }) {
 export default function Pantalla() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { data, isPending, error } = usePersonasDelGrupo(id)
-  const sesion = usePersonaActual()
+  const actor = useActor()
   const asignar = useAsignarCargo()
   const revocarCargo = useRevocarCargo()
   const integrar = useIntegrarEquipo()
@@ -77,23 +77,9 @@ export default function Pantalla() {
   // El hoy de quien mira la pantalla, no el del servidor.
   const ahora = new Date()
   const hoy = aFechaDeCalendario(ahora)
-  const quien = sesion.data?.personaActual
-  // La misma función pura que aplica el servidor: la pantalla no puede ofrecer
-  // algo que el servidor después rechace.
-  const puede =
-    quien != null &&
-    puedeAdministrarPlantelDeGrupo(
-      {
-        personaId: quien.personaId,
-        roles: quien.roles.map((funcion) => ({
-          rol: funcion.rol,
-          ambito: { tipo: funcion.ambitoTipo, id: funcion.ambitoId ?? null },
-        })),
-        esAdministradorDesignado: quien.esAdministradorDesignado,
-        estaElevado: quien.estaElevado,
-      },
-      id,
-    )
+  // La misma función pura que aplica el servidor, con el mismo actor: la
+  // pantalla no puede ofrecer algo que el servidor después rechace.
+  const puede = actor !== null && puedeAdministrarPlantelDeGrupo(actor, id)
 
   const adultos = (data?.personas ?? []).filter(
     (persona) => persona.pertenencia.categoria !== 'beneficiario',

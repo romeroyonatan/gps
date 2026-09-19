@@ -25,6 +25,15 @@ type Afiliado {
 }
 
 """
+Qué entidades alcanza quien pregunta, ya expandidas.
+"""
+type AlcanceDelPedido {
+  distritosVisibles: [ID!]!
+  esAdministrador: Boolean!
+  gruposVisibles: [ID!]!
+}
+
+"""
 Contra qué entidad apunta una función.
 """
 enum AmbitoDeRol {
@@ -477,6 +486,8 @@ type Persona {
 Quién está autenticado en este pedido.
 """
 type PersonaAutenticada {
+  alcance: AlcanceDelPedido!
+
   """
   Hasta cuándo vale la elevación, en ISO. Null si no está elevada.
   """

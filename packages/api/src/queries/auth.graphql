@@ -5,6 +5,11 @@ query PersonaActual {
     esAdministradorDesignado
     estaElevado
     elevadaHasta
+    alcance {
+      gruposVisibles
+      distritosVisibles
+      esAdministrador
+    }
     roles {
       rol
       ambitoTipo

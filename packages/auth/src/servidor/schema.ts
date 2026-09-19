@@ -18,6 +18,11 @@ interface PersonaAutenticada {
   readonly esAdministradorDesignado: boolean
   readonly estaElevado: boolean
   readonly elevadaHasta: Date | null
+  readonly alcance: {
+    readonly gruposVisibles: readonly string[]
+    readonly distritosVisibles: readonly string[]
+    readonly esAdministrador: boolean
+  }
 }
 
 export function registrarSchema(builder: Builder): void {
@@ -55,6 +60,22 @@ export function registrarSchema(builder: Builder): void {
       }),
     })
 
+  // El alcance ya expandido, tal como lo resolvió el contexto de este pedido.
+  // Viaja para que las pantallas puedan preguntar `puedeVerGrupo` con la misma
+  // función pura que aplica el servidor, en vez de reimplementar la expansión
+  // de ámbitos —un comisionado alcanza los grupos de su distrito— del lado del
+  // cliente. Es qué alcanza, no qué puede hacer: eso lo dicen los roles.
+  const AlcanceRef = builder
+    .objectRef<PersonaAutenticada['alcance']>('AlcanceDelPedido')
+    .implement({
+      description: 'Qué entidades alcanza quien pregunta, ya expandidas.',
+      fields: (t) => ({
+        gruposVisibles: t.idList({ resolve: (alcance) => [...alcance.gruposVisibles] }),
+        distritosVisibles: t.idList({ resolve: (alcance) => [...alcance.distritosVisibles] }),
+        esAdministrador: t.exposeBoolean('esAdministrador'),
+      }),
+    })
+
   const PersonaAutenticadaRef = builder
     .objectRef<PersonaAutenticada>('PersonaAutenticada')
     .implement({
@@ -69,6 +90,7 @@ export function registrarSchema(builder: Builder): void {
           description: 'Hasta cuándo vale la elevación, en ISO. Null si no está elevada.',
           resolve: (quien) => quien.elevadaHasta?.toISOString() ?? null,
         }),
+        alcance: t.field({ type: AlcanceRef, resolve: (quien) => quien.alcance }),
       }),
     })
 
@@ -100,6 +122,11 @@ export function registrarSchema(builder: Builder): void {
           esAdministradorDesignado: contexto.actor.esAdministradorDesignado,
           estaElevado: contexto.actor.estaElevado,
           elevadaHasta: contexto.elevadaHasta,
+          alcance: contexto.alcance ?? {
+            gruposVisibles: [],
+            distritosVisibles: [],
+            esAdministrador: false,
+          },
         },
     }),
   )

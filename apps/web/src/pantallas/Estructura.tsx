@@ -1,6 +1,11 @@
-import { useDistritos, useJefesDeGrupos } from '@gps/api'
+import { useAlcance, useDistritos, useJefesDeGrupos } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
-import { etiquetaDeEdades, ramaDelCatalogo, type Unidad } from '@gps/estructura/dominio'
+import {
+  etiquetaDeEdades,
+  puedeVerGrupo,
+  ramaDelCatalogo,
+  type Unidad,
+} from '@gps/estructura/dominio'
 import { Link } from 'wouter'
 
 /** El nombre propio y, en gris, el tramo de edad de su rama. Se muestra el
@@ -20,30 +25,44 @@ function Grupo(props: {
   numero: number
   nombre: string
   jefes: readonly string[]
+  /** Si quien mira alcanza este grupo. El directorio los lista todos, pero el
+   *  detalle -su gente, su cuenta, sus salidas- es del ámbito de cada uno: un
+   *  grupo que no se va a poder abrir no se ofrece como enlace. */
+  seAbre: boolean
   unidades: readonly Pick<Unidad, 'id' | 'rama' | 'nombre'>[]
 }) {
+  const contenido = (
+    <>
+      <p className={`text-sm font-medium ${props.seAbre ? 'text-slate-900' : 'text-slate-500'}`}>
+        <span className="text-slate-400">Grupo Scout Nº{props.numero} -</span> {props.nombre}
+      </p>
+      {props.jefes.length > 0 && (
+        <p className="mt-0.5 text-xs text-slate-500">{props.jefes.join(' · ')}</p>
+      )}
+      {props.unidades.length === 0 ? (
+        <p className="mt-1.5 text-xs text-slate-400">Todavía no abrió ninguna unidad</p>
+      ) : (
+        <ul className="mt-1.5 flex flex-wrap gap-1.5">
+          {props.unidades.map((unidad) => (
+            <EtiquetaDeUnidad key={unidad.id} unidad={unidad} />
+          ))}
+        </ul>
+      )}
+    </>
+  )
+
   return (
     <li>
-      <Link
-        href={`/grupos/${props.id}`}
-        className="block px-4 py-3 hover:bg-slate-50 active:bg-slate-100"
-      >
-        <p className="text-sm font-medium text-slate-900">
-          <span className="text-slate-400">Grupo Scout Nº{props.numero} -</span> {props.nombre}
-        </p>
-        {props.jefes.length > 0 && (
-          <p className="mt-0.5 text-xs text-slate-500">{props.jefes.join(' · ')}</p>
-        )}
-        {props.unidades.length === 0 ? (
-          <p className="mt-1.5 text-xs text-slate-400">Todavía no abrió ninguna unidad</p>
-        ) : (
-          <ul className="mt-1.5 flex flex-wrap gap-1.5">
-            {props.unidades.map((unidad) => (
-              <EtiquetaDeUnidad key={unidad.id} unidad={unidad} />
-            ))}
-          </ul>
-        )}
-      </Link>
+      {props.seAbre ? (
+        <Link
+          href={`/grupos/${props.id}`}
+          className="block px-4 py-3 hover:bg-slate-50 active:bg-slate-100"
+        >
+          {contenido}
+        </Link>
+      ) : (
+        <div className="px-4 py-3">{contenido}</div>
+      )}
     </li>
   )
 }
@@ -58,6 +77,7 @@ export function Estructura() {
     distrito.grupos.map((grupo) => grupo.id),
   )
   const jefes = useJefesDeGrupos(grupos, aFechaDeCalendario(new Date()))
+  const alcance = useAlcance()
   const porGrupo = new Map<string, string[]>()
   for (const jefe of jefes.data?.jefesDeGrupos ?? []) {
     const suyos = porGrupo.get(jefe.grupoId) ?? []
@@ -98,6 +118,7 @@ export function Estructura() {
                   numero={grupo.numero}
                   nombre={grupo.nombre}
                   jefes={porGrupo.get(grupo.id) ?? []}
+                  seAbre={alcance !== null && puedeVerGrupo(alcance, grupo.id)}
                   unidades={grupo.unidades}
                 />
               ))}

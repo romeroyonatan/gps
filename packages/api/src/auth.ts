@@ -1,3 +1,4 @@
+import type { Actor, Alcance } from '@gps/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import {
@@ -23,6 +24,44 @@ export function usePersonaActual() {
     staleTime: 0,
     retry: false,
   })
+}
+
+/** El actor de esta sesión, con la forma que esperan las políticas puras del
+ *  dominio. Null si el pedido es anónimo.
+ *
+ *  Existe para que las pantallas llamen `puedeAdministrarPlantelDeGrupo` y
+ *  compañía con exactamente el mismo dato que usa el servidor, en vez de que
+ *  cada una arme el objeto a mano y alguna se equivoque. */
+export function useActor(): Actor | null {
+  const { data } = usePersonaActual()
+  const quien = data?.personaActual
+  if (!quien) return null
+  return {
+    personaId: quien.personaId,
+    roles: quien.roles.map((funcion) => ({
+      rol: funcion.rol,
+      ambito: { tipo: funcion.ambitoTipo, id: funcion.ambitoId ?? null },
+    })),
+    esAdministradorDesignado: quien.esAdministradorDesignado,
+    estaElevado: quien.estaElevado,
+  }
+}
+
+/** El alcance ya expandido de esta sesión: qué grupos y distritos alcanza.
+ *  Lo resolvió el servidor —expandir el distrito de un comisionado a sus
+ *  grupos es su trabajo— y viaja para que la pantalla pueda preguntar
+ *  `puedeVerGrupo` sin reimplementar esa expansión. */
+export function useAlcance(): Alcance | null {
+  const { data } = usePersonaActual()
+  const actor = useActor()
+  const alcance = data?.personaActual?.alcance
+  if (!actor || !alcance) return null
+  return {
+    actor,
+    gruposVisibles: alcance.gruposVisibles,
+    distritosVisibles: alcance.distritosVisibles,
+    esAdministrador: alcance.esAdministrador,
+  }
 }
 
 /** Cierra la sesión en el servidor y tira todo el cache: lo que quedó adentro

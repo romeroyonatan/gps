@@ -1,8 +1,8 @@
 import {
+  useActor,
   useAsignarCargo,
   useIntegrarEquipo,
   useInvitar,
-  usePersonaActual,
   usePersonasDelGrupo,
   useRevocarCargo,
   useRevocarIntegranteDeEquipo,
@@ -98,7 +98,7 @@ function Enlace(props: { personaId: string; nombre: string }) {
 
 export function Plantel(props: { grupoId: string }) {
   const { data, isPending, error } = usePersonasDelGrupo(props.grupoId)
-  const sesion = usePersonaActual()
+  const actor = useActor()
   const asignar = useAsignarCargo()
   const revocarCargo = useRevocarCargo()
   const integrar = useIntegrarEquipo()
@@ -108,24 +108,10 @@ export function Plantel(props: { grupoId: string }) {
   // que el servidor manda las fechas y no un booleano `vigente`.
   const ahora = new Date()
   const hoy = aFechaDeCalendario(ahora)
-  const quien = sesion.data?.personaActual
-  // La misma función pura que aplica el servidor: la pantalla no inventa una
-  // regla propia, y por eso no puede ofrecer algo que el servidor rechace.
-  const puede =
-    quien !== null &&
-    quien !== undefined &&
-    puedeAdministrarPlantelDeGrupo(
-      {
-        personaId: quien.personaId,
-        roles: quien.roles.map((funcion) => ({
-          rol: funcion.rol,
-          ambito: { tipo: funcion.ambitoTipo, id: funcion.ambitoId ?? null },
-        })),
-        esAdministradorDesignado: quien.esAdministradorDesignado,
-        estaElevado: quien.estaElevado,
-      },
-      props.grupoId,
-    )
+  // La misma función pura que aplica el servidor, con el mismo actor: la
+  // pantalla no inventa una regla propia, y por eso no puede ofrecer algo que
+  // el servidor rechace.
+  const puede = actor !== null && puedeAdministrarPlantelDeGrupo(actor, props.grupoId)
 
   if (isPending) return <p className="mt-8 text-sm text-slate-500">Consultando el plantel…</p>
   if (error) {
