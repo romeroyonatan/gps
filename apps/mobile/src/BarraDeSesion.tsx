@@ -1,4 +1,5 @@
 import { useCerrarSesion, usePersonaActual } from '@gps/api'
+import { nombreDelRol } from '@gps/personas/dominio'
 import { Pressable, Text, View } from 'react-native'
 import { olvidarSesion } from './sesion'
 
@@ -16,10 +17,10 @@ export function BarraDeSesion() {
   const funciones = [...new Set(quien.roles.map((funcion) => funcion.rol))]
 
   return (
-    <View className="mt-4 flex-row flex-wrap items-center gap-2 border-b border-slate-200 pb-4">
+    <View className="mt-4 flex-row flex-wrap items-center gap-2 border-b border-line pb-4">
       {funciones.map((funcion) => (
-        <View key={funcion} className="rounded-full bg-slate-100 px-2.5 py-1">
-          <Text className="text-xs text-slate-700">{funcion}</Text>
+        <View key={funcion} className="rounded-full bg-surface-3 px-2.5 py-1">
+          <Text className="text-xs text-ink-muted">{nombreDelRol(funcion)}</Text>
         </View>
       ))}
       <Pressable
@@ -29,7 +30,7 @@ export function BarraDeSesion() {
           cerrar.mutate(undefined, { onSuccess: () => olvidarSesion() })
         }}
       >
-        <Text className="text-xs font-medium text-slate-500">Cerrar sesión</Text>
+        <Text className="text-xs font-medium text-ink-muted">Cerrar sesión</Text>
       </Pressable>
     </View>
   )

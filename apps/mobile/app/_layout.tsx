@@ -44,8 +44,8 @@ function Adentro() {
 
   if (sesion.isPending) {
     return (
-      <View className="flex-1 items-center justify-center bg-slate-50">
-        <Text className="text-sm text-slate-500">Un momento…</Text>
+      <View className="flex-1 items-center justify-center bg-surface">
+        <Text className="text-sm text-ink-muted">Un momento…</Text>
       </View>
     )
   }
