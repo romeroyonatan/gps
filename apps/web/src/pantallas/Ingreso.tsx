@@ -27,12 +27,35 @@ function enlaceDeIngreso(proveedor: string, extra = ''): string {
   return `/auth/${proveedor}/iniciar?destino=${encodeURIComponent(destinoActual())}${extra}`
 }
 
-function Boton(props: { href: string; children: React.ReactNode }) {
+/** La marca del proveedor es una letra en un cuadrado, no un logo: no se
+ *  recibió el material de marca de Apple ni de Google y dibujarlo a mano sería
+ *  inventarlo. Se reemplaza cuando lleguen los SVG oficiales. */
+function Inicial(props: { letra: string; sobreNegro?: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`inline-flex size-5 items-center justify-center rounded-full text-label font-bold ${
+        props.sobreNegro ? 'bg-ink-muted text-accent-ink' : 'bg-surface-3 text-ink-muted'
+      }`}
+    >
+      {props.letra}
+    </span>
+  )
+}
+
+/** El botón de proveedor: 56px de alto, el objetivo táctil holgado que pide la
+ *  guía para el teléfono. Apple va sólido porque es el primero. */
+function Proveedor(props: { href: string; letra: string; solido?: boolean; children: string }) {
   return (
     <a
       href={props.href}
-      className="block rounded-lg border border-slate-300 bg-white px-4 py-3 text-center text-sm font-medium text-slate-900 hover:bg-slate-50 active:bg-slate-100"
+      className={`flex min-h-14 w-full items-center justify-center gap-2.5 rounded-lg text-base font-semibold ${
+        props.solido
+          ? 'bg-accent text-accent-ink hover:bg-accent-strong'
+          : 'border border-line-strong text-ink hover:bg-surface-3'
+      }`}
     >
+      <Inicial letra={props.letra} sobreNegro={props.solido} />
       {props.children}
     </a>
   )
@@ -40,44 +63,75 @@ function Boton(props: { href: string; children: React.ReactNode }) {
 
 export function Ingreso(props: { entorno: string }) {
   return (
-    <section className="mt-10">
-      <h2 className="text-lg font-medium text-slate-900">Entrá a GPS</h2>
-      <p className="mt-1 text-sm text-slate-500">
-        GPS no tiene contraseña propia: entrás con la cuenta que ya usás.
-      </p>
-
-      <div className="mt-6 grid gap-2">
-        <Boton href={enlaceDeIngreso('google')}>Continuar con Google</Boton>
-        <Boton href={enlaceDeIngreso('apple')}>Continuar con Apple</Boton>
+    // A sangre y sin tarjeta: dos mitades, negra y blanca, sin filete ni
+    // margen entre ellas. A 375px la mitad negra no existe —ahí el que manda
+    // es el par de botones— y la pantalla es blanca entera.
+    //
+    // En escritorio la altura la fija el viewport y scrollea sólo la mitad
+    // blanca: la negra es un fondo, no contenido que se recorra. La derecha va
+    // alineada arriba y no centrada porque un contenedor flex centrado que
+    // además scrollea recorta el principio de su contenido.
+    <div className="min-h-dvh bg-surface font-sans text-base text-ink md:grid md:h-dvh md:grid-cols-2 md:overflow-hidden">
+      <div className="hidden bg-accent text-accent-ink md:flex md:flex-col md:justify-between md:p-12">
+        <p className="text-2xl font-bold">GPS</p>
+        <div>
+          <p className="max-w-[22ch] text-xl font-semibold">Gestión para Scouts</p>
+          <p className="mt-2 max-w-[34ch] text-sm text-surface-3">
+            Grupos, ramas, afiliaciones y salidas. El acceso es de dirigentes y del personal de la
+            diócesis.
+          </p>
+        </div>
       </div>
 
-      {props.entorno === 'demo' && (
-        <div className="mt-8">
-          <h3 className="text-sm font-medium text-slate-900">Perfiles de demostración</h3>
-          <p className="mt-1 text-xs text-slate-500">
-            Cada uno abre una sesión de verdad, con los permisos que le dan sus cargos y equipos.
-          </p>
-          <div className="mt-3 grid gap-2">
-            {PERFILES_DEMO.map((perfil) => (
-              <Boton
-                key={perfil.subject}
-                href={enlaceDeIngreso('demo', `&perfil=${perfil.subject}`)}
-              >
-                <span className="block">{perfil.nombre}</span>
-                <span className="mt-0.5 block text-xs font-normal text-slate-500">
-                  {perfil.que}
-                </span>
-              </Boton>
-            ))}
-          </div>
-        </div>
-      )}
+      <div className="flex flex-col gap-3 px-6 py-10 md:overflow-y-auto md:p-12">
+        {/* En el teléfono la marca va acá, en negro sobre blanco: la mitad
+            oscura es una decisión de escritorio, no de la pantalla chica. */}
+        <p className="text-3xl font-bold md:hidden">GPS</p>
+        <h2 className="text-2xl font-bold">Entrar</h2>
+        {/* Sólo en escritorio, como en el mockup: en el teléfono no hay bajada,
+            porque ahí la pantalla es la marca y el par de botones. */}
+        <p className="hidden text-sm text-ink-muted md:block">
+          Usá la misma cuenta con la que entrás en el teléfono.
+        </p>
 
-      <p className="mt-8 text-xs text-slate-400">
-        Si todavía no tenés acceso, pedile el enlace de activación a la jefatura o a la Secretaría
-        de tu grupo.
-      </p>
-    </section>
+        {/* Apple primero: lo exige la App Store cuando hay ingreso social, y
+            el orden se mantiene en escritorio para no mover el dedo de lugar. */}
+        <div className="mt-2 grid gap-3">
+          <Proveedor href={enlaceDeIngreso('apple')} letra="A" solido>
+            Continuar con Apple
+          </Proveedor>
+          <Proveedor href={enlaceDeIngreso('google')} letra="G">
+            Continuar con Google
+          </Proveedor>
+        </div>
+
+        {props.entorno === 'demo' && (
+          <div className="mt-4">
+            <h3 className="text-label font-medium text-ink-muted">Perfiles de demostración</h3>
+            <p className="mt-1 text-xs text-ink-faint">
+              Cada uno abre una sesión de verdad, con los permisos que le dan sus cargos y equipos.
+            </p>
+            <div className="mt-3 grid gap-2">
+              {PERFILES_DEMO.map((perfil) => (
+                <a
+                  key={perfil.subject}
+                  href={enlaceDeIngreso('demo', `&perfil=${perfil.subject}`)}
+                  className="rounded-lg border border-line-strong px-4 py-3 hover:bg-surface-3"
+                >
+                  <span className="block text-sm font-semibold">{perfil.nombre}</span>
+                  <span className="mt-0.5 block text-xs text-ink-muted">{perfil.que}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <p className="mt-4 text-label text-ink-faint">
+          Si todavía no tenés acceso, pedile el enlace de activación a la jefatura o a la Secretaría
+          de tu grupo.
+        </p>
+      </div>
+    </div>
   )
 }
 

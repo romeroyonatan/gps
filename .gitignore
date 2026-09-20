@@ -16,3 +16,5 @@ apps/mobile/android/
 
 # la base de desarrollo se crea sola, no se versiona
 *.db
+*.db-shm
+*.db-wal

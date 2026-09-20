@@ -1,3 +1,5 @@
+@import "@gps/diseno/tokens.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

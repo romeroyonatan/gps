@@ -7,6 +7,7 @@
     "@gps/afiliacion": "workspace:*",
     "@gps/api": "workspace:*",
     "@gps/core": "workspace:*",
+    "@gps/diseno": "workspace:*",
     "@gps/estructura": "workspace:*",
     "@gps/personas": "workspace:*",
     "@gps/salidas": "workspace:*",
