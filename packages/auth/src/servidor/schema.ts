@@ -82,6 +82,14 @@ export function registrarSchema(builder: Builder): void {
       description: 'Quién está autenticado en este pedido.',
       fields: (t) => ({
         personaId: t.exposeID('personaId'),
+        // Sólo el nombre de pila, y nada más: la pantalla de ingreso saluda
+        // -"Hola, María Paz"- antes de preguntar con qué rol entra. El
+        // apellido y el documento no salen de personas sin una razón.
+        nombres: t.string({
+          nullable: true,
+          description: 'El nombre de pila de quien está autenticado, para saludarlo.',
+          resolve: (quien, _args, contexto) => contexto.auth.nombreDe(quien.personaId),
+        }),
         roles: t.field({ type: [FuncionRef], resolve: (quien) => [...quien.roles] }),
         esAdministradorDesignado: t.exposeBoolean('esAdministradorDesignado'),
         estaElevado: t.exposeBoolean('estaElevado'),

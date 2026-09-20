@@ -494,6 +494,11 @@ type PersonaAutenticada {
   elevadaHasta: String
   esAdministradorDesignado: Boolean!
   estaElevado: Boolean!
+
+  """
+  El nombre de pila de quien está autenticado, para saludarlo.
+  """
+  nombres: String
   personaId: ID!
   roles: [FuncionVigente!]!
 }

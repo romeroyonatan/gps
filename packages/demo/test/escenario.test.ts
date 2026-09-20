@@ -15,7 +15,7 @@ import {
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import { ramasDeLasUnidades } from '@gps/estructura/dominio'
 import { estructura } from '@gps/estructura/servidor'
-import { puedeAdministrarPlantelDeGrupo } from '@gps/personas/dominio'
+import { puedeAdministrarPlantelDeGrupo, rolesParaElegir } from '@gps/personas/dominio'
 import { personas } from '@gps/personas/servidor'
 import { salidas } from '@gps/salidas/servidor'
 import { puedeRegistrarPagos } from '@gps/tesoreria/dominio'
@@ -375,6 +375,28 @@ describe('perfiles del proveedor demo', () => {
         secretaria.alcance.gruposVisibles[0] ?? '',
       ),
     ).toBe(true)
+  })
+
+  test('el perfil demo entra con varias funciones para elegir', async () => {
+    const contexto = montarContexto()
+    await sembrarEscenario(contexto, HORA)
+
+    const demo = await alcanceDe(contexto, (await entrarComo(contexto, 'demo')).secreto)
+    const funciones = demo.alcance.actor.roles.map((una) => una.rol)
+
+    // Tres historias de permisos que antes pedian tres logins distintos,
+    // ahora adentro de una sola sesion.
+    expect(funciones).toContain('jefeDeGrupo')
+    expect(funciones).toContain('tesoreriaDiocesana')
+    expect(funciones).toContain('administracionDiocesana')
+    expect(puedeRegistrarPagos(demo.alcance.actor)).toBe(true)
+
+    // Y hay mas de una entre las que elegir, que es lo que hace visible el
+    // conmutador de rol de la cabecera. El dirigente de su grupo no cuenta:
+    // se lo lleva puesto la jefatura del mismo grupo.
+    const elegibles = rolesParaElegir(demo.alcance.actor)
+    expect(elegibles).toHaveLength(3)
+    expect(elegibles.map((una) => una.rol)).not.toContain('dirigente')
   })
 
   test('el administrador entra sin alcance global y se eleva con otro clic', async () => {

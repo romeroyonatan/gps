@@ -354,6 +354,24 @@ const PERSONAS: readonly {
     // una sola diocesis por instancia.
     cargosDeAmbitoMayor: [{ cargo: 'jefeScoutDiocesano', hasta: null }],
   },
+  {
+    // La persona de demostracion: la unica con varias funciones encima, para
+    // que el conmutador de rol de la cabecera tenga algo que conmutar. Va en
+    // el grupo 7, que no tenia jefatura, y los dos equipos diocesanos se los
+    // suma sembrarPerfilesDemo.
+    datos: {
+      tipoDeDocumento: 'dni',
+      numeroDeDocumento: '30.115.902',
+      nombres: 'Paula',
+      apellidos: 'Miranda',
+      fechaDeNacimiento: '1983-07-14',
+    },
+    numeroDeGrupo: 7,
+    categoria: 'activo',
+    rama: 'scouts',
+    desde: '2009-03-07',
+    cargos: [{ cargo: 'jefeDeGrupo', hasta: null }],
+  },
 ]
 
 /** Siembra el escenario llamando a los servicios publicos de cada modulo, no
@@ -496,8 +514,8 @@ export async function sembrarEscenario(ctx: Context, ahora: Date): Promise<void>
   await sembrarPerfilesDemo(ctx, [...gruposPorNumero.values()])
 }
 
-/** Los perfiles del proveedor `demo`: cuatro identidades sintéticas que entran
- *  de un clic y recorren la misma autorización que una de Google.
+/** Los perfiles del proveedor `demo`: identidades sintéticas que entran de un
+ *  clic y recorren la misma autorización que una de Google.
  *
  *  Cada uno es una persona ya sembrada con sus cargos, más -para Secretaría y
  *  Tesorería- la pertenencia al equipo que le da sus permisos. La identidad
@@ -508,24 +526,34 @@ export async function sembrarEscenario(ctx: Context, ahora: Date): Promise<void>
  *  El administrador queda designado pero **no elevado**: para tener alcance
  *  global tiene que volver a autenticarse con otro clic, igual que uno real. */
 const PERFILES_DEMO = [
+  // El perfil de demostración: el único con varias funciones a la vez -jefatura
+  // de su grupo, Tesorería y Administración diocesanas-, que es lo que hace
+  // visible el conmutador de rol. Va primero porque es el botón grande de la
+  // pantalla de ingreso; los de abajo quedan para mirar una historia de
+  // permisos sola, sin las otras encima.
+  {
+    subject: 'demo',
+    documento: '30.115.902',
+    equipos: ['tesoreriaDiocesana', 'administracionDiocesana'],
+  },
   // Jefatura de grupo: administra su grupo y lee su cuenta, nada del vecino.
-  { subject: 'jefatura', documento: '33.207.415', equipo: null },
+  { subject: 'jefatura', documento: '33.207.415', equipos: [] },
   // Secretaría: los mismos permisos de grupo que la jefatura, pero salen del
   // equipo y no de un cargo estatutario.
-  { subject: 'secretaria', documento: '20.447.195', equipo: 'secretaria' },
+  { subject: 'secretaria', documento: '20.447.195', equipos: ['secretaria'] },
   // Tesorería diocesana: la única que registra pagos, de cualquier grupo.
-  { subject: 'tesoreria', documento: '36.114.780', equipo: 'tesoreriaDiocesana' },
+  { subject: 'tesoreria', documento: '36.114.780', equipos: ['tesoreriaDiocesana'] },
   // Comisionada de distrito: alcanza los grupos de su distrito para firmar sus
   // permisos de salida, pero no ve el padrón ni la cuenta de ninguno.
-  { subject: 'comisionado', documento: '28.904.331', equipo: null },
+  { subject: 'comisionado', documento: '28.904.331', equipos: [] },
   // La persona administradora. Entra con lo que le dan sus cargos -es jefe
   // scout diocesano- y para el alcance global tiene que elevarse con otro
   // clic, igual que una real.
-  { subject: 'administrador', documento: '35.208.774', equipo: null },
+  { subject: 'administrador', documento: '35.208.774', equipos: [] },
 ] as const satisfies readonly {
   subject: string
   documento: string
-  equipo: TipoDeEquipo | null
+  equipos: readonly TipoDeEquipo[]
 }[]
 
 async function sembrarPerfilesDemo(ctx: Context, grupos: readonly { id: string }[]): Promise<void> {
@@ -542,11 +570,13 @@ async function sembrarPerfilesDemo(ctx: Context, grupos: readonly { id: string }
     )
     if (!persona) throw new Error(`El escenario no tiene la persona ${perfil.documento}.`)
 
-    if (perfil.equipo) {
-      const esDeGrupo = perfil.equipo === 'secretaria'
+    for (const equipo of perfil.equipos) {
+      // La Secretaría es de un grupo -el propio, que es el único que
+      // `integrarEquipo` acepta- y los otros dos son de la diócesis entera.
+      const esDeGrupo = equipo === 'secretaria'
       await ctx.personas.integrarEquipo(elevado.actor, {
         personaId: persona.id,
-        tipo: perfil.equipo,
+        tipo: equipo,
         ambitoTipo: esDeGrupo ? 'grupo' : 'diocesis',
         ambitoId: esDeGrupo ? persona.pertenencia.grupoId : null,
         desde: persona.pertenencia.desde,

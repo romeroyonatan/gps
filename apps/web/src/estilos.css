@@ -1,2 +1,71 @@
 /* apps/web/src/estilos.css */
+/* Primera de todo: un @import tiene que preceder a cualquier otra regla. */
+@import url("https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
+@import "@gps/diseno/tokens.css";
+
+/* Los mismos nombres de rol que `tokens.css`, como utilidades de Tailwind:
+   bg-surface-2, text-ink-muted, border-line. `inline` porque los valores ya
+   son var(): así el modo oscuro los cambia sin recompilar nada. */
+@theme inline {
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-4: var(--surface-4);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-ink-inverse: var(--ink-inverse);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-line: var(--accent-line);
+  --color-accent-ink: var(--accent-ink);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-rama-castores: var(--rama-castores);
+  --color-rama-lobatos: var(--rama-lobatos);
+  --color-rama-scouts: var(--rama-scouts);
+  --color-rama-raiders: var(--rama-raiders);
+  --color-rama-rovers: var(--rama-rovers);
+  --color-rama-adultos: var(--rama-adultos);
+
+  --font-sans: "Archivo", system-ui, -apple-system, sans-serif;
+}
+
+/* Escala tipográfica de la guía: 12 · 13 · 14 · 15 · 17 · 20 · 31 · 46.
+   La de espaciado y los radios quedan como los trae Tailwind: la guía ya está
+   escrita sobre ellos (escala de 4, radio 8px = rounded-lg). */
+@theme {
+  --text-xs: 12px;
+  --text-xs--line-height: 1.4;
+  --text-label: 13px;
+  --text-label--line-height: 1.4;
+  --text-sm: 14px;
+  --text-sm--line-height: 1.45;
+  --text-base: 15px;
+  --text-base--line-height: 1.5;
+  --text-lg: 17px;
+  --text-lg--line-height: 1.35;
+  --text-xl: 20px;
+  --text-xl--line-height: 1.2;
+  --text-xl--letter-spacing: -0.015em;
+  --text-2xl: 31px;
+  --text-2xl--line-height: 1.1;
+  --text-2xl--letter-spacing: -0.035em;
+  --text-3xl: 46px;
+  --text-3xl--line-height: 1.02;
+  --text-3xl--letter-spacing: -0.035em;
+}
+
+/* El modo oscuro lo enciende `.dark` en <html>, no la preferencia del sistema:
+   mobile lo maneja igual y así las dos apps tienen un solo interruptor. */
+@custom-variant dark (&:where(.dark, .dark *));

@@ -102,6 +102,12 @@ interface TransaccionDeLogin {
 }
 
 export interface ServicioDeAuth extends Auth {
+  /** El nombre de pila de quien tiene la sesión. Lo resuelve auth y no el
+   *  resolver porque `personas` le llega como dependencia declarada -la
+   *  interfaz pública, no el servicio-, y el contexto de un módulo es privado
+   *  de ese módulo. */
+  nombreDe(personaId: string): Promise<string | null>
+
   crearSesionParaIdentidad(identidadId: string): Promise<{ secreto: string; sesionId: string }>
   revocarSesion(sesionId: string): Promise<void>
 
@@ -315,6 +321,9 @@ export function crearServicioDeAuth(
   }
 
   return {
+    async nombreDe(personaId) {
+      return (await personas.nombreDe(personaId))?.nombres ?? null
+    },
     async esAdministradorDesignado(personaId) {
       return esAdministrador(personaId)
     },

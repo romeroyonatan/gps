@@ -11,6 +11,7 @@
     "@gps/api": "workspace:*",
     "@gps/archivos": "workspace:*",
     "@gps/core": "workspace:*",
+    "@gps/diseno": "workspace:*",
     "@gps/estructura": "workspace:*",
     "@gps/personas": "workspace:*",
     "@gps/salidas": "workspace:*",
