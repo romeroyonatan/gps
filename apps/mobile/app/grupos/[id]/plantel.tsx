@@ -10,7 +10,7 @@ import {
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import { estaVigente, nombreCompleto, puedeAdministrarPlantelDeGrupo } from '@gps/personas/dominio'
 import { Link, useLocalSearchParams } from 'expo-router'
-import { Pressable, SafeAreaView, ScrollView, Share, Text, View } from 'react-native'
+import { Pressable, ScrollView, Share, Text, View } from 'react-native'
 
 /** Los dos vínculos que conceden acceso en un grupo, que son los que hay que
  *  poder cambiar en el día. */
@@ -86,7 +86,7 @@ export default function Pantalla() {
   )
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50">
+    <View className="flex-1 bg-slate-50">
       <ScrollView contentContainerClassName="px-4 py-10">
         <Link href={`/grupos/${id}`} className="text-sm text-slate-500">
           ← Volver al grupo
@@ -184,6 +184,6 @@ export default function Pantalla() {
           })}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   )
 }

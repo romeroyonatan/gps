@@ -34,19 +34,11 @@ import {
 } from '@gps/salidas/dominio'
 import * as DocumentPicker from 'expo-document-picker'
 import * as ImagePicker from 'expo-image-picker'
-import { Link, useLocalSearchParams } from 'expo-router'
+import { useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
-import {
-  Alert,
-  Linking,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from 'react-native'
+import { Alert, Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { PadDeFirma } from '../../../componentes/PadDeFirma'
+import { BarraDeSesion } from '../../../src/BarraDeSesion'
 
 type Permiso = PermisosQuery['permisos'][number]
 
@@ -611,42 +603,36 @@ export default function Pantalla() {
   const firmantes = distrito ? firmantesRequeridos(id, distrito.id) : []
 
   return (
-    <SafeAreaView className="flex-1 bg-surface">
-      <ScrollView contentContainerClassName="px-4 py-6">
-        <Link href={`/grupos/${id}`} className="text-label text-ink-muted">
-          ← Grupo
-        </Link>
-        <Text className="mt-1 text-2xl font-bold text-ink">Permisos de salida</Text>
+    <ScrollView contentContainerClassName="px-4 pb-6">
+      <BarraDeSesion />
+      <Text className="mt-4 text-2xl font-bold text-ink">Permisos de salida</Text>
 
-        {consulta.isPending && <Text className="mt-8 text-sm text-ink-muted">Consultando…</Text>}
-        {consulta.error && (
-          <View className="mt-8 rounded-lg bg-danger-soft p-4">
-            <Text className="text-sm text-danger">
-              No se pudieron consultar los permisos: {consulta.error.message}
-            </Text>
-          </View>
-        )}
+      {consulta.isPending && <Text className="mt-8 text-sm text-ink-muted">Consultando…</Text>}
+      {consulta.error && (
+        <View className="mt-8 rounded-lg bg-danger-soft p-4">
+          <Text className="text-sm text-danger">
+            No se pudieron consultar los permisos: {consulta.error.message}
+          </Text>
+        </View>
+      )}
 
-        {actor &&
-          (consulta.data?.permisos ?? []).map((permiso) => (
-            <Tarjeta
-              key={permiso.id}
-              permiso={permiso}
-              grupoId={id}
-              actor={actor}
-              firmantes={firmantes}
-            />
-          ))}
-        {consulta.data?.permisos.length === 0 && (
-          <View className="mt-6 rounded-lg border border-line p-4">
-            <Text className="text-sm text-ink-muted">
-              El grupo todavía no cargó ninguna salida.
-            </Text>
-          </View>
-        )}
+      {actor &&
+        (consulta.data?.permisos ?? []).map((permiso) => (
+          <Tarjeta
+            key={permiso.id}
+            permiso={permiso}
+            grupoId={id}
+            actor={actor}
+            firmantes={firmantes}
+          />
+        ))}
+      {consulta.data?.permisos.length === 0 && (
+        <View className="mt-6 rounded-lg border border-line p-4">
+          <Text className="text-sm text-ink-muted">El grupo todavía no cargó ninguna salida.</Text>
+        </View>
+      )}
 
-        {actor && puedeAdministrarPermisosDelGrupo(actor, id) && <NuevoPermiso grupoId={id} />}
-      </ScrollView>
-    </SafeAreaView>
+      {actor && puedeAdministrarPermisosDelGrupo(actor, id) && <NuevoPermiso grupoId={id} />}
+    </ScrollView>
   )
 }

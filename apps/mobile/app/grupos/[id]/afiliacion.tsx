@@ -1,7 +1,7 @@
 import { useDeclaraciones, useDeclararAfiliacion } from '@gps/api'
 import { nombreDelTipo } from '@gps/personas/dominio'
 import { Link, useLocalSearchParams } from 'expo-router'
-import { Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native'
+import { Pressable, ScrollView, Text, View } from 'react-native'
 
 type Declaracion = NonNullable<ReturnType<typeof useDeclaraciones>['data']>['declaraciones'][number]
 
@@ -34,7 +34,7 @@ export default function Pantalla() {
   const declarar = useDeclararAfiliacion()
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50">
+    <View className="flex-1 bg-slate-50">
       <ScrollView contentContainerClassName="px-4 py-10">
         <Link href={`/grupos/${id}`} className="text-sm text-slate-500">
           ← Grupo
@@ -91,6 +91,6 @@ export default function Pantalla() {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   )
 }
