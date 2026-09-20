@@ -12,6 +12,7 @@ import type { Actor } from '@gps/core'
 import { type ReactNode, useEffect, useRef } from 'react'
 import { Route, Switch, useLocation, useRoute } from 'wouter'
 import { Afiliacion } from './pantallas/Afiliacion'
+import { AltaDePersona } from './pantallas/AltaDePersona'
 import {
   CambioDeRol,
   inicioDelRol,
@@ -64,6 +65,7 @@ function Rutas() {
       <Route path="/tesoreria/configuracion" component={ConfiguracionDeCuotas} />
       <Route path="/tesoreria" component={Tesoreria} />
       <Route path="/grupos/:id/afiliacion">{(params) => <Afiliacion grupoId={params.id} />}</Route>
+      <Route path="/grupos/:id/alta">{(params) => <AltaDePersona grupoId={params.id} />}</Route>
       <Route path="/grupos/:id/salidas">{(params) => <Salidas grupoId={params.id} />}</Route>
       <Route path="/grupos/:id/plantel">{(params) => <Plantel grupoId={params.id} />}</Route>
       <Route path="/grupos/:id">{(params) => <Grupo id={params.id} />}</Route>

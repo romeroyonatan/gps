@@ -19,7 +19,6 @@ import {
 } from '@gps/personas/dominio'
 import { firmantesRequeridos, puedeFirmarEnLaApp, repartirSalidas } from '@gps/salidas/dominio'
 import { Link } from 'wouter'
-import { AltaDePersona } from './AltaDePersona'
 
 type Persona = NonNullable<ReturnType<typeof usePersonasDelGrupo>['data']>['personas'][number]
 
@@ -409,7 +408,14 @@ export function Grupo(props: { id: string }) {
         />
       </div>
 
-      <AltaDePersona grupoId={props.id} unidadesAbiertas={grupo.unidades} />
+      {/* Cargar una persona es una tarea propia, no un apéndice del padrón:
+          se va a su pantalla y se vuelve con la lista ya actualizada. */}
+      <Link
+        href={`/grupos/${props.id}/alta`}
+        className="mt-7 flex min-h-12 w-full items-center justify-center rounded-lg bg-accent px-6 font-semibold text-accent-ink hover:bg-accent-strong sm:w-fit"
+      >
+        Agregar una persona
+      </Link>
     </>
   )
 }
