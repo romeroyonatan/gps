@@ -262,11 +262,27 @@ const PERSONAS: readonly {
       apellidos: 'Quiroga',
       fechaDeNacimiento: '1993-06-25',
     },
-    numeroDeGrupo: 42,
+    numeroDeGrupo: 7,
     categoria: 'activo',
     rama: 'scouts',
     desde: '2012-03-03',
     cargos: [{ cargo: 'jefeDeGrupo', hasta: '2028-03-01' }],
+  },
+  {
+    // El director del 7: sin el, el grupo de la jefatura no puede firmar
+    // ningun permiso, porque los tres firmantes son cargos distintos.
+    datos: {
+      tipoDeDocumento: 'dni',
+      numeroDeDocumento: '21.560.483',
+      nombres: 'Héctor',
+      apellidos: 'Ruiz',
+      fechaDeNacimiento: '1971-11-22',
+    },
+    numeroDeGrupo: 7,
+    categoria: 'adherente',
+    rama: null,
+    desde: '2014-03-08',
+    cargos: [{ cargo: 'director', hasta: null }],
   },
   {
     // Dos cargos a la vez, que es lo que pasa en un grupo real.
@@ -357,7 +373,7 @@ const PERSONAS: readonly {
   {
     // La persona de demostracion: la unica con varias funciones encima, para
     // que el conmutador de rol de la cabecera tenga algo que conmutar. Va en
-    // el grupo 7, que no tenia jefatura, y los dos equipos diocesanos se los
+    // el grupo 42, que es el mas poblado, y los dos equipos diocesanos se los
     // suma sembrarPerfilesDemo.
     datos: {
       tipoDeDocumento: 'dni',
@@ -366,7 +382,7 @@ const PERSONAS: readonly {
       apellidos: 'Miranda',
       fechaDeNacimiento: '1983-07-14',
     },
-    numeroDeGrupo: 7,
+    numeroDeGrupo: 42,
     categoria: 'activo',
     rama: 'scouts',
     desde: '2009-03-07',
@@ -511,6 +527,10 @@ export async function sembrarEscenario(ctx: Context, ahora: Date): Promise<void>
   }
 
   await sembrarSalidas(ctx, grupoDeLaExtraordinaria, ahora)
+  // El 7 también: ahí manda el perfil `jefatura`, y un perfil que entra a un
+  // grupo sin ninguna salida no muestra la mitad de la app.
+  const grupoDeLaJefatura = gruposPorNumero.get(7)
+  if (grupoDeLaJefatura) await sembrarSalidas(ctx, grupoDeLaJefatura, ahora)
   await sembrarPerfilesDemo(ctx, [...gruposPorNumero.values()])
 }
 

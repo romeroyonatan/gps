@@ -93,7 +93,9 @@ export function useNombreDelAmbito() {
   }
 }
 
-/** El conmutador de rol, al lado de la marca.
+/** El conmutador de rol. Vive en dos lugares -la cabecera del teléfono y el
+ *  pie de la barra de tareas-, y por eso la hoja se abre para donde haya
+ *  lugar: abajo en la cabecera, arriba cuando cuelga del pie.
  *
  *  Con una sola función no hay control: se muestra el ámbito y nada más. No se
  *  ofrece un menú de una sola opción. */
@@ -101,8 +103,10 @@ export function CambioDeRol(props: {
   roles: readonly Funcion[]
   activo: Funcion
   elegir: (funcion: Funcion) => void
+  hacia?: 'abajo' | 'arriba'
 }) {
   const { roles, activo, elegir } = props
+  const arriba = props.hacia === 'arriba'
   const nombreDelAmbito = useNombreDelAmbito()
   const [, navegar] = useLocation()
   const [abierta, abrir] = useState(false)
@@ -137,9 +141,13 @@ export function CambioDeRol(props: {
             type="button"
             aria-label="Cerrar"
             onClick={() => abrir(false)}
-            className="fixed inset-0 top-11 z-10 cursor-default bg-ink/10"
+            className={`fixed inset-0 z-10 cursor-default bg-ink/10 ${arriba ? '' : 'top-11'}`}
           />
-          <div className="absolute inset-x-0 top-11 z-20 border-b border-line bg-surface shadow-sm">
+          <div
+            className={`absolute inset-x-0 z-20 border-line bg-surface shadow-sm ${
+              arriba ? 'bottom-full mb-2 rounded-lg border' : 'top-11 border-b'
+            }`}
+          >
             <p className="px-5 pb-1 pt-2 text-label text-ink-muted">Entrar como</p>
             {roles.map((funcion) => {
               const esActivo = claveDelRol(funcion) === claveDelRol(activo)

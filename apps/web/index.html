@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GPS — Gestión para Scouts</title>
     <link rel="stylesheet" href="./src/estilos.css" />
+    <!-- El modo oscuro es una clase en <html>, no un @media: mobile lo
+         enciende igual. Acá lo decide la preferencia del sistema, antes de
+         pintar, para que no haya un destello blanco. -->
+    <script>
+      if (matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.classList.add('dark')
+    </script>
   </head>
   <body>
     <div id="raiz"></div>

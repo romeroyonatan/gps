@@ -11,6 +11,7 @@ import { aFechaDeCalendario } from '@gps/core/fechas'
 import { type Rama, ramaDelCatalogo } from '@gps/estructura/dominio'
 import type { TipoDeCargo } from '@gps/personas/dominio'
 import { firmantesRequeridos, puedeFirmarEnLaApp, repartirSalidas } from '@gps/salidas/dominio'
+import type { ReactNode } from 'react'
 import { Link } from 'wouter'
 import { COLOR_DE_RAMA } from '../ramas'
 
@@ -48,6 +49,27 @@ function PorRama(props: { total: number; ramas: readonly { rama: Rama; cuantos: 
         ))}
       </ul>
     </>
+  )
+}
+
+/** Toda sección tiene el mismo encabezado: el nombre a la izquierda y su única
+ *  acción a la derecha, siempre con la misma forma. Ninguna acción vive suelta
+ *  adentro del texto. */
+function Seccion(props: {
+  titulo: string
+  accion: { texto: string; href: string }
+  children?: ReactNode
+}) {
+  return (
+    <section className="mt-5 border-t border-line pt-4 first-of-type:border-t-0 first-of-type:pt-0">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="font-semibold">{props.titulo}</h3>
+        <Link href={props.accion.href} className="shrink-0 text-sm text-ink-muted hover:text-ink">
+          {props.accion.texto} →
+        </Link>
+      </div>
+      {props.children}
+    </section>
   )
 }
 
@@ -183,16 +205,10 @@ export function Grupo(props: { id: string }) {
         </div>
       )}
 
-      <section className="mt-5">
-        <div className="flex items-baseline justify-between">
-          <h3 className="font-semibold">Integrantes</h3>
-          <Link
-            href={`/grupos/${props.id}/nomina`}
-            className="text-sm text-ink-muted hover:text-ink"
-          >
-            Ver nómina
-          </Link>
-        </div>
+      <Seccion
+        titulo="Integrantes"
+        accion={{ texto: 'Ver nómina', href: `/grupos/${props.id}/nomina` }}
+      >
         <p className="mt-1.5 flex items-baseline gap-2.5">
           <span className="text-3xl font-bold tabular-nums">{personas.length}</span>
           <span className="text-sm text-ink-muted">
@@ -200,11 +216,13 @@ export function Grupo(props: { id: string }) {
           </span>
         </p>
         <PorRama total={enRamas} ramas={ramas} />
-      </section>
+      </Seccion>
 
       {cuenta && (
-        <section className="mt-5 border-t border-line pt-4">
-          <h3 className="font-semibold">Cuenta corriente</h3>
+        <Seccion
+          titulo="Cuenta corriente"
+          accion={{ texto: 'Ver movimientos', href: `/tesoreria/grupos/${props.id}` }}
+        >
           {/* El saldo positivo es deuda: así lo guarda tesorería. El signo se
               escribe, no se deduce del color. */}
           <p
@@ -214,24 +232,15 @@ export function Grupo(props: { id: string }) {
             {pesos.format(Math.abs(cuenta.saldo))}
           </p>
           <p className="mt-0.5 text-sm text-ink-muted">
-            {cuenta.saldo > 0 ? 'De deuda' : cuenta.saldo < 0 ? 'A favor del grupo' : 'Sin deuda'}.{' '}
-            <Link href={`/tesoreria/grupos/${props.id}`} className="underline">
-              Ver movimientos
-            </Link>
+            {cuenta.saldo > 0 ? 'De deuda' : cuenta.saldo < 0 ? 'A favor del grupo' : 'Sin deuda'}
           </p>
-        </section>
+        </Seccion>
       )}
 
-      <section className="mt-5 border-t border-line pt-4">
-        <div className="flex items-baseline justify-between">
-          <h3 className="font-semibold">Salidas</h3>
-          <Link
-            href={`/grupos/${props.id}/salidas`}
-            className="text-sm text-ink-muted hover:text-ink"
-          >
-            ver todas
-          </Link>
-        </div>
+      <Seccion
+        titulo="Salidas"
+        accion={{ texto: 'Ver todas', href: `/grupos/${props.id}/salidas` }}
+      >
         {!permisos.data ? (
           <p className="mt-1.5 text-sm text-ink-muted">Consultando las salidas…</p>
         ) : filasDeSalidas.length === 0 ? (
@@ -256,13 +265,7 @@ export function Grupo(props: { id: string }) {
             ))}
           </ul>
         )}
-        <Link
-          href={`/grupos/${props.id}/plantel`}
-          className="mt-3 inline-block text-sm text-ink-muted hover:text-ink"
-        >
-          Plantel →
-        </Link>
-      </section>
+      </Seccion>
     </>
   )
 }
