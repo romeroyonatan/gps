@@ -1,0 +1,95 @@
+/* packages/diseno/tokens.css — GPS · dirección "Moderna".
+ *
+ * Blanco, negro y aire: la jerarquía la hacen el tamaño del texto y el
+ * espacio, no los filetes. El negro es la única acción; el color aparece sólo
+ * en afiliación, deuda o pago, nunca de adorno.
+ *
+ * Los tokens se nombran por ROL, no por valor. El modo oscuro redefine este
+ * mismo bloque: ningún componente cambia. Lo consumen web (Tailwind v4, vía
+ * `@theme inline`) y mobile (NativeWind, vía `tailwind.js`).
+ *
+ * Fuente: proyecto de diseño GPS, ficha "GPS-Guideline-v2-Moderna".
+ *
+ * La webfont NO se importa acá: un `@import url(...)` dentro de este archivo
+ * termina después de las reglas de Tailwind y el navegador lo descarta. Va
+ * primera de todo en `apps/web/src/estilos.css`.
+ */
+
+:root {
+  /* Superficies */
+  --surface: #ffffff; /* página */
+  --surface-2: #ffffff; /* tarjeta, fila */
+  --surface-3: #f3f3f3; /* bloque gris: agrupa donde otros pondrían una línea */
+  --surface-4: #e8e8e8; /* pulsado */
+
+  /* Texto */
+  --ink: #000000; /* 21:1 */
+  --ink-muted: #6b6b6b; /* secundario */
+  --ink-faint: #8f8f8f; /* terciario, sólo 13px+ */
+  --ink-inverse: #ffffff;
+
+  /* Líneas */
+  --line: #ededed;
+  --line-strong: #d9d9d9;
+
+  /* Acción — negro, sin color de marca */
+  --accent: #000000;
+  --accent-strong: #242424; /* hover */
+  --accent-soft: #f3f3f3; /* seleccionado */
+  --accent-line: #d9d9d9;
+  --accent-ink: #ffffff;
+  --focus: #000000;
+
+  /* Estado. Siempre acompañados de texto: el color es refuerzo, nunca el dato. */
+  --ok: #0b5f42;
+  --ok-soft: #e8f5ef; /* afiliado, pago */
+  --warn: #7a5200;
+  --warn-soft: #fff6e5; /* sin afiliar, a cobrar */
+  --danger: #a32620;
+  --danger-soft: #fdecea; /* error, baja */
+  --info: #2f5b86;
+  --info-soft: #eaf1f8; /* pendiente de firma */
+
+  /* Ramas. USO ÚNICO: punto de 8px dentro de una etiqueta gris, con el nombre
+     escrito al lado. Nunca fondo, nunca color de texto. */
+  --rama-castores: #b35a1e;
+  --rama-lobatos: #c08a00;
+  --rama-scouts: #2f6b45;
+  --rama-raiders: #2e7ba6;
+  --rama-rovers: #a32a22;
+  --rama-adultos: #6b4a2e;
+}
+
+/* El jefe de grupo abre la app de noche antes de la reunión: el oscuro es uso
+   real, no preferencia. */
+.dark:root,
+.dark {
+  --surface: #0b0b0b;
+  --surface-2: #141414;
+  --surface-3: #1f1f1f;
+  --surface-4: #2a2a2a;
+
+  --ink: #ffffff;
+  --ink-muted: #a3a3a3;
+  --ink-faint: #7c7c83;
+  --ink-inverse: #000000;
+
+  --line: #262626;
+  --line-strong: #3a3a3a;
+
+  --accent: #ffffff;
+  --accent-strong: #e5e5e5;
+  --accent-soft: #1f1f1f;
+  --accent-line: #3a3a3a;
+  --accent-ink: #000000;
+  --focus: #ffffff;
+
+  --ok: #6fcfa6;
+  --ok-soft: #0f2a21;
+  --warn: #e0b15c;
+  --warn-soft: #2e2410;
+  --danger: #f08c86;
+  --danger-soft: #331512;
+  --info: #8fb4d8;
+  --info-soft: #13212e;
+}
