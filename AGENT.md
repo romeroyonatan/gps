@@ -243,11 +243,6 @@ no puede hacerlo porque la dependencia va al revés —no conoce a `personas`—
 otro módulo lo hace tampoco. `afiliacion` la esquiva filtrando por `gruposAbiertosEn` al
 declarar, pero `listarPersonas` de un grupo cerrado sigue devolviendo gente.
 
-También queda, de deuda de paridad: la pantalla `Grupo` de mobile no tiene el estado "no
-hay ningún grupo abierto con esa dirección" que sí tiene la de web
-(`apps/web/src/pantallas/Grupo.tsx`). Quedó a la vista al construir las pantallas de
-afiliación y no se resolvió ahí.
-
 La base es SQLite por Drizzle y llega a los módulos por `Core.bd`; las migraciones las
 declara cada módulo y las aplica `aplicarMigraciones` al arrancar. Sigue sin haber
 Postgres, ni pool, ni réplicas.
