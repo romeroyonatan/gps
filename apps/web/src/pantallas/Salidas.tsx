@@ -1,6 +1,7 @@
 import {
   type PermisosQuery,
   type TipoDeCargo,
+  useActor,
   useAgregarParticipante,
   useAnularPermiso,
   useCrearPermiso,
@@ -17,37 +18,81 @@ import {
   useSubirArchivo,
 } from '@gps/api'
 import { TIPOS_ADMITIDOS, TIPOS_QUE_SE_PUEDEN_ANEXAR } from '@gps/archivos/dominio'
+import type { Actor } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import { nombreCompleto } from '@gps/personas/dominio'
 import type { Trazos } from '@gps/salidas/dominio'
 import {
   avisoDeAnticipacion,
   candidatos,
+  firmantesRequeridos,
   marcaSegunCategoria,
+  puedeAdministrarPermisosDelGrupo,
+  puedeFirmarEnLaApp,
   resumenDeParticipantes,
 } from '@gps/salidas/dominio'
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, type ReactNode, useState } from 'react'
 import { Link } from 'wouter'
 import { PadDeFirma } from './PadDeFirma'
 
 type Permiso = PermisosQuery['permisos'][number]
+type Firma = Permiso['firmas'][number]
 type Persona = NonNullable<ReturnType<typeof usePersonasDelGrupo>['data']>['personas'][number]
 
-const ESTILO_DE_ESTADO: Record<string, string> = {
-  borrador: 'bg-slate-100 text-slate-700',
-  emitido: 'bg-amber-100 text-amber-800',
-  firmado: 'bg-emerald-100 text-emerald-800',
-  anulado: 'bg-slate-100 text-slate-400 line-through',
-}
-
-function Etiqueta(props: { estado: string }) {
+/** El estado se lee, no se adivina: la píldora siempre lleva su texto y el
+ *  color es refuerzo. El mismo componente que el padrón, porque es la misma
+ *  píldora. */
+function Chip(props: { tono: 'ok' | 'warn' | 'info' | 'neutro'; children: ReactNode }) {
+  const tonos = {
+    ok: 'bg-ok-soft text-ok',
+    warn: 'bg-warn-soft text-warn',
+    info: 'bg-info-soft text-info',
+    neutro: 'bg-surface-3 text-ink-muted',
+  }
   return (
     <span
-      className={`rounded-full px-2 py-0.5 text-xs font-medium ${ESTILO_DE_ESTADO[props.estado] ?? ''}`}
+      className={`inline-flex min-h-[26px] items-center rounded-full px-2.5 py-0.5 text-label font-semibold whitespace-nowrap ${tonos[props.tono]}`}
     >
-      {props.estado}
+      {props.children}
     </span>
   )
+}
+
+const CAMPO =
+  'w-full rounded-lg border border-line-strong bg-surface-2 px-3 text-base text-ink placeholder:text-ink-faint focus:border-ink focus:outline-none'
+
+const BOTON_PRINCIPAL =
+  'flex min-h-12 w-full items-center justify-center rounded-lg bg-accent px-4 text-base font-semibold text-accent-ink hover:bg-accent-strong disabled:opacity-40'
+
+const BOTON_SECUNDARIO =
+  'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-line-strong px-3.5 text-sm font-semibold text-ink hover:bg-surface-3'
+
+function Falla(props: { children: ReactNode }) {
+  return (
+    <p className="mt-2 rounded-lg bg-danger-soft p-3 text-sm break-words text-danger">
+      {props.children}
+    </p>
+  )
+}
+
+function Aviso(props: { children: ReactNode }) {
+  return <p className="mt-2 rounded-lg bg-warn-soft p-3 text-sm text-warn">{props.children}</p>
+}
+
+/** Cómo está el permiso, contado como lo cuenta quien mira: lo que le importa
+ *  al que abre la pantalla no es la palabra del estado sino cuántas firmas
+ *  faltan y si alguna es la suya. */
+function estadoDelPermiso(permiso: Permiso, miFirmaPendiente: boolean) {
+  if (permiso.estado === 'borrador') return { tono: 'neutro', texto: 'Borrador' } as const
+  if (permiso.estado === 'anulado') return { tono: 'neutro', texto: 'Anulada' } as const
+
+  const faltan = permiso.firmas.filter((firma) => !firma.firmada).length
+  if (faltan === 0) return { tono: 'ok', texto: 'Firmada por los tres' } as const
+  if (miFirmaPendiente) return { tono: 'warn', texto: 'Pendiente de tu firma' } as const
+  return {
+    tono: 'info',
+    texto: faltan === 1 ? 'Falta 1 firma' : `Faltan ${faltan} firmas`,
+  } as const
 }
 
 /** El formulario de alta. Los avisos se muestran mientras se escribe y no
@@ -67,55 +112,47 @@ function NuevoPermiso(props: { grupoId: string }) {
   }
 
   return (
-    <form onSubmit={enviar} className="mt-8 space-y-3 rounded-lg bg-white p-4 shadow-sm">
-      <h3 className="text-sm font-semibold text-slate-900">Nueva salida</h3>
-      <input
-        value={datos.lugar}
-        onChange={(evento) => setDatos({ ...datos, lugar: evento.target.value })}
-        placeholder="¿A dónde van?"
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-      />
-      <div className="flex gap-2">
-        <label className="flex-1 text-xs text-slate-500">
-          Salen
-          <input
-            type="date"
-            value={datos.desde}
-            onChange={(evento) => setDatos({ ...datos, desde: evento.target.value })}
-            className="mt-0.5 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
-          />
-        </label>
-        <label className="flex-1 text-xs text-slate-500">
-          Vuelven
-          <input
-            type="date"
-            value={datos.hasta}
-            onChange={(evento) => setDatos({ ...datos, hasta: evento.target.value })}
-            className="mt-0.5 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
-          />
-        </label>
+    <form onSubmit={enviar} className="mt-8 border-t border-line pt-5">
+      <h3 className="text-lg font-bold">Nueva salida</h3>
+      <div className="mt-3 space-y-3">
+        <input
+          value={datos.lugar}
+          onChange={(evento) => setDatos({ ...datos, lugar: evento.target.value })}
+          placeholder="¿A dónde van?"
+          className={`${CAMPO} h-12`}
+        />
+        <div className="flex gap-2">
+          <label className="flex-1 text-label font-medium text-ink-muted">
+            Salen
+            <input
+              type="date"
+              value={datos.desde}
+              onChange={(evento) => setDatos({ ...datos, desde: evento.target.value })}
+              className={`${CAMPO} mt-1 h-12 tabular-nums`}
+            />
+          </label>
+          <label className="flex-1 text-label font-medium text-ink-muted">
+            Vuelven
+            <input
+              type="date"
+              value={datos.hasta}
+              onChange={(evento) => setDatos({ ...datos, hasta: evento.target.value })}
+              className={`${CAMPO} mt-1 h-12 tabular-nums`}
+            />
+          </label>
+        </div>
+        <input
+          value={datos.comoSeViaja}
+          onChange={(evento) => setDatos({ ...datos, comoSeViaja: evento.target.value })}
+          placeholder="Cómo viajan (opcional)"
+          className={`${CAMPO} h-12`}
+        />
+        {aviso && <Aviso>{aviso.mensaje}</Aviso>}
+        {crear.error && <Falla>{crear.error.message}</Falla>}
+        <button type="submit" disabled={crear.isPending} className={BOTON_PRINCIPAL}>
+          Crear borrador
+        </button>
       </div>
-      <input
-        value={datos.comoSeViaja}
-        onChange={(evento) => setDatos({ ...datos, comoSeViaja: evento.target.value })}
-        placeholder="Cómo viajan (opcional)"
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-      />
-      {aviso && (
-        <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">{aviso.mensaje}</p>
-      )}
-      {crear.error && (
-        <p className="rounded-lg bg-red-50 p-3 text-xs break-words text-red-800">
-          {crear.error.message}
-        </p>
-      )}
-      <button
-        type="submit"
-        disabled={crear.isPending}
-        className="w-full rounded-lg bg-slate-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
-      >
-        Crear borrador
-      </button>
     </form>
   )
 }
@@ -149,13 +186,13 @@ function Armado(props: { permiso: Permiso; grupoId: string }) {
   )
 
   return (
-    <div className="mt-3 space-y-3 border-t border-slate-100 pt-3">
+    <div className="mt-4 space-y-4 border-t border-line pt-4">
       <div>
-        <p className="text-xs font-semibold text-slate-700">¿Qué unidades van?</p>
-        <ul className="mt-1.5 space-y-1">
+        <p className="font-semibold">¿Qué unidades van?</p>
+        <ul className="mt-1.5">
           {(grupo?.unidades ?? []).map((unidad) => (
             <li key={unidad.id}>
-              <label className="flex items-center gap-2 text-sm text-slate-700">
+              <label className="flex min-h-11 items-center gap-3 text-sm">
                 <input
                   type="checkbox"
                   checked={elegidas.includes(unidad.id)}
@@ -167,6 +204,7 @@ function Armado(props: { permiso: Permiso; grupoId: string }) {
                         : elegidas.filter((id) => id !== unidad.id),
                     })
                   }
+                  className="size-5 shrink-0 accent-black"
                 />
                 {unidad.nombreParaMostrar}
               </label>
@@ -176,16 +214,16 @@ function Armado(props: { permiso: Permiso; grupoId: string }) {
       </div>
 
       <div>
-        <p className="text-xs font-semibold text-slate-700">
-          ¿Quiénes van? <span className="font-normal text-slate-400">{puestos.size} elegidos</span>
+        <p className="font-semibold">
+          ¿Quiénes van? <span className="font-normal text-ink-muted">{puestos.size} elegidos</span>
         </p>
         {puedenIr.length === 0 ? (
-          <p className="mt-1 text-xs text-slate-400">Elegí primero alguna unidad.</p>
+          <p className="mt-1 text-sm text-ink-faint">Elegí primero alguna unidad.</p>
         ) : (
-          <ul className="mt-1.5 space-y-1">
+          <ul className="mt-1.5">
             {puedenIr.map((persona) => (
               <li key={persona.id}>
-                <label className="flex items-center gap-2 text-sm text-slate-700">
+                <label className="flex min-h-11 items-center gap-3 text-sm">
                   <input
                     type="checkbox"
                     checked={puestos.has(persona.id)}
@@ -195,12 +233,11 @@ function Armado(props: { permiso: Permiso; grupoId: string }) {
                         personaId: persona.id,
                       })
                     }
+                    className="size-5 shrink-0 accent-black"
                   />
                   {nombreCompleto(persona)}
                   {marcaSegunCategoria(persona.pertenencia.categoria) === 'dirigente' && (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                      dirigente
-                    </span>
+                    <Chip tono="neutro">dirigente</Chip>
                   )}
                 </label>
               </li>
@@ -212,122 +249,275 @@ function Armado(props: { permiso: Permiso; grupoId: string }) {
   )
 }
 
-/** Las tres firmas, cada una con sus dos caminos. */
-function Firmas(props: { permiso: Permiso }) {
-  const [firmando, setFirmando] = useState<TipoDeCargo | null>(null)
+/** Firmar en la app: el pad y el botón. Es un acto personal, así que esto sólo
+ *  se monta para el cargo que quien mira ocupa hoy. */
+function FirmarEnPantalla(props: { permiso: Permiso; firma: Firma; onListo: () => void }) {
   const [trazos, setTrazos] = useState<Trazos>({ trazos: [] })
-  const [papel, setPapel] = useState<TipoDeCargo | null>(null)
-  const firmarEnApp = useFirmarEnApp()
-  const firmarEnPapel = useFirmarEnPapel()
-  const subir = useSubirArchivo()
+  const firmar = useFirmarEnApp()
+  const vacio = trazos.trazos.length === 0
 
   return (
-    <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
-      <p className="text-xs font-semibold text-slate-700">Firmas</p>
-      {props.permiso.firmas.map((firma) => (
-        <div key={firma.cargo} className="rounded-lg bg-slate-50 p-2.5">
-          <p className="text-sm text-slate-900">
-            <span aria-hidden="true">{firma.firmada ? '✓' : '○'}</span> {firma.nombreDelCargo}
-            <span className="text-slate-400"> · {firma.quien ?? 'sin ocupante'}</span>
+    <div className="mt-3.5">
+      <PadDeFirma onCambiar={setTrazos} />
+      <p className="mt-2 text-label text-ink-faint">
+        Se registra tu nombre, la fecha y la hora junto al trazo.
+      </p>
+      {firmar.error && <Falla>{firmar.error.message}</Falla>}
+      <button
+        type="button"
+        disabled={vacio || firmar.isPending}
+        onClick={() =>
+          firmar.mutate(
+            {
+              permisoId: props.permiso.id,
+              cargo: props.firma.cargo,
+              trazos: JSON.stringify(trazos.trazos),
+            },
+            { onSuccess: props.onListo },
+          )
+        }
+        className={`${BOTON_PRINCIPAL} mt-3`}
+      >
+        {vacio
+          ? 'Firmá arriba para confirmar'
+          : `Confirmar firma como ${props.firma.nombreDelCargo}`}
+      </button>
+    </div>
+  )
+}
+
+/** Subir el papel firmado. Un mismo escaneo puede traer las tres firmas: se
+ *  declara cuáles están y no se valida acá —eso lo hace quien autoriza la
+ *  salida, mirando el documento—. Por eso las casillas y no un cargo fijo. */
+function SubirEscaneo(props: { permiso: Permiso; pendientes: readonly Firma[] }) {
+  const [archivo, setArchivo] = useState<File | null>(null)
+  const [cargos, setCargos] = useState<readonly TipoDeCargo[]>([])
+  const subir = useSubirArchivo()
+  const firmarEnPapel = useFirmarEnPapel()
+  const yendo = subir.isPending || firmarEnPapel.isPending
+
+  return (
+    <div className="mt-3.5">
+      <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-line-strong bg-surface-3 px-4 py-3 text-center text-base font-semibold">
+        {archivo ? archivo.name : 'Subir foto o escaneo del papel firmado'}
+        <span className="text-label font-normal text-ink-muted">
+          {archivo ? 'Queda como respaldo de la firma en papel.' : 'Imagen o PDF'}
+        </span>
+        <input
+          type="file"
+          accept={TIPOS_QUE_SE_PUEDEN_ANEXAR.join(',')}
+          className="hidden"
+          onChange={(evento) => setArchivo(evento.target.files?.[0] ?? null)}
+        />
+      </label>
+
+      {archivo && (
+        <div className="mt-3.5">
+          <p className="text-sm font-semibold">¿Quiénes firmaron en este papel?</p>
+          <p className="mt-0.5 text-label text-ink-faint">
+            Marcá todas las que aparezcan. Quien autoriza la salida las verifica contra el escaneo.
           </p>
-          {firma.firmada ? (
-            <p className="mt-0.5 text-xs text-slate-500">
-              Firmó {firma.modo === 'app' ? 'en la app' : 'en papel'} el {firma.fecha}
-              {firma.verificada === false && (
-                <span className="ml-1 font-medium text-red-700">· sello no verificado</span>
-              )}
-            </p>
-          ) : (
-            <div className="mt-1.5 flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={firma.quien === null}
-                onClick={() => {
-                  setFirmando(firma.cargo)
-                  setTrazos({ trazos: [] })
-                }}
-                className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white disabled:opacity-40"
+          <ul className="mt-1.5">
+            {props.pendientes.map((firma) => (
+              <li key={firma.cargo}>
+                <label className="flex min-h-13 items-center gap-3 border-b border-line last:border-b-0">
+                  <input
+                    type="checkbox"
+                    checked={cargos.includes(firma.cargo)}
+                    onChange={(evento) =>
+                      setCargos(
+                        evento.target.checked
+                          ? [...cargos, firma.cargo]
+                          : cargos.filter((uno) => uno !== firma.cargo),
+                      )
+                    }
+                    className="size-5.5 shrink-0 accent-black"
+                  />
+                  <span className="min-w-0 flex-1 text-sm font-semibold">
+                    {firma.nombreDelCargo}
+                  </span>
+                  <span className="shrink-0 text-label text-ink-muted">
+                    {firma.quien ?? 'sin ocupante'}
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {(subir.error ?? firmarEnPapel.error) && (
+        <Falla>{(subir.error ?? firmarEnPapel.error)?.message}</Falla>
+      )}
+
+      <button
+        type="button"
+        disabled={!archivo || cargos.length === 0 || yendo}
+        onClick={() => {
+          if (!archivo) return
+          subir.mutate(
+            { permisoId: props.permiso.id, archivo, adjuntar: false },
+            {
+              onSuccess: (escaneoId) =>
+                firmarEnPapel.mutate(
+                  { permisoId: props.permiso.id, cargos: [...cargos], escaneoId },
+                  {
+                    onSuccess: () => {
+                      setArchivo(null)
+                      setCargos([])
+                    },
+                  },
+                ),
+            },
+          )
+        }}
+        className={`${BOTON_PRINCIPAL} mt-3`}
+      >
+        {yendo
+          ? 'Subiendo el papel firmado…'
+          : !archivo
+            ? 'Subí el papel para registrar'
+            : cargos.length === 0
+              ? 'Marcá quiénes firmaron'
+              : cargos.length === 1
+                ? 'Registrar 1 firma del papel'
+                : `Registrar ${cargos.length} firmas del papel`}
+      </button>
+    </div>
+  )
+}
+
+/** Las tres firmas: arriba el estado de cada una, porque es lo único que cambia
+ *  con el tiempo; abajo los dos caminos para poner la que falta. */
+function Firmas(props: {
+  permiso: Permiso
+  actor: Actor | null
+  distritoId: string | undefined
+  grupoId: string
+  administra: boolean
+}) {
+  const [modo, setModo] = useState<'trazo' | 'escaneo'>('trazo')
+
+  // Quién puede firmar qué: la misma política pura que aplica el servidor, así
+  // la pantalla no ofrece un botón que después se rechaza. Sin distrito
+  // todavía no se sabe quién es el comisionado, y entonces nadie firma.
+  const firmantes = props.distritoId ? firmantesRequeridos(props.grupoId, props.distritoId) : []
+  const puedoFirmar = (cargo: TipoDeCargo) => {
+    const firmante = firmantes.find((uno) => uno.cargo === cargo)
+    return (
+      props.actor !== null && firmante !== undefined && puedeFirmarEnLaApp(props.actor, firmante)
+    )
+  }
+
+  const hechas = props.permiso.firmas.filter((firma) => firma.firmada)
+  const pendientes = props.permiso.firmas.filter((firma) => !firma.firmada)
+  const mia = pendientes.find((firma) => puedoFirmar(firma.cargo))
+
+  return (
+    <div className="mt-4">
+      <div className="rounded-lg bg-surface-3 p-4">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="font-semibold">Firmas</span>
+          <span className="text-sm tabular-nums text-ink-muted">
+            {hechas.length} de {props.permiso.firmas.length}
+          </span>
+        </div>
+        <ul className="mt-2.5">
+          {props.permiso.firmas.map((firma) => (
+            <li
+              key={firma.cargo}
+              className="flex min-h-14 items-center gap-3 border-b border-line-strong py-2 last:border-b-0"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold">{firma.nombreDelCargo}</p>
+                <p className="text-label tabular-nums text-ink-muted">
+                  {firma.quien ?? 'sin ocupante'}
+                  {firma.firmada
+                    ? ` · firmó ${firma.modo === 'app' ? 'en la app' : 'en papel'} el ${firma.fecha}`
+                    : puedoFirmar(firma.cargo)
+                      ? ' · esperando tu firma'
+                      : ' · sin firmar'}
+                  {firma.verificada === false && ' · sello no verificado'}
+                </p>
+              </div>
+              <Chip
+                tono={
+                  firma.verificada === false
+                    ? 'neutro'
+                    : firma.firmada
+                      ? 'ok'
+                      : puedoFirmar(firma.cargo)
+                        ? 'warn'
+                        : 'neutro'
+                }
               >
-                Firmar acá
-              </button>
-              <label className="cursor-pointer rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-700">
-                Subir papel firmado
-                <input
-                  type="file"
-                  accept={TIPOS_QUE_SE_PUEDEN_ANEXAR.join(',')}
-                  className="hidden"
-                  onChange={(evento) => {
-                    const archivo = evento.target.files?.[0]
-                    if (!archivo) return
-                    setPapel(firma.cargo)
-                    subir.mutate(
-                      { permisoId: props.permiso.id, archivo, adjuntar: false },
-                      {
-                        onSuccess: (escaneoId) =>
-                          firmarEnPapel.mutate({
-                            permisoId: props.permiso.id,
-                            cargos: [firma.cargo],
-                            escaneoId,
-                          }),
-                      },
-                    )
-                  }}
-                />
-              </label>
+                {firma.verificada === false
+                  ? 'Sello no verificado'
+                  : firma.firmada
+                    ? 'Firmada'
+                    : 'Pendiente'}
+              </Chip>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {pendientes.length > 0 && (mia || props.administra) && (
+        <div className="mt-4 border-t border-line pt-4">
+          <p className="text-lg font-bold">
+            {mia ? `Tu firma como ${mia.nombreDelCargo}` : 'Registrar una firma en papel'}
+          </p>
+          <p className="mt-0.5 text-sm text-ink-muted">
+            {mia
+              ? 'Firmá en pantalla o subí el papel escaneado.'
+              : 'Ninguna de las firmas que faltan es tuya, pero podés asentar el papel que ya firmaron.'}
+          </p>
+
+          {/* Los dos caminos, uno al lado del otro: el papel no es una
+              excepción del flujo, cierra la firma igual que el trazo. Si la
+              firma que falta no es mía, el trazo no es un camino: firmar por
+              otro sería falsificar. */}
+          {mia && (
+            <div className="mt-3.5 flex gap-2">
+              {(['trazo', 'escaneo'] as const).map((uno) => (
+                <button
+                  key={uno}
+                  type="button"
+                  onClick={() => setModo(uno)}
+                  className={`min-h-11 flex-1 rounded-lg border text-sm font-semibold ${
+                    modo === uno
+                      ? 'border-accent bg-accent text-accent-ink'
+                      : 'border-line-strong text-ink hover:bg-surface-3'
+                  }`}
+                >
+                  {uno === 'trazo' ? 'Firmar en pantalla' : 'Subir escaneo'}
+                </button>
+              ))}
             </div>
           )}
 
-          {firmando === firma.cargo && (
-            <div className="mt-2">
-              <p className="text-xs text-slate-500">
-                Vas a firmar como {firma.nombreDelCargo}: {firma.quien}
-              </p>
-              <div className="mt-1">
-                <PadDeFirma onCambiar={setTrazos} />
-              </div>
-              <div className="mt-1.5 flex gap-2">
-                <button
-                  type="button"
-                  disabled={firmarEnApp.isPending}
-                  onClick={() =>
-                    firmarEnApp.mutate(
-                      {
-                        permisoId: props.permiso.id,
-                        cargo: firma.cargo,
-                        trazos: JSON.stringify(trazos.trazos),
-                      },
-                      { onSuccess: () => setFirmando(null) },
-                    )
-                  }
-                  className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white disabled:opacity-50"
-                >
-                  Firmar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFirmando(null)}
-                  className="text-xs text-slate-500"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
+          {mia && modo === 'trazo' ? (
+            <FirmarEnPantalla
+              permiso={props.permiso}
+              firma={mia}
+              onListo={() => setModo('escaneo')}
+            />
+          ) : (
+            <SubirEscaneo permiso={props.permiso} pendientes={pendientes} />
           )}
         </div>
-      ))}
-      {(firmarEnApp.error ?? firmarEnPapel.error ?? subir.error) && (
-        <p className="rounded-lg bg-red-50 p-3 text-xs break-words text-red-800">
-          {(firmarEnApp.error ?? firmarEnPapel.error ?? subir.error)?.message}
-        </p>
-      )}
-      {papel !== null && subir.isPending && (
-        <p className="text-xs text-slate-500">Subiendo el papel firmado…</p>
       )}
     </div>
   )
 }
 
-function Tarjeta(props: { permiso: Permiso; grupoId: string }) {
+function Tarjeta(props: {
+  permiso: Permiso
+  grupoId: string
+  distritoId: string | undefined
+  actor: Actor | null
+  administra: boolean
+}) {
   const { permiso } = props
   const emitir = useEmitirPermiso()
   const anular = useAnularPermiso()
@@ -337,21 +527,33 @@ function Tarjeta(props: { permiso: Permiso; grupoId: string }) {
   const hoy = aFechaDeCalendario(new Date())
   const aviso = avisoDeAnticipacion(hoy, permiso.desde)
 
+  const firmantes = props.distritoId ? firmantesRequeridos(props.grupoId, props.distritoId) : []
+  const miFirmaPendiente = permiso.firmas.some((firma) => {
+    if (firma.firmada) return false
+    const firmante = firmantes.find((uno) => uno.cargo === firma.cargo)
+    return (
+      props.actor !== null && firmante !== undefined && puedeFirmarEnLaApp(props.actor, firmante)
+    )
+  })
+  const estado = estadoDelPermiso(permiso, miFirmaPendiente)
+
   return (
-    <section className="rounded-lg bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="text-sm font-semibold text-slate-900">{permiso.lugar}</h3>
-        <Etiqueta estado={permiso.estado} />
+    <section className="border-t border-line pt-5 first:border-t-0 first:pt-0">
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="text-xl font-bold">{permiso.lugar}</h3>
+        <Chip tono={estado.tono}>{estado.texto}</Chip>
       </div>
-      <p className="mt-0.5 text-xs text-slate-500">
+      <p className="mt-1 text-sm tabular-nums text-ink-muted">
         {permiso.desde} a {permiso.hasta}
         {permiso.comoSeViaja && <span> · {permiso.comoSeViaja}</span>}
       </p>
 
-      {permiso.estado === 'borrador' && <Armado permiso={permiso} grupoId={props.grupoId} />}
+      {permiso.estado === 'borrador' && props.administra && (
+        <Armado permiso={permiso} grupoId={props.grupoId} />
+      )}
 
       {permiso.estado !== 'borrador' && permiso.emitidos.length > 0 && (
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-sm text-ink-muted">
           {resumenDeParticipantes(
             permiso.emitidos.map((uno) => ({ marca: uno.marca as 'dirigente' | 'beneficiario' })),
           )}
@@ -359,16 +561,22 @@ function Tarjeta(props: { permiso: Permiso; grupoId: string }) {
       )}
 
       {(permiso.estado === 'emitido' || permiso.estado === 'firmado') && (
-        <Firmas permiso={permiso} />
+        <Firmas
+          permiso={permiso}
+          actor={props.actor}
+          distritoId={props.distritoId}
+          grupoId={props.grupoId}
+          administra={props.administra}
+        />
       )}
 
-      <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-        {permiso.estado === 'borrador' && (
+      <div className="mt-4 flex flex-wrap gap-2">
+        {permiso.estado === 'borrador' && props.administra && (
           <button
             type="button"
             disabled={emitir.isPending}
             onClick={() => emitir.mutate({ permisoId: permiso.id })}
-            className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+            className={BOTON_PRINCIPAL}
           >
             Emitir permiso
           </button>
@@ -379,110 +587,113 @@ function Tarjeta(props: { permiso: Permiso; grupoId: string }) {
               href={`/permisos/${permiso.id}/pdf`}
               target="_blank"
               rel="noreferrer"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-700"
+              className={BOTON_SECUNDARIO}
             >
               Ver PDF
             </a>
             {/* Ver y bajar son dos cosas distintas: al permiso firmado hay que
-                guardarlo o mandarlo, no solo mirarlo. */}
-            <a
-              href={`/permisos/${permiso.id}/pdf?descargar`}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-700"
-            >
-              Descargar PDF
+                guardarlo o mandarlo, no solo mirarlo. El PDF se puede bajar en
+                cualquier momento: lleva las firmas ya registradas y deja en
+                blanco los recuadros que faltan. */}
+            <a href={`/permisos/${permiso.id}/pdf?descargar`} className={BOTON_SECUNDARIO}>
+              Descargar para imprimir
             </a>
           </>
         )}
-        {permiso.estado === 'anulado' && (
+        {permiso.estado === 'anulado' && props.administra && (
           <button
             type="button"
             onClick={() => reEmitir.mutate({ permisoId: permiso.id })}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-700"
+            className={BOTON_SECUNDARIO}
           >
             Re-emitir
           </button>
         )}
-        <label className="cursor-pointer rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-700">
-          Adjuntar
-          {/* Mas ancho que el de la firma en papel: una planificacion puede ser
-              el .docx que el jefe de rama ya tenia escrito, y no se anexa al
-              PDF, solo cuelga del permiso. */}
-          <input
-            type="file"
-            className="hidden"
-            accept={TIPOS_ADMITIDOS.join(',')}
-            onChange={(evento) => {
-              const archivo = evento.target.files?.[0]
-              if (archivo) subir.mutate({ permisoId: permiso.id, archivo, adjuntar: true })
-            }}
-          />
-        </label>
+        {props.administra && (
+          <label className={`${BOTON_SECUNDARIO} cursor-pointer`}>
+            Adjuntar
+            {/* Mas ancho que el de la firma en papel: una planificacion puede ser
+                el .docx que el jefe de rama ya tenia escrito, y no se anexa al
+                PDF, solo cuelga del permiso. */}
+            <input
+              type="file"
+              className="hidden"
+              accept={TIPOS_ADMITIDOS.join(',')}
+              onChange={(evento) => {
+                const archivo = evento.target.files?.[0]
+                if (archivo) subir.mutate({ permisoId: permiso.id, archivo, adjuntar: true })
+              }}
+            />
+          </label>
+        )}
       </div>
 
       {permiso.adjuntos.length > 0 && (
-        <ul className="mt-2 space-y-0.5">
+        <ul className="mt-3">
           {permiso.adjuntos.map((adjunto) => (
-            <li key={adjunto.id} className="flex items-center gap-2">
+            <li
+              key={adjunto.id}
+              className="flex min-h-14 items-center gap-3 rounded-lg border border-line px-3"
+            >
               {/* Link y no boton: el navegador sabe abrir un PDF o una imagen,
                   y asi se puede guardar o compartir con el menu de siempre. */}
               <a
                 href={adjunto.url}
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs text-slate-600 underline underline-offset-2 hover:text-slate-900"
+                className="min-w-0 flex-1 truncate font-semibold hover:underline"
               >
                 {adjunto.nombre}
               </a>
               {/* Un .docx el navegador no lo sabe mostrar, asi que bajarlo es
                   la unica forma de abrirlo. */}
-              <a href={`${adjunto.url}?descargar`} className="text-xs text-slate-400">
+              <a href={`${adjunto.url}?descargar`} className="text-label text-ink-muted">
                 descargar
               </a>
               {/* Con confirmacion: borra el archivo y no se deshace. */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (!confirm(`¿Borrar "${adjunto.nombre}"? No se puede deshacer.`)) return
-                  quitarAdjunto.mutate({ permisoId: permiso.id, adjuntoId: adjunto.id })
-                }}
-                className="text-xs text-slate-400 hover:text-red-700"
-              >
-                quitar
-              </button>
+              {props.administra && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!confirm(`¿Borrar "${adjunto.nombre}"? No se puede deshacer.`)) return
+                    quitarAdjunto.mutate({ permisoId: permiso.id, adjuntoId: adjunto.id })
+                  }}
+                  className="text-label text-ink-faint hover:text-danger"
+                >
+                  quitar
+                </button>
+              )}
             </li>
           ))}
         </ul>
       )}
 
       {emitir.data?.emitirPermiso.avisos.map((mensaje) => (
-        <p key={mensaje} className="mt-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
-          {mensaje}
-        </p>
+        <Aviso key={mensaje}>{mensaje}</Aviso>
       ))}
       {permiso.estado === 'emitido' && !permiso.firmas.every((firma) => firma.firmada) && (
-        <p className="mt-2 text-xs text-slate-400">
+        <p className="mt-2 text-label text-ink-faint">
           Si alguien va a firmar en la app, mejor que lo haga antes de imprimir.
         </p>
       )}
-      {aviso && permiso.estado === 'borrador' && (
-        <p className="mt-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">{aviso.mensaje}</p>
-      )}
+      {aviso && permiso.estado === 'borrador' && <Aviso>{aviso.mensaje}</Aviso>}
       {(emitir.error ?? anular.error ?? reEmitir.error ?? subir.error ?? quitarAdjunto.error) && (
-        <p className="mt-2 rounded-lg bg-red-50 p-3 text-xs break-words text-red-800">
+        <Falla>
           {
             (emitir.error ?? anular.error ?? reEmitir.error ?? subir.error ?? quitarAdjunto.error)
               ?.message
           }
-        </p>
+        </Falla>
       )}
 
       {/* Lo menos frecuente, al final y chiquito: el mismo criterio que
-          "declarar extraordinaria" en afiliacion. */}
-      {(permiso.estado === 'emitido' || permiso.estado === 'firmado') && (
+          "declarar extraordinaria" en afiliacion. Firmar no se deshace desde
+          acá: si hay un error, se anula y se re-emite. */}
+      {props.administra && (permiso.estado === 'emitido' || permiso.estado === 'firmado') && (
         <button
           type="button"
           onClick={() => anular.mutate({ permisoId: permiso.id })}
-          className="mt-3 text-xs text-slate-400 hover:text-red-700"
+          className="mt-3 text-label text-ink-faint hover:text-danger"
         >
           Anular permiso
         </button>
@@ -493,36 +704,47 @@ function Tarjeta(props: { permiso: Permiso; grupoId: string }) {
 
 export function Salidas(props: { grupoId: string }) {
   const consulta = usePermisos(props.grupoId)
+  const arbol = useDistritos()
+  const actor = useActor()
+
+  const distrito = arbol.data?.distritos.find((candidato) =>
+    candidato.grupos.some((grupo) => grupo.id === props.grupoId),
+  )
+  const administra = actor !== null && puedeAdministrarPermisosDelGrupo(actor, props.grupoId)
 
   return (
     <>
-      <Link
-        href={`/grupos/${props.grupoId}`}
-        className="mt-6 inline-block text-sm text-slate-500 hover:text-slate-900"
-      >
+      <Link href={`/grupos/${props.grupoId}`} className="text-label text-ink-muted hover:text-ink">
         ← Grupo
       </Link>
-      <h2 className="mt-1 text-lg font-semibold text-slate-900">Permisos de salida</h2>
+      <h2 className="mt-1 text-2xl font-bold">Salidas</h2>
 
-      {consulta.isPending && <p className="mt-8 text-sm text-slate-500">Consultando…</p>}
+      {consulta.isPending && <p className="mt-6 text-sm text-ink-muted">Consultando…</p>}
       {consulta.error && (
-        <p className="mt-8 rounded-lg bg-red-50 p-4 text-sm break-words text-red-800">
+        <p className="mt-6 rounded-lg bg-danger-soft p-4 text-sm break-words text-danger">
           No se pudieron consultar los permisos: {consulta.error.message}
         </p>
       )}
 
-      <div className="mt-6 space-y-4">
+      <div className="mt-6 space-y-5">
         {(consulta.data?.permisos ?? []).map((permiso) => (
-          <Tarjeta key={permiso.id} permiso={permiso} grupoId={props.grupoId} />
+          <Tarjeta
+            key={permiso.id}
+            permiso={permiso}
+            grupoId={props.grupoId}
+            distritoId={distrito?.id}
+            actor={actor}
+            administra={administra}
+          />
         ))}
         {consulta.data?.permisos.length === 0 && (
-          <p className="rounded-lg bg-white p-4 text-sm text-slate-500 shadow-sm">
+          <p className="rounded-lg border border-dashed border-line-strong p-4 text-sm text-ink-muted">
             El grupo todavía no cargó ninguna salida.
           </p>
         )}
       </div>
 
-      <NuevoPermiso grupoId={props.grupoId} />
+      {administra && <NuevoPermiso grupoId={props.grupoId} />}
     </>
   )
 }

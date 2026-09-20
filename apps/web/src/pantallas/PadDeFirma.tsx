@@ -28,7 +28,7 @@ export function PadDeFirma(props: {
     const pincel = canvas?.getContext('2d')
     if (!canvas || !pincel) return
     pincel.clearRect(0, 0, canvas.width, canvas.height)
-    pincel.strokeStyle = '#0f172a'
+    pincel.strokeStyle = '#000000'
     pincel.lineWidth = 2
     pincel.lineCap = 'round'
     pincel.lineJoin = 'round'
@@ -57,7 +57,7 @@ export function PadDeFirma(props: {
         width={600}
         height={200}
         aria-label="Dibujá tu firma"
-        className="h-40 w-full touch-none rounded-lg border border-dashed border-slate-300 bg-white"
+        className="h-40 w-full touch-none rounded-lg border border-dashed border-line-strong bg-white"
         onPointerDown={(evento) => {
           if (props.deshabilitado) return
           // Capturar el puntero mantiene el trazo aunque el dedo se salga del
@@ -81,7 +81,7 @@ export function PadDeFirma(props: {
       <button
         type="button"
         onClick={() => actualizar([])}
-        className="mt-1 text-xs text-slate-500 hover:text-slate-900"
+        className="mt-1 min-h-9 text-label text-ink-muted hover:text-ink"
       >
         Borrar y empezar de nuevo
       </button>

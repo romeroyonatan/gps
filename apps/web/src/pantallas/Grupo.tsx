@@ -1,5 +1,6 @@
 import { periodoDe } from '@gps/afiliacion/dominio'
 import {
+  useActor,
   useAfiliadosEn,
   useDistritos,
   usePermisos,
@@ -14,7 +15,9 @@ import {
   nombreCompleto,
   nombreDelCargo,
   nombreDelTipo,
+  type TipoDeCargo,
 } from '@gps/personas/dominio'
+import { firmantesRequeridos, puedeFirmarEnLaApp, repartirSalidas } from '@gps/salidas/dominio'
 import { Link } from 'wouter'
 import { AltaDePersona } from './AltaDePersona'
 
@@ -157,6 +160,7 @@ export function Grupo(props: { id: string }) {
   const lista = usePersonasDelGrupo(props.id)
   const permisos = usePermisos(props.id)
   const tesoreria = useTesoreria()
+  const actor = useActor()
   const hoy = new Date()
 
   const personas = lista.data?.personas ?? []
@@ -216,12 +220,44 @@ export function Grupo(props: { id: string }) {
   const ramas = [...porRama].map(([rama, cuantos]) => ({ rama, cuantos }))
   const enRamas = ramas.reduce((suma, una) => suma + una.cuantos, 0)
 
-  // Mismo criterio que la pantalla de salidas: un permiso emitido al que le
-  // falta al menos una firma es uno que espera. No dice "tu firma" porque
-  // esta consulta no sabe qué cargo ocupa quien mira.
-  const esperanFirma = (permisos.data?.permisos ?? []).filter(
-    (permiso) => permiso.estado === 'emitido' && !permiso.firmas.every((firma) => firma.firmada),
-  ).length
+  // El reparto es la misma función pura que usa la pantalla de salidas, así
+  // que "espera tu firma" quiere decir lo mismo en los dos lados. Quién firma
+  // qué lo decide `puedeFirmarEnLaApp` contra los tres firmantes del permiso:
+  // sin distrito todavía no se sabe quién es el comisionado, y entonces nadie
+  // firma nada.
+  const firmantes = distrito ? firmantesRequeridos(props.id, distrito.id) : []
+  const puedoFirmar = (cargo: TipoDeCargo) => {
+    const firmante = firmantes.find((uno) => uno.cargo === cargo)
+    return actor !== null && firmante !== undefined && puedeFirmarEnLaApp(actor, firmante)
+  }
+  const reparto = repartirSalidas(
+    permisos.data?.permisos ?? [],
+    aFechaDeCalendario(hoy),
+    puedoFirmar,
+  )
+  const esperanFirma = reparto.esperanMiFirma.length
+
+  // Sólo las pilas con algo: una fila que dice "0" no informa nada y empuja
+  // hacia abajo a las que sí.
+  const filasDeSalidas = [
+    {
+      titulo: 'Esperan tu firma',
+      detalle: `La más próxima, ${[...reparto.esperanMiFirma].sort((a, b) => a.desde.localeCompare(b.desde))[0]?.desde}`,
+      cuantas: reparto.esperanMiFirma.length,
+    },
+    {
+      titulo: 'Firmadas, falta el resto',
+      detalle: 'Sin acción de tu parte',
+      cuantas: reparto.esperanOtraFirma.length,
+    },
+    {
+      titulo: 'Próximas',
+      detalle: [...reparto.proximas]
+        .sort((a, b) => a.desde.localeCompare(b.desde))
+        .map((una) => `${una.lugar} · ${una.desde}`)[0],
+      cuantas: reparto.proximas.length,
+    },
+  ].filter((fila) => fila.cuantas > 0)
 
   const cuenta = tesoreria.data?.cuentasDeGrupos.find((una) => una.grupoId === props.id)
 
@@ -239,7 +275,9 @@ export function Grupo(props: { id: string }) {
       {esperanFirma > 0 && (
         <div className="mt-5 rounded-lg bg-warn-soft p-4">
           <p className="font-semibold text-warn">
-            {esperanFirma === 1 ? '1 salida espera firma' : `${esperanFirma} salidas esperan firma`}
+            {esperanFirma === 1
+              ? '1 salida espera tu firma'
+              : `${esperanFirma} salidas esperan tu firma`}
           </p>
           <Link
             href={`/grupos/${props.id}/salidas`}
@@ -252,7 +290,7 @@ export function Grupo(props: { id: string }) {
 
       <section className="mt-5">
         <div className="flex items-baseline justify-between">
-          <h3 className="font-semibold">Gente</h3>
+          <h3 className="font-semibold">Integrantes</h3>
           <Link
             href={`/grupos/${props.id}/afiliacion`}
             className="text-sm text-ink-muted hover:text-ink"
@@ -299,11 +337,30 @@ export function Grupo(props: { id: string }) {
             ver todas
           </Link>
         </div>
-        <p className="mt-1.5 text-sm text-ink-muted">
-          {permisos.data
-            ? `${permisos.data.permisos.length} en total · ${esperanFirma} esperan firma`
-            : 'Consultando las salidas…'}
-        </p>
+        {!permisos.data ? (
+          <p className="mt-1.5 text-sm text-ink-muted">Consultando las salidas…</p>
+        ) : filasDeSalidas.length === 0 ? (
+          <p className="mt-1.5 text-sm text-ink-muted">
+            {permisos.data.permisos.length === 0
+              ? 'El grupo todavía no cargó ninguna salida.'
+              : 'Ninguna salida espera nada por ahora.'}
+          </p>
+        ) : (
+          <ul className="mt-2">
+            {filasDeSalidas.map((fila) => (
+              <li
+                key={fila.titulo}
+                className="flex min-h-[52px] items-center justify-between gap-3 border-b border-line last:border-b-0"
+              >
+                <div className="min-w-0">
+                  <p className="font-semibold">{fila.titulo}</p>
+                  <p className="text-label tabular-nums text-ink-muted">{fila.detalle}</p>
+                </div>
+                <span className="shrink-0 text-xl font-bold tabular-nums">{fila.cuantas}</span>
+              </li>
+            ))}
+          </ul>
+        )}
         <Link
           href={`/grupos/${props.id}/plantel`}
           className="mt-3 inline-block text-sm text-ink-muted hover:text-ink"
