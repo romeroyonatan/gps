@@ -2,6 +2,7 @@
 query PersonaActual {
   personaActual {
     personaId
+    nombres
     esAdministradorDesignado
     estaElevado
     elevadaHasta

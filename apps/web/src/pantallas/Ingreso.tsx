@@ -1,5 +1,10 @@
-/** Los perfiles que siembra el escenario demo. Sólo se muestran en ese
- *  entorno: afuera la ruta no existe y el servicio también la rechaza. */
+import type { RolConAmbito } from '@gps/core'
+import { claveDelRol, nombreDelRol } from '@gps/personas/dominio'
+import type { ReactNode } from 'react'
+
+/** Los perfiles de una sola historia de permisos. El multi-rol no está acá:
+ *  es el botón grande de arriba. Sólo se muestran en entorno demo: afuera la
+ *  ruta no existe y el servicio también la rechaza. */
 const PERFILES_DEMO = [
   { subject: 'jefatura', nombre: 'Jefatura de grupo', que: 'Administra su grupo y lee su cuenta' },
   { subject: 'secretaria', nombre: 'Secretaría', que: 'Lo mismo, desde el equipo del grupo' },
@@ -61,16 +66,21 @@ function Proveedor(props: { href: string; letra: string; solido?: boolean; child
   )
 }
 
-export function Ingreso(props: { entorno: string }) {
+/** La carcasa de las dos pantallas del ingreso: la de los proveedores y la de
+ *  elegir rol. Es una sola porque elegir rol sigue siendo entrar —la sesión
+ *  existe pero la app todavía no se dibujó—, y cambiar de fondo en el medio
+ *  haría parecer que algo falló.
+ *
+ *  A sangre y sin tarjeta: dos mitades, negra y blanca, sin filete ni margen
+ *  entre ellas. A 375px la mitad negra no existe —ahí el que manda es el
+ *  contenido— y la pantalla es blanca entera.
+ *
+ *  En escritorio la altura la fija el viewport y scrollea sólo la mitad
+ *  blanca: la negra es un fondo, no contenido que se recorra. La derecha va
+ *  alineada arriba y no centrada porque un contenedor flex centrado que además
+ *  scrollea recorta el principio de su contenido. */
+function Portada(props: { children: ReactNode }) {
   return (
-    // A sangre y sin tarjeta: dos mitades, negra y blanca, sin filete ni
-    // margen entre ellas. A 375px la mitad negra no existe —ahí el que manda
-    // es el par de botones— y la pantalla es blanca entera.
-    //
-    // En escritorio la altura la fija el viewport y scrollea sólo la mitad
-    // blanca: la negra es un fondo, no contenido que se recorra. La derecha va
-    // alineada arriba y no centrada porque un contenedor flex centrado que
-    // además scrollea recorta el principio de su contenido.
     <div className="min-h-dvh bg-surface font-sans text-base text-ink md:grid md:h-dvh md:grid-cols-2 md:overflow-hidden">
       <div className="hidden bg-accent text-accent-ink md:flex md:flex-col md:justify-between md:p-12">
         <p className="text-2xl font-bold">GPS</p>
@@ -87,51 +97,113 @@ export function Ingreso(props: { entorno: string }) {
         {/* En el teléfono la marca va acá, en negro sobre blanco: la mitad
             oscura es una decisión de escritorio, no de la pantalla chica. */}
         <p className="text-3xl font-bold md:hidden">GPS</p>
-        <h2 className="text-2xl font-bold">Entrar</h2>
-        {/* Sólo en escritorio, como en el mockup: en el teléfono no hay bajada,
-            porque ahí la pantalla es la marca y el par de botones. */}
-        <p className="hidden text-sm text-ink-muted md:block">
-          Usá la misma cuenta con la que entrás en el teléfono.
-        </p>
-
-        {/* Apple primero: lo exige la App Store cuando hay ingreso social, y
-            el orden se mantiene en escritorio para no mover el dedo de lugar. */}
-        <div className="mt-2 grid gap-3">
-          <Proveedor href={enlaceDeIngreso('apple')} letra="A" solido>
-            Continuar con Apple
-          </Proveedor>
-          <Proveedor href={enlaceDeIngreso('google')} letra="G">
-            Continuar con Google
-          </Proveedor>
-        </div>
-
-        {props.entorno === 'demo' && (
-          <div className="mt-4">
-            <h3 className="text-label font-medium text-ink-muted">Perfiles de demostración</h3>
-            <p className="mt-1 text-xs text-ink-faint">
-              Cada uno abre una sesión de verdad, con los permisos que le dan sus cargos y equipos.
-            </p>
-            <div className="mt-3 grid gap-2">
-              {PERFILES_DEMO.map((perfil) => (
-                <a
-                  key={perfil.subject}
-                  href={enlaceDeIngreso('demo', `&perfil=${perfil.subject}`)}
-                  className="rounded-lg border border-line-strong px-4 py-3 hover:bg-surface-3"
-                >
-                  <span className="block text-sm font-semibold">{perfil.nombre}</span>
-                  <span className="mt-0.5 block text-xs text-ink-muted">{perfil.que}</span>
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <p className="mt-4 text-label text-ink-faint">
-          Si todavía no tenés acceso, pedile el enlace de activación a la jefatura o a la Secretaría
-          de tu grupo.
-        </p>
+        {props.children}
       </div>
     </div>
+  )
+}
+
+export function Ingreso(props: { entorno: string }) {
+  return (
+    <Portada>
+      <h2 className="text-2xl font-bold">Entrar</h2>
+      {/* Sólo en escritorio, como en el mockup: en el teléfono no hay bajada,
+            porque ahí la pantalla es la marca y el par de botones. */}
+      <p className="hidden text-sm text-ink-muted md:block">
+        Usá la misma cuenta con la que entrás en el teléfono.
+      </p>
+
+      {/* Apple primero: lo exige la App Store cuando hay ingreso social, y
+            el orden se mantiene en escritorio para no mover el dedo de lugar. */}
+      <div className="mt-2 grid gap-3">
+        <Proveedor href={enlaceDeIngreso('apple')} letra="A" solido>
+          Continuar con Apple
+        </Proveedor>
+        <Proveedor href={enlaceDeIngreso('google')} letra="G">
+          Continuar con Google
+        </Proveedor>
+        {/* La persona de demostración tiene varias funciones encima, así que
+              entra directo al conmutador de rol de la cabecera: es el camino
+              que muestra el producto entero sin pedir cinco logins. */}
+        {props.entorno === 'demo' && (
+          <Proveedor href={enlaceDeIngreso('demo', '&perfil=demo')} letra="D">
+            Iniciar sesión demo
+          </Proveedor>
+        )}
+      </div>
+
+      {props.entorno === 'demo' && (
+        <div className="mt-4">
+          <h3 className="text-label font-medium text-ink-muted">Una función por vez</h3>
+          <p className="mt-1 text-xs text-ink-faint">
+            Para mirar una historia de permisos sola, sin las otras encima. Cada uno abre una sesión
+            de verdad, con lo que le dan sus cargos y equipos.
+          </p>
+          <div className="mt-3 grid gap-2">
+            {PERFILES_DEMO.map((perfil) => (
+              <a
+                key={perfil.subject}
+                href={enlaceDeIngreso('demo', `&perfil=${perfil.subject}`)}
+                className="rounded-lg border border-line-strong px-4 py-3 hover:bg-surface-3"
+              >
+                <span className="block text-sm font-semibold">{perfil.nombre}</span>
+                <span className="mt-0.5 block text-xs text-ink-muted">{perfil.que}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <p className="mt-4 text-label text-ink-faint">
+        Si todavía no tenés acceso, pedile el enlace de activación a la jefatura o a la Secretaría
+        de tu grupo.
+      </p>
+    </Portada>
+  )
+}
+
+/** Con qué rol entra quien tiene más de uno.
+ *
+ *  Va acá y no en un menú escondido: el rol define qué app se ve, así que
+ *  preguntarlo después de dibujar una app sería dibujar la equivocada. Quien
+ *  tiene un solo rol nunca llega a esta pantalla —entra directo con ése—, que
+ *  es la otra mitad de la misma regla. */
+export function ElegirRol(props: {
+  nombre: string | null
+  roles: readonly RolConAmbito[]
+  ambitoDe: (funcion: RolConAmbito) => string
+  elegir: (funcion: RolConAmbito) => void
+}) {
+  return (
+    <Portada>
+      <div className="mt-auto overflow-hidden rounded-lg border border-line-strong">
+        <div className="border-b border-line px-4 py-3.5">
+          <p className="text-lg font-semibold">{props.nombre ? `Hola, ${props.nombre}` : 'Hola'}</p>
+          <p className="mt-0.5 text-sm text-ink-muted">
+            Tenés {props.roles.length} roles. ¿Con cuál entrás?
+          </p>
+        </div>
+        {props.roles.map((funcion) => (
+          <button
+            key={claveDelRol(funcion)}
+            type="button"
+            onClick={() => props.elegir(funcion)}
+            className="flex min-h-16 w-full items-center gap-3 border-b border-line px-4 py-3 text-left hover:bg-surface-3"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block text-base font-semibold">{nombreDelRol(funcion.rol)}</span>
+              <span className="block text-label text-ink-muted">{props.ambitoDe(funcion)}</span>
+            </span>
+            <span aria-hidden="true" className="flex-none text-ink-faint">
+              ›
+            </span>
+          </button>
+        ))}
+        <p className="px-4 py-3 text-label text-ink-faint">
+          Se puede cambiar después desde la cabecera.
+        </p>
+      </div>
+    </Portada>
   )
 }
 

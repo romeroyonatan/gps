@@ -21,6 +21,7 @@ export {
   puedeVerPersonasDelGrupo,
 } from './politicas'
 export type { MiembroActivo, MiembroDelGrupo, Personas } from './publico'
+export { claveDelRol, nombreDelRol, rolesParaElegir } from './roles'
 export type { Problema } from './validaciones'
 export { validarIngreso, validarPersona } from './validaciones'
 export type {
