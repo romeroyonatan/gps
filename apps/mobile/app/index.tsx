@@ -83,8 +83,6 @@ export default function Pantalla() {
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
       <ScrollView contentContainerClassName="px-4 py-10">
-        <Text className="text-2xl font-semibold text-slate-900">GPS</Text>
-        <Text className="mt-1 text-sm text-slate-500">Gestión para Scouts</Text>
         <BarraDeSesion />
         <Link href="/tesoreria" className="mt-6 text-sm font-medium text-slate-700">
           Tesorería →
