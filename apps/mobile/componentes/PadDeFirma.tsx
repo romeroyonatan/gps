@@ -3,6 +3,12 @@ import { useRef, useState } from 'react'
 import { type LayoutChangeEvent, PanResponder, Pressable, Text, View } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
 
+/** La tinta. Es el valor de `--ink` en claro y no la variable: react-native-svg
+ *  no lee clases ni variables CSS, quiere un color.
+ *  ponytail: mobile todavía no prende el modo oscuro -`darkMode: 'class'` y
+ *  nadie pone la clase-; cuando lo prenda, esto sale del tema y no de acá. */
+const TINTA = '#000000'
+
 /** El lienzo donde se dibuja la firma, en mobile. Guarda el mismo formato que
  *  el de web -coordenadas normalizadas de 0 a 1- para que una firma hecha en el
  *  telefono se vea igual en el PDF que una hecha en la compu.
@@ -67,14 +73,14 @@ export function PadDeFirma(props: { onCambiar: (trazos: Trazos) => void }) {
       <View
         onLayout={medir}
         {...gestos.panHandlers}
-        className="h-40 w-full rounded-lg border border-dashed border-slate-300 bg-white"
+        className="h-40 w-full rounded-lg border border-dashed border-line-strong bg-surface-2"
       >
         <Svg width="100%" height="100%" viewBox="0 0 1 1" preserveAspectRatio="none">
           {trazos.map((trazo) => (
             <Path
               key={trazo.id}
               d={trazo.puntos.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x} ${y}`).join(' ')}
-              stroke="#0f172a"
+              stroke={TINTA}
               strokeWidth={0.008}
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -83,8 +89,8 @@ export function PadDeFirma(props: { onCambiar: (trazos: Trazos) => void }) {
           ))}
         </Svg>
       </View>
-      <Pressable onPress={() => actualizar([])} className="mt-1">
-        <Text className="text-xs text-slate-500">Borrar y empezar de nuevo</Text>
+      <Pressable onPress={() => actualizar([])} className="min-h-12 justify-center">
+        <Text className="text-sm text-ink-muted">Borrar y empezar de nuevo</Text>
       </Pressable>
     </View>
   )
