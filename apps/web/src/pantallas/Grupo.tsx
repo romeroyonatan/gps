@@ -8,120 +8,17 @@ import {
   useTesoreria,
 } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
-import { etiquetaDeEdades, type Rama, ramaDelCatalogo } from '@gps/estructura/dominio'
-import {
-  calcularEdad,
-  estaVigente,
-  nombreCompleto,
-  nombreDelCargo,
-  nombreDelTipo,
-  type TipoDeCargo,
-} from '@gps/personas/dominio'
+import { type Rama, ramaDelCatalogo } from '@gps/estructura/dominio'
+import type { TipoDeCargo } from '@gps/personas/dominio'
 import { firmantesRequeridos, puedeFirmarEnLaApp, repartirSalidas } from '@gps/salidas/dominio'
 import { Link } from 'wouter'
-
-type Persona = NonNullable<ReturnType<typeof usePersonasDelGrupo>['data']>['personas'][number]
+import { COLOR_DE_RAMA } from '../ramas'
 
 const pesos = new Intl.NumberFormat('es-AR', {
   style: 'currency',
   currency: 'ARS',
   maximumFractionDigits: 0,
 })
-
-/** El color de rama escrito entero, no armado con plantilla: Tailwind lee las
- *  clases del fuente y una interpolada nunca se genera. Es la única forma de
- *  que `bg-rama-lobatos` exista en la hoja. */
-const COLOR_DE_RAMA: Record<Rama, string> = {
-  castores: 'bg-rama-castores',
-  lobatos: 'bg-rama-lobatos',
-  scouts: 'bg-rama-scouts',
-  raiders: 'bg-rama-raiders',
-  rovers: 'bg-rama-rovers',
-  adultos: 'bg-rama-adultos',
-}
-
-/** El estado se lee, no se adivina: la píldora siempre lleva su texto y el
- *  color es refuerzo. */
-function Chip(props: { tono: 'ok' | 'warn' | 'neutro'; children: React.ReactNode }) {
-  const tonos = {
-    ok: 'bg-ok-soft text-ok',
-    warn: 'bg-warn-soft text-warn',
-    neutro: 'bg-surface-3 text-ink-muted',
-  }
-  return (
-    <span
-      className={`inline-flex min-h-[26px] items-center rounded-full px-2.5 py-0.5 text-label font-semibold whitespace-nowrap ${tonos[props.tono]}`}
-    >
-      {props.children}
-    </span>
-  )
-}
-
-function FilaDePersona(props: { persona: Persona; hoy: Date; afiliada: boolean; periodo: number }) {
-  // El "hasta" generado es opcional (string | null | undefined); el del
-  // dominio es string | null a secas. Se normaliza solo en esta frontera.
-  const vigentes = props.persona.cargos.filter((cargo) =>
-    estaVigente({ desde: cargo.desde, hasta: cargo.hasta ?? null }, props.hoy),
-  )
-  return (
-    <li className="flex min-h-[72px] items-center gap-3 border-b border-line py-3 last:border-b-0">
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold">{nombreCompleto(props.persona)}</p>
-        <p className="mt-0.5 text-xs tabular-nums text-ink-muted">
-          {nombreDelTipo(props.persona.tipoDeDocumento)} {props.persona.numeroDeDocumento} ·{' '}
-          {calcularEdad(props.persona.fechaDeNacimiento, props.hoy)} años
-        </p>
-        {vigentes.length > 0 && (
-          <p className="mt-1.5 text-xs text-ink-faint">
-            {vigentes.map((cargo) => nombreDelCargo(cargo.cargo)).join(' · ')}
-          </p>
-        )}
-      </div>
-      {/* El período va escrito: pertenecer no es estar afiliado, y "afiliado"
-          a secas no dice de cuándo. El sustantivo y no el adjetivo porque el
-          padrón no guarda el género de la persona: "Afiliada" en la fila de
-          Ignacio es un dato inventado. */}
-      <Chip tono={props.afiliada ? 'ok' : 'warn'}>
-        {props.afiliada ? `Afiliación ${props.periodo}` : 'Sin afiliar'}
-      </Chip>
-    </li>
-  )
-}
-
-function Seccion(props: {
-  titulo: string
-  detalle?: string
-  personas: readonly Persona[]
-  hoy: Date
-  afiliados: ReadonlySet<string>
-  periodo: number
-}) {
-  return (
-    <section>
-      <h3 className="text-lg font-bold">
-        {props.titulo}
-        {props.detalle && (
-          <span className="ml-2 text-label font-medium text-ink-muted">{props.detalle}</span>
-        )}
-      </h3>
-      {props.personas.length === 0 ? (
-        <p className="mt-1 text-label text-ink-faint">Todavía no hay nadie</p>
-      ) : (
-        <ul className="mt-2">
-          {props.personas.map((persona) => (
-            <FilaDePersona
-              key={persona.id}
-              persona={persona}
-              hoy={props.hoy}
-              afiliada={props.afiliados.has(persona.id)}
-              periodo={props.periodo}
-            />
-          ))}
-        </ul>
-      )}
-    </section>
-  )
-}
 
 /** La distribución por rama: barra de proporciones más una etiqueta por rama
  *  con su nombre escrito. El color nunca viaja solo. */
@@ -203,7 +100,6 @@ export function Grupo(props: { id: string }) {
     )
   }
 
-  const adherentes = personas.filter((persona) => persona.pertenencia.categoria === 'adherente')
   const sinAfiliar = personas.filter((persona) => !afiliados.has(persona.id)).length
 
   // Por rama, contando por la unidad a la que pertenece cada quien: la rama es
@@ -291,10 +187,10 @@ export function Grupo(props: { id: string }) {
         <div className="flex items-baseline justify-between">
           <h3 className="font-semibold">Integrantes</h3>
           <Link
-            href={`/grupos/${props.id}/afiliacion`}
+            href={`/grupos/${props.id}/nomina`}
             className="text-sm text-ink-muted hover:text-ink"
           >
-            ver afiliación
+            Ver nómina
           </Link>
         </div>
         <p className="mt-1.5 flex items-baseline gap-2.5">
@@ -367,55 +263,6 @@ export function Grupo(props: { id: string }) {
           Plantel →
         </Link>
       </section>
-
-      <div className="mt-7 space-y-6 border-t border-line pt-5">
-        {/* Ya vienen ordenadas por el servidor: por catalogo y, dentro de una
-            rama, por nombre. Una unidad abierta sin nadie se muestra vacia y no
-            se esconde, porque es informacion. */}
-        {grupo.unidades.map((unidad) => {
-          const suyas = personas.filter((persona) => persona.pertenencia.unidadId === unidad.id)
-          // Primero los dirigentes: son los que uno busca cuando abre la unidad.
-          const activos = suyas.filter((p) => p.pertenencia.categoria === 'activo')
-          const beneficiarios = suyas.filter((p) => p.pertenencia.categoria === 'beneficiario')
-          const rama = ramaDelCatalogo(unidad.rama)
-          return (
-            <Seccion
-              key={unidad.id}
-              titulo={unidad.nombre}
-              detalle={
-                rama ? `${rama.nombre} · ${etiquetaDeEdades(rama)} · ${unidad.sexo}` : undefined
-              }
-              personas={[...activos, ...beneficiarios]}
-              hoy={hoy}
-              afiliados={afiliados}
-              periodo={periodo}
-            />
-          )
-        })}
-
-        {grupo.unidades.length === 0 && (
-          <p className="rounded-lg border border-dashed border-line-strong p-4 text-sm text-ink-muted">
-            El grupo todavía no abrió ninguna unidad.
-          </p>
-        )}
-
-        <Seccion
-          titulo="Adherentes"
-          personas={adherentes}
-          hoy={hoy}
-          afiliados={afiliados}
-          periodo={periodo}
-        />
-      </div>
-
-      {/* Cargar una persona es una tarea propia, no un apéndice del padrón:
-          se va a su pantalla y se vuelve con la lista ya actualizada. */}
-      <Link
-        href={`/grupos/${props.id}/alta`}
-        className="mt-7 flex min-h-12 w-full items-center justify-center rounded-lg bg-accent px-6 font-semibold text-accent-ink hover:bg-accent-strong sm:w-fit"
-      >
-        Agregar una persona
-      </Link>
     </>
   )
 }

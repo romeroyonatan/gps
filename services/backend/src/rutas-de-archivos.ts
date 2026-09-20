@@ -1,3 +1,4 @@
+import { GrupoInexistente, NominaFueraDeAlcance } from '@gps/afiliacion/servidor'
 import { SinAutorizador, SubidaInvalida, SubidaNoAutorizada } from '@gps/archivos/servidor'
 import { alcanceDe, type Context, type Logger } from '@gps/core'
 import { PermisoFueraDeAlcance, PermisoNoEditable } from '@gps/salidas/servidor'
@@ -28,6 +29,45 @@ export async function rutaDelPdfDeUnPermiso(
     }
     if (error instanceof PermisoNoEditable) return new Response(error.message, { status: 400 })
     return loQueNoEsperabamos(logger, error, `armando el PDF del permiso ${pedido.params.id}`)
+  }
+}
+
+/** La nomina del grupo para bajar, en PDF o en planilla. Se arma al pedirla y
+ *  no se guarda, por lo mismo que el PDF del permiso: es el padron de hoy, y un
+ *  archivo guardado seria una segunda verdad que envejece.
+ *
+ *  Ruta y no mutation por lo mismo que los bytes de archivos: un binario no
+ *  viaja bien por el lenguaje de consultas, y asi el navegador lo baja con un
+ *  link. El formato va en la ruta y no en un parametro para que la URL termine
+ *  en la extension: es lo que hace que el sistema operativo la abra con la
+ *  aplicacion que corresponde. */
+export async function rutaDeLaNominaDeUnGrupo(
+  contexto: Context,
+  logger: Logger,
+  pedido: Bun.BunRequest<'/grupos/:id/nomina.pdf'> | Bun.BunRequest<'/grupos/:id/nomina.xlsx'>,
+  formato: 'pdf' | 'xlsx',
+): Promise<Response> {
+  const { id } = pedido.params
+
+  try {
+    const { nombre, contenido } =
+      formato === 'pdf'
+        ? await contexto.afiliacion.pdfDeLaNomina(alcanceDe(contexto), id)
+        : await contexto.afiliacion.xlsxDeLaNomina(alcanceDe(contexto), id)
+
+    return new Response(contenido as BlobPart, {
+      headers: {
+        'content-type':
+          formato === 'pdf'
+            ? 'application/pdf'
+            : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'content-disposition': comoSeEntrega(pedido.url, nombre),
+      },
+    })
+  } catch (error) {
+    if (error instanceof NominaFueraDeAlcance) return new Response(error.message, { status: 403 })
+    if (error instanceof GrupoInexistente) return new Response(error.message, { status: 404 })
+    return loQueNoEsperabamos(logger, error, `armando la nomina del grupo ${id} en ${formato}`)
   }
 }
 

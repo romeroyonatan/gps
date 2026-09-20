@@ -4,7 +4,7 @@ import inicio from '../../../apps/web/index.html'
 import { crearInterceptorDeEscriturasElevadas } from './auditoria'
 import { componer } from './composicion'
 import { crearContexto } from './context'
-import { rutaDeArchivos, rutaDelPdfDeUnPermiso } from './rutas-de-archivos'
+import { rutaDeArchivos, rutaDeLaNominaDeUnGrupo, rutaDelPdfDeUnPermiso } from './rutas-de-archivos'
 import { rutaDeCallbackDeLogin, rutaDeInicioDeLogin } from './rutas-de-auth'
 
 export async function crearServidor(
@@ -51,6 +51,20 @@ export async function crearServidor(
         rutaDeArchivos(await contextoPorPedido({ request: pedido }), logger, pedido),
       '/permisos/:id/pdf': async (pedido) =>
         rutaDelPdfDeUnPermiso(await contextoPorPedido({ request: pedido }), logger, pedido),
+      '/grupos/:id/nomina.pdf': async (pedido) =>
+        rutaDeLaNominaDeUnGrupo(
+          await contextoPorPedido({ request: pedido }),
+          logger,
+          pedido,
+          'pdf',
+        ),
+      '/grupos/:id/nomina.xlsx': async (pedido) =>
+        rutaDeLaNominaDeUnGrupo(
+          await contextoPorPedido({ request: pedido }),
+          logger,
+          pedido,
+          'xlsx',
+        ),
       '/*': inicio,
     },
   })

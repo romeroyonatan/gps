@@ -74,7 +74,12 @@ ni una persona ni un grupo—. La selección de sus nóminas declarables es una 
 foto, y `src/servidor/servicio.ts` compone esas operaciones con las consultas. No todo
 hecho de negocio necesita tabla: su calendario (el día de corte del período, las fechas
 ordinarias) es un catálogo en `src/dominio/config.ts`, no una tabla, porque cambia
-poquísimo y no hace falta consultarlo.
+poquísimo y no hace falta consultarlo. También arma la nómina del grupo para bajar:
+`src/dominio/nomina.ts` decide qué filas salen y en qué orden, y `src/servidor/pdf.ts`
+y `src/servidor/xlsx.ts` sólo la dibujan —`.xlsx` es un ZIP con cinco XML, así que se
+escribe a mano en vez de sumar una librería de planillas—. La sirven
+`/grupos/:id/nomina.pdf` y `/grupos/:id/nomina.xlsx`, con la política de `personas` y
+no la suya: verla es ver el padrón.
 
 ## Reglas obligatorias
 

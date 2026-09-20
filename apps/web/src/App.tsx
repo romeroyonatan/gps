@@ -27,6 +27,7 @@ import { Estructura } from './pantallas/Estructura'
 import { Grupo } from './pantallas/Grupo'
 import { ElegirRol, Ingreso } from './pantallas/Ingreso'
 import { ModoElevado } from './pantallas/ModoElevado'
+import { Nomina } from './pantallas/Nomina'
 import { Plantel } from './pantallas/Plantel'
 import { Salidas } from './pantallas/Salidas'
 import { Tesoreria } from './pantallas/Tesoreria'
@@ -65,6 +66,7 @@ function Rutas() {
       <Route path="/tesoreria/configuracion" component={ConfiguracionDeCuotas} />
       <Route path="/tesoreria" component={Tesoreria} />
       <Route path="/grupos/:id/afiliacion">{(params) => <Afiliacion grupoId={params.id} />}</Route>
+      <Route path="/grupos/:id/nomina">{(params) => <Nomina grupoId={params.id} />}</Route>
       <Route path="/grupos/:id/alta">{(params) => <AltaDePersona grupoId={params.id} />}</Route>
       <Route path="/grupos/:id/salidas">{(params) => <Salidas grupoId={params.id} />}</Route>
       <Route path="/grupos/:id/plantel">{(params) => <Plantel grupoId={params.id} />}</Route>

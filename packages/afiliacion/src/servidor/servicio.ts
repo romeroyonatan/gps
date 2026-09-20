@@ -5,6 +5,7 @@ import type { Afiliado, Declaracion } from '../dominio/modelos'
 import type { Afiliacion } from '../dominio/publico'
 import { crearConsultasDeAfiliacion } from './consultas'
 import { crearOperacionesDeDeclaracion } from './declaraciones'
+import { crearConsultasDeLaNomina } from './nomina'
 
 export {
   DeclaracionDenegada,
@@ -12,6 +13,7 @@ export {
   NadaQueDeclarar,
   YaDeclaroHoy,
 } from './declaraciones'
+export { GrupoInexistente, NominaFueraDeAlcance } from './nomina'
 
 export interface ServicioDeAfiliacion extends Afiliacion {
   /** Fotografia a los miembros activos del dia `fecha`. Sin `grupoId` declara
@@ -44,6 +46,18 @@ export interface ServicioDeAfiliacion extends Afiliacion {
 
   /** Declara las fechas ordinarias vencidas que cada grupo aun no emitio. */
   declararPendientes(): Promise<readonly Declaracion[]>
+
+  /** El padron de hoy del grupo, con su afiliacion del periodo, para bajar. Son
+   * dos usos del mismo documento: el PDF se presenta en el distrito y la
+   * planilla se trabaja en una hoja de calculo. */
+  pdfDeLaNomina(
+    alcance: Alcance,
+    grupoId: string,
+  ): Promise<{ nombre: string; contenido: Uint8Array }>
+  xlsxDeLaNomina(
+    alcance: Alcance,
+    grupoId: string,
+  ): Promise<{ nombre: string; contenido: Uint8Array }>
 }
 
 /** Compone los casos de uso y consultas del modulo. Las dependencias llegan ya
@@ -53,8 +67,10 @@ export function crearServicioDeAfiliacion(
   personas: Personas,
   estructura: Estructura,
 ): ServicioDeAfiliacion {
+  const consultas = crearConsultasDeAfiliacion(core)
   return {
     ...crearOperacionesDeDeclaracion(core, personas, estructura),
-    ...crearConsultasDeAfiliacion(core),
+    ...consultas,
+    ...crearConsultasDeLaNomina(core, personas, estructura, consultas.afiliadosEn),
   }
 }
