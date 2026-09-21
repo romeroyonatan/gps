@@ -4,24 +4,17 @@ import type { Unidad } from '@gps/estructura/dominio'
 import { puedeVerPersonasDelGrupo } from '@gps/personas/dominio'
 import { useState } from 'react'
 import { Link } from 'wouter'
-import { CAMPO, Cargando, ChipDeRama, Falla, Titulo, Vacio } from '../ui'
-
-function Chevron(props: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className={props.className}
-    >
-      <path d="m9 18 6-6-6-6" />
-    </svg>
-  )
-}
+import {
+  BOTON_SECUNDARIO,
+  CAMPO,
+  Cargando,
+  CHEVRON,
+  ChipDeRama,
+  Falla,
+  Icono,
+  Titulo,
+  Vacio,
+} from '../ui'
 
 function Grupo(props: {
   id: string
@@ -62,7 +55,7 @@ function Grupo(props: {
           </ul>
         )}
       </span>
-      {props.seAbre && <Chevron className="size-5 shrink-0 text-ink-faint" />}
+      {props.seAbre && <Icono trazos={CHEVRON} className="size-5 shrink-0 text-ink-faint" />}
     </>
   )
 
@@ -166,7 +159,7 @@ export function Estructura() {
                   Object.fromEntries(distritos.map((distrito) => [distrito.id, algunoAbierto])),
                 )
               }
-              className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-lg border border-line-strong px-3.5 text-sm font-semibold hover:bg-surface-3"
+              className={`${BOTON_SECUNDARIO} min-h-12 shrink-0`}
             >
               {algunoAbierto ? 'Contraer todo' : 'Expandir todo'}
             </button>
@@ -190,7 +183,8 @@ export function Estructura() {
                     }
                     className="flex min-h-16 w-full items-center gap-3 bg-surface-3 px-4 py-2.5 text-left"
                   >
-                    <Chevron
+                    <Icono
+                      trazos={CHEVRON}
                       className={`size-5 shrink-0 text-ink-muted ${distrito.abierto ? 'rotate-90' : ''}`}
                     />
                     <span className="min-w-0 flex-1">

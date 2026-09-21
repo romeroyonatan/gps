@@ -36,6 +36,7 @@ import { RegistrarPago } from './pantallas/RegistrarPago'
 import { Salida } from './pantallas/Salida'
 import { Salidas } from './pantallas/Salidas'
 import { Tesoreria } from './pantallas/Tesoreria'
+import { Icono } from './ui'
 
 /** La salida. Vive en la cabecera y no en la hoja de roles porque quien tiene
  *  un solo rol no tiene hoja, y sin esto no tendría por dónde salir. */
@@ -98,25 +99,6 @@ const TAREAS = [
     ],
   },
 ] as const
-
-function Icono(props: { trazos: readonly string[] }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className="size-6 shrink-0"
-    >
-      {props.trazos.map((trazo) => (
-        <path key={trazo} d={trazo} />
-      ))}
-    </svg>
-  )
-}
 
 /** El menú de tareas del grupo. Es uno solo con dos formas: columna al
  *  costado desde `md`, barra fija abajo en el teléfono —donde llega el
