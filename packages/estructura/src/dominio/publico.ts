@@ -1,5 +1,5 @@
 import type { Actor, Alcance } from '@gps/core'
-import type { Grupo, GrupoConUnidades } from './modelos'
+import type { Distrito, Grupo, GrupoConUnidades } from './modelos'
 
 /** Lo que estructura le publica a los otros modulos, y nada mas.
  *
@@ -36,6 +36,14 @@ export interface Estructura {
   /** Todos los grupos conocidos, incluso los cerrados: una deuda no desaparece
    * cuando cierra el grupo que la contrajo. */
   listarGrupos(): Promise<readonly Grupo[]>
+
+  /** Los distritos conocidos, incluso los cerrados, sin sus grupos. Es mas
+   *  chico que listarDistritos del servicio -que arma el arbol entero y pide
+   *  alcance- porque el unico consumidor, el reporte de cobranza de Tesoreria,
+   *  ya tiene los grupos y solo necesita como se llama cada distrito para
+   *  agrupar por el. Cerrados incluidos por lo mismo que los grupos: lo que se
+   *  factura en un periodo no se borra cuando el distrito deja de existir. */
+  listarDistritosSinGrupos(): Promise<readonly Distrito[]>
 
   /** Los ids de los grupos que estaban abiertos el dia `fecha` (aaaa-mm-dd).
    *  Cerrado ese mismo dia todavia cuenta como abierto, igual que estaVigente

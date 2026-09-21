@@ -141,6 +141,15 @@ al índice.
 **Mobile-first.** Todo se diseña primero a 375px. `sm:` y `md:` sólo agregan en
 pantallas grandes, nunca arreglan lo que se rompió en chicas.
 
+**La web angosta y la app son la misma pantalla.** A ancho de teléfono, `apps/web` tiene
+que verse igual —o lo más parecido posible— que la pantalla equivalente de `apps/mobile`:
+mismo orden de bloques, mismas alturas de fila, mismas píldoras, mismo pie. La mayoría de
+la gente entra por la web del teléfono, así que "está bien en la app" no alcanza: si las
+dos se separan, es un bug de paridad y se arregla en las dos. La forma la manda el
+mockup de mobile —es el diseño más apretado y el que decide qué entra—, y el escritorio
+sólo agrega con `sm:`/`md:` sobre esa base. Cuando toques una pantalla de una app,
+abrí la otra al lado antes de dar por terminado.
+
 **Piezas de interfaz: mirar `apps/web/src/ui.tsx` antes de escribir markup.** Es la guía
 escrita una sola vez —no una librería de propósito general— y ya tiene esto:
 
@@ -168,10 +177,16 @@ escrita una sola vez —no una librería de propósito general— y ya tiene est
 El color de rama vive aparte, en `apps/web/src/ramas.ts` (`COLOR_DE_RAMA`), escrito entero
 y no interpolado, porque Tailwind lee las clases del fuente.
 
-Todo esto es de web. Mobile no tiene equivalente todavía: `apps/mobile/componentes/` son
-dos pantallas grandes y nada compartido. Lo que se comparte entre las dos apps son los
-`/dominio` de los módulos, no la interfaz —React DOM y React Native no dibujan con las
-mismas etiquetas—, así que la paridad se copia a mano y hay que decirlo cuando se rompe.
+Mobile tiene su gemelo en `apps/mobile/componentes/ui.tsx`, con los mismos nombres
+escritos con las primitivas de React Native: `Pantalla` (el marco con el pie fijo),
+`Volver`, `Titulo`, `Filtros`, `Campo`, `CAMPO`, `BotonPrincipal`, `Chip`, `Falla`,
+`Cargando` y `Vacio`. Hoy lo usan las pantallas de tesorería; el resto de mobile sigue
+con clases `slate-*` sueltas y es deuda de paridad conocida. Lo que se comparte entre las
+dos apps son los `/dominio` de los módulos, no la interfaz —React DOM y React Native no
+dibujan con las mismas etiquetas—, así que la paridad se copia a mano y hay que decirlo
+cuando se rompe. Ojo con lo que NativeWind no tiene: `last:`, `first-of-type:` y
+`tabular-nums` no llegan a React Native, así que el borde de la última fila se resuelve
+con el markup y no con una variante.
 
 **Agregar una pieza nueva es bienvenido**, con una condición: que la misma forma ya esté
 escrita en dos pantallas. Lo que aparece una sola vez se queda en su pantalla —una

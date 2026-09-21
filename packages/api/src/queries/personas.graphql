@@ -21,6 +21,7 @@ query Personas($grupoId: ID!) {
     equipos {
       id
       equipoId
+      tipo
       desde
       hasta
     }

@@ -1,4 +1,4 @@
-import { ErrorDeApi, useCrearPersona, useDistritos } from '@gps/api'
+import { ErrorDeApi, useCrearPersona, useGrupo } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import {
   etiquetaDeEdades,
@@ -24,7 +24,17 @@ import {
 import { type FormEvent, useState } from 'react'
 import { useLocation } from 'wouter'
 import { COLOR_DE_RAMA } from '../ramas'
-import { BOTON_PRINCIPAL, CAMPO, Campo, Chip, Falla, Titulo, Volver } from '../ui'
+import {
+  BOTON_PRINCIPAL,
+  CAMPO,
+  Campo,
+  Chip,
+  ELEGIBLE,
+  ELEGIDO,
+  Falla,
+  Titulo,
+  Volver,
+} from '../ui'
 
 type UnidadAbierta = Pick<Unidad, 'id' | 'rama' | 'nombre' | 'sexo'>
 
@@ -201,7 +211,7 @@ function Unidades(props: {
 }
 
 export function AltaDePersona(props: { grupoId: string }) {
-  const arbol = useDistritos()
+  const { grupo } = useGrupo(props.grupoId)
   const alta = useCrearPersona()
   const [, navegar] = useLocation()
   const hoy = new Date()
@@ -216,9 +226,6 @@ export function AltaDePersona(props: { grupoId: string }) {
   const [cargos, setCargos] = useState<DatosDeIngreso['cargos']>([])
   const [problemas, setProblemas] = useState<readonly Problema[]>([])
 
-  const grupo = arbol.data?.distritos
-    .flatMap((distrito) => distrito.grupos)
-    .find((uno) => uno.id === props.grupoId)
   const unidades: readonly UnidadAbierta[] = grupo?.unidades ?? []
 
   const problemaDe = (campo: Problema['campo']) =>
@@ -368,9 +375,7 @@ export function AltaDePersona(props: { grupoId: string }) {
                   type="button"
                   onClick={() => setCategoria(una.id)}
                   className={`min-h-12 flex-1 rounded-lg border text-base font-semibold ${
-                    categoria === una.id
-                      ? 'border-accent bg-accent text-accent-ink'
-                      : 'border-line-strong text-ink hover:bg-surface-3'
+                    categoria === una.id ? ELEGIDO : `${ELEGIBLE} text-ink`
                   }`}
                 >
                   {una.nombre}

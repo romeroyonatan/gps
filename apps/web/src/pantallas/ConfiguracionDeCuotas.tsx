@@ -1,11 +1,5 @@
 import { useTesoreria } from '@gps/api'
-import { Accion, Cargando, Falla, FILA, Titulo, Vacio, Volver } from '../ui'
-
-const pesos = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS',
-  maximumFractionDigits: 0,
-})
+import { Accion, Cargando, Falla, FILA, pesos, Titulo, Vacio, Volver } from '../ui'
 
 /** El historial de cuotas. Definir una es una tarea que termina y tiene su
  *  propia pantalla: acá sólo se mira lo que ya está, con la acción arriba. */

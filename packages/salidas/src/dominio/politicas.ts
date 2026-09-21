@@ -1,6 +1,6 @@
 import type { AccesoAlModulo, Actor, Alcance, Rol } from '@gps/core'
 import { tieneRol } from '@gps/core/roles'
-import type { FirmanteRequerido } from './firmas'
+import { type FirmanteRequerido, firmantesRequeridos } from './firmas'
 
 /** Jefatura y Secretaria administran los permisos de su grupo; director y
  *  comisionado entran porque son firmantes y necesitan leer lo que firman. */
@@ -40,4 +40,22 @@ const ROL_DEL_CARGO: Record<FirmanteRequerido['cargo'], Rol | undefined> = {
 export function puedeFirmarEnLaApp(actor: Actor, firmante: FirmanteRequerido): boolean {
   const rol = ROL_DEL_CARGO[firmante.cargo]
   return rol !== undefined && tieneRol(actor, [rol], firmante.ambito, firmante.ambitoId)
+}
+
+/** Si quien mira ocupa hoy ese cargo firmante del permiso de ese grupo.
+ *
+ *  Es `firmantesRequeridos` + `puedeFirmarEnLaApp` en una sola pregunta, que es
+ *  como la hacen los dos lados: tres pantallas y el servidor escribían el mismo
+ *  cruce a mano, y "pendiente de tu firma" tiene que querer decir lo mismo en
+ *  todas. Sin distrito todavía no se sabe quién es el comisionado, y entonces
+ *  nadie firma: es el estado de carga, no un permiso denegado. */
+export function puedeFirmarComo(
+  actor: Actor | null,
+  cargo: FirmanteRequerido['cargo'],
+  grupoId: string,
+  distritoId: string | undefined,
+): boolean {
+  if (actor === null || distritoId === undefined) return false
+  const firmante = firmantesRequeridos(grupoId, distritoId).find((uno) => uno.cargo === cargo)
+  return firmante !== undefined && puedeFirmarEnLaApp(actor, firmante)
 }

@@ -65,6 +65,21 @@ enum Categoria {
   beneficiario
 }
 
+type CobranzaDelDistrito {
+  cobrado: Int!
+  declararon: Int!
+
+  """
+  Facturado menos cobrado del período. No es el saldo de las cuentas.
+  """
+  deuda: Int!
+  distritoId: ID!
+  facturado: Int!
+  grupos: Int!
+  numero: Int!
+  zona: String!
+}
+
 type CuentaDeGrupo {
   cerrado: Boolean!
   grupoId: ID!
@@ -240,6 +255,11 @@ type IntegranteDeEquipo {
   equipoId: ID!
   hasta: String
   id: ID!
+
+  """
+  De qué equipo es. Sin esto la pantalla los dibuja a todos iguales.
+  """
+  tipo: TipoDeEquipo!
 }
 
 """
@@ -605,6 +625,11 @@ type Query {
   personas(grupoId: ID!): [Persona!]!
 
   """
+  Null si quien pregunta no es autoridad diocesana de Tesorería.
+  """
+  reporteDeCobranza(periodo: Int!): ReporteDeCobranza
+
+  """
   Devuelve la version de esta instancia.
   """
   version: Version!
@@ -620,6 +645,16 @@ enum Rama {
   raiders
   rovers
   scouts
+}
+
+type ReporteDeCobranza {
+  """
+  El cierre del período anterior, para comparar contra éste.
+  """
+  anterior: TotalesDelPeriodo!
+  periodo: Int!
+  porDistrito: [CobranzaDelDistrito!]!
+  totales: TotalesDelPeriodo!
 }
 
 type ResultadoDeReconciliacion {
@@ -718,6 +753,17 @@ enum TipoDeMovimientoDeTesoreria {
   anulacion_pago
   cargo_afiliacion
   pago
+}
+
+type TotalesDelPeriodo {
+  cobrado: Int!
+  declararon: Int!
+  deuda: Int!
+  distritos: Int!
+  facturado: Int!
+  grupos: Int!
+  periodo: Int!
+  personasCobradas: Int!
 }
 
 """

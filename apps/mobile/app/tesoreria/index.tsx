@@ -1,121 +1,197 @@
 import { useGenerarDeudasPendientes, useTesoreria } from '@gps/api'
 import { Link } from 'expo-router'
 import { useState } from 'react'
-import { Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native'
+import { Pressable, Text, TextInput, View } from 'react-native'
+import {
+  BotonPrincipal,
+  CAMPO,
+  Cargando,
+  Chip,
+  Falla,
+  Filtros,
+  Pantalla,
+  pesos,
+  Titulo,
+  Vacio,
+  Volver,
+} from '../../componentes/ui'
 
 type Filtro = 'todos' | 'deuda' | 'favor' | 'cero'
-const pesos = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS',
-  maximumFractionDigits: 0,
-})
 
-export default function Pantalla() {
+const FILTROS = [
+  { id: 'todos', etiqueta: 'Todos' },
+  { id: 'deuda', etiqueta: 'A cobrar' },
+  { id: 'favor', etiqueta: 'A favor' },
+  { id: 'cero', etiqueta: 'Sin deuda' },
+] as const satisfies readonly { id: Filtro; etiqueta: string }[]
+
+type Cuenta = NonNullable<ReturnType<typeof useTesoreria>['data']>['cuentasDeGrupos'][number]
+
+/** La tabla de siete columnas del escritorio no cabe en 393px: cada grupo es
+ *  una fila de 88px con el importe como dato principal a la derecha. */
+function FilaDeCuenta(props: { cuenta: Cuenta }) {
+  const { cuenta } = props
+  return (
+    <Link href={`/tesoreria/grupos/${cuenta.grupoId}`} asChild>
+      <Pressable className="min-h-[88px] flex-row items-center gap-3 border-b border-line py-3.5 active:bg-surface-3">
+        <View className="min-w-0 flex-1 gap-1.5">
+          <Text numberOfLines={1} className="text-base font-semibold text-ink">
+            Grupo Scout Nº{cuenta.numero} — {cuenta.nombre}
+          </Text>
+          <View className="flex-row items-center gap-2">
+            <Chip tono={cuenta.saldo > 0 ? 'warn' : cuenta.saldo < 0 ? 'ok' : 'neutro'}>
+              {cuenta.saldo > 0 ? 'A cobrar' : cuenta.saldo < 0 ? 'A favor' : 'Sin deuda'}
+            </Chip>
+            {cuenta.cerrado && <Text className="text-label text-ink-faint">Grupo cerrado</Text>}
+          </View>
+        </View>
+        {/* El signo y la palabra dicen de qué lado va el saldo; el color es
+            refuerzo, nunca el dato. */}
+        <View className="shrink-0 items-end gap-1">
+          <Text
+            className={`text-lg font-bold ${cuenta.saldo > 0 ? 'text-danger' : cuenta.saldo < 0 ? 'text-ok' : 'text-ink-faint'}`}
+          >
+            {cuenta.saldo === 0 ? '—' : pesos.format(Math.abs(cuenta.saldo))}
+          </Text>
+          <Text className="text-label text-ink-faint">
+            {cuenta.saldo > 0 ? 'de deuda' : cuenta.saldo < 0 ? 'a favor' : 'al día'}
+          </Text>
+        </View>
+      </Pressable>
+    </Link>
+  )
+}
+
+/** El total de un lado de la cuenta, escrito grande. Dos y no cuatro: en el
+ *  teléfono sólo entran los dos que se miran. */
+function Total(props: { titulo: string; importe: number; tono: 'danger' | 'ok' }) {
+  return (
+    <View
+      className={`flex-1 rounded-lg p-3 ${props.tono === 'danger' ? 'bg-danger-soft' : 'bg-ok-soft'}`}
+    >
+      <Text className={`text-label ${props.tono === 'danger' ? 'text-danger' : 'text-ok'}`}>
+        {props.titulo}
+      </Text>
+      <Text
+        className={`mt-1 text-xl font-bold ${props.tono === 'danger' ? 'text-danger' : 'text-ok'}`}
+      >
+        {pesos.format(props.importe)}
+      </Text>
+    </View>
+  )
+}
+
+export default function Pantalla_() {
   const consulta = useTesoreria()
   const generar = useGenerarDeudasPendientes()
   const [filtro, setFiltro] = useState<Filtro>('todos')
+  const [busqueda, setBusqueda] = useState('')
+
+  const todas = consulta.data?.cuentasDeGrupos ?? []
   const pendientes = consulta.data?.deudasPendientes
   // Null quiere decir "esto no es para vos": el enlace a configurar cuotas no
   // se muestra si no se van a poder configurar.
   const configura = consulta.data?.periodosConfigurablesDeAfiliacion != null
-  const cuentas = (consulta.data?.cuentasDeGrupos ?? []).filter((cuenta) =>
-    filtro === 'deuda'
-      ? cuenta.saldo > 0
-      : filtro === 'favor'
-        ? cuenta.saldo < 0
-        : filtro === 'cero'
-          ? cuenta.saldo === 0
-          : true,
-  )
+
+  const buscado = busqueda.trim().toLowerCase()
+  const cuentas = todas.filter((cuenta) => {
+    if (buscado && !`${cuenta.numero} ${cuenta.nombre}`.toLowerCase().includes(buscado))
+      return false
+    if (filtro === 'deuda') return cuenta.saldo > 0
+    if (filtro === 'favor') return cuenta.saldo < 0
+    if (filtro === 'cero') return cuenta.saldo === 0
+    return true
+  })
+
+  const sumar = (cuáles: readonly Cuenta[], signo: 1 | -1) =>
+    cuáles.reduce((total, una) => total + (una.saldo * signo > 0 ? Math.abs(una.saldo) : 0), 0)
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50">
-      <ScrollView contentContainerClassName="px-4 py-10">
-        <Link href="/" className="text-sm text-slate-500">
-          ← Inicio
+    <Pantalla>
+      <Volver href="/">Directorio</Volver>
+      <Titulo>Tesorería</Titulo>
+
+      {/* Las otras pantallas de Tesorería. En web esto es la barra de tareas
+          del rol; mobile todavía no tiene esa barra y quedan como enlaces
+          -ver la deuda de paridad en AGENT.md-. */}
+      <View className="mt-2 flex-row gap-4">
+        <Link href="/tesoreria/reportes" className="text-sm text-ink-muted">
+          Reportes →
         </Link>
-        <View className="mt-1 flex-row items-center justify-between gap-3">
-          <Text className="text-lg font-semibold text-slate-900">Tesorería</Text>
-          {configura && (
-            <Link href="/tesoreria/configuracion" className="text-sm text-slate-600">
-              Configurar cuotas
-            </Link>
-          )}
-        </View>
-        {consulta.isPending && (
-          <Text className="mt-8 text-sm text-slate-500">Consultando cuentas…</Text>
+        {configura && (
+          <Link href="/tesoreria/configuracion" className="text-sm text-ink-muted">
+            Cuotas →
+          </Link>
         )}
-        {consulta.error && (
-          <View className="mt-6 rounded-lg bg-red-50 p-4">
-            <Text className="text-sm text-red-800">{consulta.error.message}</Text>
-          </View>
-        )}
+      </View>
 
-        {pendientes && pendientes.cantidad > 0 && (
-          <View className="mt-6 rounded-lg bg-amber-50 p-4">
-            <Text className="text-sm text-amber-900">
-              Hay {pendientes.cantidad} deudas pendientes.
+      {consulta.isPending && <Cargando>Consultando cuentas…</Cargando>}
+      {consulta.error && <Falla>{consulta.error.message}</Falla>}
+
+      {todas.length > 0 && (
+        <View className="mt-4 flex-row gap-2">
+          <Total titulo="Deuda total" importe={sumar(todas, 1)} tono="danger" />
+          <Total titulo="A favor" importe={sumar(todas, -1)} tono="ok" />
+        </View>
+      )}
+
+      {/* Lo que exige acción va arriba de todo, y sólo aparece si hay algo que
+          hacer: un bloque destacado que dice "0" no destaca nada. */}
+      {pendientes && pendientes.cantidad > 0 && (
+        <View className="mt-4 gap-2 rounded-lg bg-warn-soft p-4">
+          <Text className="font-semibold text-warn">
+            Hay {pendientes.cantidad}{' '}
+            {pendientes.cantidad === 1 ? 'deuda pendiente' : 'deudas pendientes'}.
+          </Text>
+          {pendientes.periodosSinCuota.length > 0 && (
+            <Text className="text-label text-warn">
+              Falta configurar la cuota de: {pendientes.periodosSinCuota.join(', ')}.
             </Text>
-            {pendientes.periodosSinCuota.length > 0 && (
-              <Text className="mt-1 text-xs text-amber-800">
-                Falta cuota para: {pendientes.periodosSinCuota.join(', ')}.
-              </Text>
-            )}
-            <Pressable
-              disabled={generar.isPending}
-              onPress={() => generar.mutate()}
-              className="mt-3 rounded-lg bg-amber-900 px-3 py-2"
-            >
-              <Text className="text-center text-sm font-medium text-white">
-                {generar.isPending
-                  ? 'Generando…'
-                  : `Generar ${pendientes.cantidad} deudas pendientes`}
-              </Text>
-            </Pressable>
+          )}
+          <View className="mt-1">
+            <BotonPrincipal disabled={generar.isPending} onPress={() => generar.mutate()}>
+              {generar.isPending
+                ? 'Generando…'
+                : `Generar ${pendientes.cantidad} deudas pendientes`}
+            </BotonPrincipal>
           </View>
-        )}
+        </View>
+      )}
+      {generar.error && <Falla>{generar.error.message}</Falla>}
 
-        <Text className="mt-6 text-sm font-semibold text-slate-900">Cuentas de grupos</Text>
-        <View className="mt-2 flex-row flex-wrap gap-2">
-          {(['todos', 'deuda', 'favor', 'cero'] as const).map((uno) => (
-            <Pressable
-              key={uno}
-              onPress={() => setFiltro(uno)}
-              className={`rounded-full px-3 py-2 ${filtro === uno ? 'bg-slate-900' : 'bg-white'}`}
-            >
-              <Text className={`text-xs ${filtro === uno ? 'text-white' : 'text-slate-600'}`}>
-                {uno === 'todos'
-                  ? 'Todos'
-                  : uno === 'deuda'
-                    ? 'Con deuda'
-                    : uno === 'favor'
-                      ? 'Saldo a favor'
-                      : 'Saldo cero'}
-              </Text>
-            </Pressable>
-          ))}
+      <TextInput
+        accessibilityLabel="Buscar grupo"
+        placeholder="Buscar grupo"
+        value={busqueda}
+        onChangeText={setBusqueda}
+        className={`${CAMPO} mt-5`}
+      />
+      <View className="mt-3">
+        <Filtros opciones={FILTROS} valor={filtro} onElegir={setFiltro} />
+      </View>
+
+      <View className="mt-2">
+        {cuentas.map((cuenta) => (
+          <FilaDeCuenta key={cuenta.grupoId} cuenta={cuenta} />
+        ))}
+      </View>
+
+      {cuentas.length === 0 && !consulta.isPending && (
+        <Vacio>Ningún grupo coincide. Probá con otro filtro o limpiá la búsqueda.</Vacio>
+      )}
+
+      {/* El pie del escritorio, que dice cuánto suma lo que se está mirando:
+          el filtro cambia la pregunta y el total tiene que cambiar con ella. */}
+      {cuentas.length > 0 && (
+        <View className="mt-4 flex-row justify-between gap-3 rounded-lg bg-surface-3 p-3">
+          <Text className="text-sm text-ink-muted">
+            {cuentas.length} {cuentas.length === 1 ? 'grupo' : 'grupos'}
+          </Text>
+          <Text className="text-sm font-bold text-ink">
+            Deuda filtrada {pesos.format(sumar(cuentas, 1))}
+          </Text>
         </View>
-        <View className="mt-3 overflow-hidden rounded-lg bg-white">
-          {cuentas.map((cuenta) => (
-            <Link key={cuenta.grupoId} href={`/tesoreria/grupos/${cuenta.grupoId}`} asChild>
-              <Pressable className="flex-row items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-                <Text className="flex-1 text-sm">
-                  Grupo Scout Nº{cuenta.numero} - {cuenta.nombre}
-                </Text>
-                <Text
-                  className={`text-sm font-semibold ${cuenta.saldo > 0 ? 'text-red-700' : cuenta.saldo < 0 ? 'text-emerald-700' : 'text-slate-500'}`}
-                >
-                  {pesos.format(Math.abs(cuenta.saldo))}
-                  {cuenta.saldo < 0 ? ' a favor' : ''}
-                </Text>
-              </Pressable>
-            </Link>
-          ))}
-        </View>
-        {cuentas.length === 0 && !consulta.isPending && (
-          <Text className="mt-3 text-sm text-slate-500">No hay grupos para este filtro.</Text>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+      )}
+    </Pantalla>
   )
 }

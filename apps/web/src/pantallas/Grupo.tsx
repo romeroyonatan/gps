@@ -2,7 +2,7 @@ import { periodoDe } from '@gps/afiliacion/dominio'
 import {
   useActor,
   useAfiliadosEn,
-  useDistritos,
+  useGrupo,
   usePermisos,
   usePersonasDelGrupo,
   useTesoreria,
@@ -10,16 +10,20 @@ import {
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Rama } from '@gps/estructura/dominio'
 import type { TipoDeCargo } from '@gps/personas/dominio'
-import { firmantesRequeridos, puedeFirmarEnLaApp, repartirSalidas } from '@gps/salidas/dominio'
+import { puedeFirmarComo, repartirSalidas } from '@gps/salidas/dominio'
 import { Link } from 'wouter'
 import { COLOR_DE_RAMA } from '../ramas'
-import { BOTON_PRINCIPAL, Cargando, ChipDeRama, Falla, Seccion, Titulo, Vacio } from '../ui'
-
-const pesos = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS',
-  maximumFractionDigits: 0,
-})
+import {
+  BOTON_PRINCIPAL,
+  Cargando,
+  ChipDeRama,
+  Falla,
+  Pendiente,
+  Saldo,
+  Seccion,
+  Titulo,
+  Vacio,
+} from '../ui'
 
 /** La distribución por rama: barra de proporciones más una etiqueta por rama
  *  con su nombre escrito. El color nunca viaja solo. */
@@ -50,7 +54,8 @@ function PorRama(props: { total: number; ramas: readonly { rama: Rama; cuantos: 
 }
 
 export function Grupo(props: { id: string }) {
-  const arbol = useDistritos()
+  const arbol = useGrupo(props.id)
+  const { grupo, distrito } = arbol
   const lista = usePersonasDelGrupo(props.id)
   const permisos = usePermisos(props.id)
   const tesoreria = useTesoreria()
@@ -67,15 +72,6 @@ export function Grupo(props: { id: string }) {
     personas.map((persona) => persona.id),
   )
   const afiliados = new Set(consulta.data?.afiliadosEn ?? [])
-
-  // Reusa la query del arbol en vez de estrenar grupo(id): TanStack Query ya la
-  // tiene en cache porque venis de ahi, y de paso trae el distrito para el
-  // encabezado. Son quince grupos; el dia que deje de entrar en una query se
-  // agrega grupo(id) y se arregla en un solo lugar.
-  const distrito = arbol.data?.distritos.find((candidato) =>
-    candidato.grupos.some((grupo) => grupo.id === props.id),
-  )
-  const grupo = distrito?.grupos.find((candidato) => candidato.id === props.id)
 
   if (arbol.isPending || lista.isPending) return <Cargando>Consultando el grupo…</Cargando>
 
@@ -104,15 +100,8 @@ export function Grupo(props: { id: string }) {
   const enRamas = ramas.reduce((suma, una) => suma + una.cuantos, 0)
 
   // El reparto es la misma función pura que usa la pantalla de salidas, así
-  // que "espera tu firma" quiere decir lo mismo en los dos lados. Quién firma
-  // qué lo decide `puedeFirmarEnLaApp` contra los tres firmantes del permiso:
-  // sin distrito todavía no se sabe quién es el comisionado, y entonces nadie
-  // firma nada.
-  const firmantes = distrito ? firmantesRequeridos(props.id, distrito.id) : []
-  const puedoFirmar = (cargo: TipoDeCargo) => {
-    const firmante = firmantes.find((uno) => uno.cargo === cargo)
-    return actor !== null && firmante !== undefined && puedeFirmarEnLaApp(actor, firmante)
-  }
+  // que "espera tu firma" quiere decir lo mismo en los dos lados.
+  const puedoFirmar = (cargo: TipoDeCargo) => puedeFirmarComo(actor, cargo, props.id, distrito?.id)
   const reparto = repartirSalidas(
     permisos.data?.permisos ?? [],
     aFechaDeCalendario(hoy),
@@ -150,10 +139,8 @@ export function Grupo(props: { id: string }) {
         Grupo {grupo.numero} — {grupo.nombre}
       </Titulo>
 
-      {/* Lo que exige acción va arriba de todo, y sólo aparece si hay algo que
-          hacer: un bloque destacado que dice "0" no destaca nada. */}
       {esperanFirma > 0 && (
-        <div className="mt-5 rounded-lg bg-warn-soft p-4">
+        <Pendiente>
           <p className="font-semibold text-warn">
             {esperanFirma === 1
               ? '1 salida espera tu firma'
@@ -162,7 +149,7 @@ export function Grupo(props: { id: string }) {
           <Link href={`/grupos/${props.id}/salidas`} className={`${BOTON_PRINCIPAL} mt-3 sm:w-fit`}>
             Ver salidas
           </Link>
-        </div>
+        </Pendiente>
       )}
 
       <Seccion
@@ -183,17 +170,7 @@ export function Grupo(props: { id: string }) {
           titulo="Cuenta corriente"
           enlace={{ texto: 'Ver movimientos', href: `/tesoreria/grupos/${props.id}` }}
         >
-          {/* El saldo positivo es deuda: así lo guarda tesorería. El signo se
-              escribe, no se deduce del color. */}
-          <p
-            className={`mt-1.5 text-2xl font-bold tabular-nums ${cuenta.saldo > 0 ? 'text-danger' : 'text-ink'}`}
-          >
-            {cuenta.saldo > 0 ? '−' : ''}
-            {pesos.format(Math.abs(cuenta.saldo))}
-          </p>
-          <p className="mt-0.5 text-sm text-ink-muted">
-            {cuenta.saldo > 0 ? 'De deuda' : cuenta.saldo < 0 ? 'A favor del grupo' : 'Sin deuda'}
-          </p>
+          <Saldo importe={cuenta.saldo} className="mt-1.5" />
         </Seccion>
       )}
 

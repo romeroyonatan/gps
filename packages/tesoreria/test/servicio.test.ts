@@ -11,7 +11,7 @@ import {
   type Module,
   type Rol,
 } from '@gps/core'
-import type { Estructura, Grupo } from '@gps/estructura/dominio'
+import type { Distrito, Estructura, Grupo } from '@gps/estructura/dominio'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migraciones } from '../src/servidor/migraciones'
 import {
@@ -34,6 +34,15 @@ const GRUPO: Grupo = {
 }
 
 const OTRO_GRUPO: Grupo = { ...GRUPO, id: 'grupo_8', numero: 8, nombre: 'San Pablo' }
+
+const DISTRITO: Distrito = {
+  id: 'distrito_1',
+  numero: 1,
+  zona: 'Norte',
+  cerradoEn: null,
+  creadoEn: HORA,
+  actualizadoEn: HORA,
+}
 
 /** El alcance de una funcion concreta: es lo que distingue leer la cuenta del
  *  propio grupo de leer la del vecino. */
@@ -123,6 +132,7 @@ function montar(
     obtenerGrupo: async () => ({ ...GRUPO, unidades: [] }),
     distritoEstaAbierto: async () => true,
     listarGrupos: async () => [GRUPO, OTRO_GRUPO],
+    listarDistritosSinGrupos: async () => [DISTRITO],
     gruposAbiertosEn: async () => new Set([GRUPO.id]),
   }
   return { core, servicio: crearServicioDeTesoreria(core, afiliacion, estructura) }

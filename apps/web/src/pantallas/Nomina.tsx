@@ -1,5 +1,5 @@
 import { periodoDe } from '@gps/afiliacion/dominio'
-import { useAfiliadosEn, useDistritos, usePersonasDelGrupo } from '@gps/api'
+import { useAfiliadosEn, useGrupo, usePersonasDelGrupo } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import { type Rama, ramaDelCatalogo } from '@gps/estructura/dominio'
 import {
@@ -93,7 +93,8 @@ function Afiliacion(props: { afiliada: boolean; periodo: number }) {
 }
 
 export function Nomina(props: { grupoId: string }) {
-  const arbol = useDistritos()
+  const arbol = useGrupo(props.grupoId)
+  const { grupo, distrito } = arbol
   const lista = usePersonasDelGrupo(props.grupoId)
   const [busqueda, setBusqueda] = useState('')
   // 'todas' | 'sin-afiliar' | una rama. Uno solo: son recortes de la misma
@@ -108,11 +109,6 @@ export function Nomina(props: { grupoId: string }) {
     personas.map((persona) => persona.id),
   )
   const afiliados = new Set(consulta.data?.afiliadosEn ?? [])
-
-  const distrito = arbol.data?.distritos.find((candidato) =>
-    candidato.grupos.some((grupo) => grupo.id === props.grupoId),
-  )
-  const grupo = distrito?.grupos.find((candidato) => candidato.id === props.grupoId)
 
   if (arbol.isPending || lista.isPending) return <Cargando>Consultando la nómina…</Cargando>
 

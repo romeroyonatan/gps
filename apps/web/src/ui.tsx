@@ -38,6 +38,25 @@ export const BOTON_AL_MARGEN =
  *  pantalla: hoy hay una sola. */
 export const FILA = 'flex min-h-14 items-center gap-3 border-b border-line py-2 last:border-b-0'
 
+/** Elegido y elegible: el par de colores de todo control que se elige de a uno
+ *  —las píldoras de `Filtros`, los dos caminos de la firma, las categorías del
+ *  alta—. Son clases y no un `<Segmentado>` porque la forma cambia en cada
+ *  lugar (redondo, rectangular, al ancho de la fila) y el color no. */
+export const ELEGIDO = 'border-accent bg-accent text-accent-ink'
+export const ELEGIBLE = 'border-line-strong hover:bg-surface-3'
+
+/** La lista que de `md:` para arriba pasa a ser tabla: en el teléfono es una
+ *  lista suelta y en escritorio se encuadra. Es el mismo markup con otra
+ *  grilla, no dos pantallas paralelas. Las columnas las declara cada tabla
+ *  —no se parecen en nada entre sí—; lo que se comparte es el marco. */
+export const TABLA = 'mt-5 md:rounded-xl md:border md:border-line-strong'
+
+/** El pie de una `TABLA`: a la izquierda cuántos son, a la derecha el total. El
+ *  filtro cambia la pregunta, así que el total tiene que cambiar con ella. */
+export const PIE_DE_TABLA =
+  'mt-4 flex flex-wrap justify-between gap-3 rounded-lg bg-surface-3 px-4 py-3 text-sm ' +
+  'md:mt-0 md:rounded-none md:rounded-b-xl'
+
 /* ── Iconos ─────────────────────────────────────────────────────────────── */
 
 /** El único dibujo de la guía: trazo de 1.7, sin relleno, hereda el color del
@@ -238,7 +257,43 @@ export function ChipDeRama(props: { rama: Rama; children?: ReactNode }) {
   )
 }
 
+/* ── Plata ──────────────────────────────────────────────────────────────── */
+
+/** Los pesos, escritos igual en todas las pantallas. Sin centavos: la cuota se
+ *  define en pesos enteros y los centavos son ruido en una lista de quince
+ *  grupos. Es el gemelo del de `apps/mobile/componentes/ui.tsx`. */
+export const pesos = new Intl.NumberFormat('es-AR', {
+  style: 'currency',
+  currency: 'ARS',
+  maximumFractionDigits: 0,
+})
+
+/** El saldo de la cuenta de un grupo, con su lectura escrita debajo.
+ *
+ *  El saldo positivo es deuda: así lo guarda tesorería. El signo se escribe y
+ *  el color es refuerzo, nunca el dato —la misma regla que `Chip`—. */
+export function Saldo(props: { importe: number; className?: string }) {
+  return (
+    <div className={props.className}>
+      <p className={`text-2xl font-bold tabular-nums ${props.importe > 0 ? 'text-danger' : ''}`}>
+        {props.importe > 0 ? '−' : ''}
+        {pesos.format(Math.abs(props.importe))}
+      </p>
+      <p className="mt-0.5 text-sm text-ink-muted">
+        {props.importe > 0 ? 'De deuda' : props.importe < 0 ? 'A favor del grupo' : 'Sin deuda'}.
+      </p>
+    </div>
+  )
+}
+
 /* ── Avisos ─────────────────────────────────────────────────────────────── */
+
+/** Lo que exige acción, arriba de todo. Sólo se dibuja si hay algo que hacer:
+ *  un bloque destacado que dice "0" no destaca nada, así que la pantalla no lo
+ *  monta en vez de montarlo vacío. */
+export function Pendiente(props: { children: ReactNode }) {
+  return <section className="mt-5 rounded-lg bg-warn-soft p-4">{props.children}</section>
+}
 
 /** Algo salió mal. `break-words` porque el mensaje del servidor puede traer un
  *  id largo sin espacios y si no desborda el teléfono. */

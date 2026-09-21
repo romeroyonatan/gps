@@ -104,6 +104,9 @@ function estructuraFalsa(
     async obtenerGrupo() {
       throw new Error('afiliacion no deberia llamar a obtenerGrupo')
     },
+    async listarDistritosSinGrupos() {
+      throw new Error('afiliacion no deberia llamar a listarDistritosSinGrupos')
+    },
     async listarGrupos() {
       throw new Error('afiliacion no deberia llamar a listarGrupos')
     },

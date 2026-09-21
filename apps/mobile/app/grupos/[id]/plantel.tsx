@@ -118,7 +118,12 @@ export default function Pantalla() {
             const jefatura = persona.cargos.find(
               (cargo) => cargo.cargo === JEFATURA && vigente(cargo, ahora),
             )
-            const secretaria = persona.equipos.find((equipo) => vigente(equipo, ahora))
+            // Por tipo y no el primero vigente: alguien del grupo puede estar
+            // además en un equipo diocesano, y sin el filtro se dibujaba como
+            // Secretaría —y quitarla revocaba el equipo equivocado—.
+            const secretaria = persona.equipos.find(
+              (equipo) => equipo.tipo === SECRETARIA && vigente(equipo, ahora),
+            )
 
             return (
               <View key={persona.id} className="border-b border-slate-200 px-4 py-3">
