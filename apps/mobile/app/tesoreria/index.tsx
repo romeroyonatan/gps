@@ -1,109 +1,97 @@
 import { useGenerarDeudasPendientes, useTesoreria } from '@gps/api'
 import { Link } from 'expo-router'
 import { useState } from 'react'
-import { Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native'
+import { Pressable, ScrollView, Text, View } from 'react-native'
+import { Boton, Cargando, Falla, FILA, Filtros, Seccion, Titulo, Vacio, Volver } from '../../src/ui'
 
 type Filtro = 'todos' | 'deuda' | 'favor' | 'cero'
+
 const pesos = new Intl.NumberFormat('es-AR', {
   style: 'currency',
   currency: 'ARS',
   maximumFractionDigits: 0,
 })
 
+const FILTROS = [
+  { id: 'todos', etiqueta: 'Todos' },
+  { id: 'deuda', etiqueta: 'Con deuda' },
+  { id: 'favor', etiqueta: 'A favor' },
+  { id: 'cero', etiqueta: 'En cero' },
+] as const satisfies readonly { id: Filtro; etiqueta: string }[]
+
 export default function Pantalla() {
   const consulta = useTesoreria()
   const generar = useGenerarDeudasPendientes()
   const [filtro, setFiltro] = useState<Filtro>('todos')
+
+  const cuentas = (consulta.data?.cuentasDeGrupos ?? []).filter((cuenta) => {
+    if (filtro === 'deuda') return cuenta.saldo > 0
+    if (filtro === 'favor') return cuenta.saldo < 0
+    if (filtro === 'cero') return cuenta.saldo === 0
+    return true
+  })
   const pendientes = consulta.data?.deudasPendientes
   // Null quiere decir "esto no es para vos": el enlace a configurar cuotas no
   // se muestra si no se van a poder configurar.
   const configura = consulta.data?.periodosConfigurablesDeAfiliacion != null
-  const cuentas = (consulta.data?.cuentasDeGrupos ?? []).filter((cuenta) =>
-    filtro === 'deuda'
-      ? cuenta.saldo > 0
-      : filtro === 'favor'
-        ? cuenta.saldo < 0
-        : filtro === 'cero'
-          ? cuenta.saldo === 0
-          : true,
-  )
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50">
-      <ScrollView contentContainerClassName="px-4 py-10">
-        <Link href="/" className="text-sm text-slate-500">
-          ← Inicio
-        </Link>
-        <View className="mt-1 flex-row items-center justify-between gap-3">
-          <Text className="text-lg font-semibold text-slate-900">Tesorería</Text>
-          {configura && (
-            <Link href="/tesoreria/configuracion" className="text-sm text-slate-600">
-              Configurar cuotas
-            </Link>
-          )}
-        </View>
-        {consulta.isPending && (
-          <Text className="mt-8 text-sm text-slate-500">Consultando cuentas…</Text>
-        )}
-        {consulta.error && (
-          <View className="mt-6 rounded-lg bg-red-50 p-4">
-            <Text className="text-sm text-red-800">{consulta.error.message}</Text>
-          </View>
-        )}
+    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-10">
+      <Volver href="/">Directorio</Volver>
+      <Titulo
+        enlace={configura ? { texto: 'Cuotas', href: '/tesoreria/configuracion' } : undefined}
+      >
+        Tesorería
+      </Titulo>
 
-        {pendientes && pendientes.cantidad > 0 && (
-          <View className="mt-6 rounded-lg bg-amber-50 p-4">
-            <Text className="text-sm text-amber-900">
-              Hay {pendientes.cantidad} deudas pendientes.
+      {consulta.isPending && <Cargando>Consultando cuentas…</Cargando>}
+      {consulta.error && <Falla>{consulta.error.message}</Falla>}
+
+      {/* Lo que exige acción va arriba de todo, y sólo aparece si hay algo
+            que hacer: un bloque destacado que dice "0" no destaca nada. */}
+      {pendientes && pendientes.cantidad > 0 && (
+        <View className="mt-5 rounded-lg bg-warn-soft p-4">
+          <Text className="font-semibold text-warn">
+            Hay {pendientes.cantidad}{' '}
+            {pendientes.cantidad === 1 ? 'deuda pendiente' : 'deudas pendientes'}.
+          </Text>
+          {pendientes.periodosSinCuota.length > 0 && (
+            <Text className="mt-1 text-label text-warn">
+              Falta configurar la cuota de: {pendientes.periodosSinCuota.join(', ')}.
             </Text>
-            {pendientes.periodosSinCuota.length > 0 && (
-              <Text className="mt-1 text-xs text-amber-800">
-                Falta cuota para: {pendientes.periodosSinCuota.join(', ')}.
-              </Text>
-            )}
-            <Pressable
-              disabled={generar.isPending}
-              onPress={() => generar.mutate()}
-              className="mt-3 rounded-lg bg-amber-900 px-3 py-2"
-            >
-              <Text className="text-center text-sm font-medium text-white">
-                {generar.isPending
-                  ? 'Generando…'
-                  : `Generar ${pendientes.cantidad} deudas pendientes`}
-              </Text>
-            </Pressable>
+          )}
+          <View className="mt-3">
+            <Boton disabled={generar.isPending} onPress={() => generar.mutate()}>
+              {generar.isPending
+                ? 'Generando…'
+                : `Generar ${pendientes.cantidad} deudas pendientes`}
+            </Boton>
           </View>
-        )}
-
-        <Text className="mt-6 text-sm font-semibold text-slate-900">Cuentas de grupos</Text>
-        <View className="mt-2 flex-row flex-wrap gap-2">
-          {(['todos', 'deuda', 'favor', 'cero'] as const).map((uno) => (
-            <Pressable
-              key={uno}
-              onPress={() => setFiltro(uno)}
-              className={`rounded-full px-3 py-2 ${filtro === uno ? 'bg-slate-900' : 'bg-white'}`}
-            >
-              <Text className={`text-xs ${filtro === uno ? 'text-white' : 'text-slate-600'}`}>
-                {uno === 'todos'
-                  ? 'Todos'
-                  : uno === 'deuda'
-                    ? 'Con deuda'
-                    : uno === 'favor'
-                      ? 'Saldo a favor'
-                      : 'Saldo cero'}
-              </Text>
-            </Pressable>
-          ))}
         </View>
-        <View className="mt-3 overflow-hidden rounded-lg bg-white">
+      )}
+
+      <Seccion titulo="Cuentas de grupos" cuantos={cuentas.length}>
+        <View className="mt-3">
+          <Filtros opciones={FILTROS} valor={filtro} onElegir={setFiltro} />
+        </View>
+        <View className="mt-3">
           {cuentas.map((cuenta) => (
             <Link key={cuenta.grupoId} href={`/tesoreria/grupos/${cuenta.grupoId}`} asChild>
-              <Pressable className="flex-row items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-                <Text className="flex-1 text-sm">
-                  Grupo Scout Nº{cuenta.numero} - {cuenta.nombre}
+              <Pressable className={`${FILA} justify-between active:bg-surface-3`}>
+                <Text className="min-w-0 flex-1 text-sm font-semibold text-ink">
+                  Grupo Scout Nº{cuenta.numero} — {cuenta.nombre}
+                  {cuenta.cerrado ? ' (cerrado)' : ''}
                 </Text>
+                {/* El signo y la palabra dicen de qué lado va el saldo; el
+                      color es refuerzo, nunca el dato. */}
                 <Text
-                  className={`text-sm font-semibold ${cuenta.saldo > 0 ? 'text-red-700' : cuenta.saldo < 0 ? 'text-emerald-700' : 'text-slate-500'}`}
+                  className={`shrink-0 text-sm font-bold ${
+                    cuenta.saldo > 0
+                      ? 'text-danger'
+                      : cuenta.saldo < 0
+                        ? 'text-ok'
+                        : 'text-ink-muted'
+                  }`}
                 >
                   {pesos.format(Math.abs(cuenta.saldo))}
                   {cuenta.saldo < 0 ? ' a favor' : ''}
@@ -113,9 +101,9 @@ export default function Pantalla() {
           ))}
         </View>
         {cuentas.length === 0 && !consulta.isPending && (
-          <Text className="mt-3 text-sm text-slate-500">No hay grupos para este filtro.</Text>
+          <Vacio>No hay grupos para este filtro.</Vacio>
         )}
-      </ScrollView>
-    </SafeAreaView>
+      </Seccion>
+    </ScrollView>
   )
 }

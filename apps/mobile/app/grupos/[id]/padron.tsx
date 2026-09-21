@@ -11,28 +11,9 @@ import {
 } from '@gps/personas/dominio'
 import { useLocalSearchParams } from 'expo-router'
 import { ScrollView, Text, View } from 'react-native'
-import { AltaDePersona } from '../../../componentes/AltaDePersona'
-import { BarraDeSesion } from '../../../src/BarraDeSesion'
+import { Accion, Cargando, Chip, Falla, Titulo, Vacio } from '../../../src/ui'
 
 type Persona = NonNullable<ReturnType<typeof usePersonasDelGrupo>['data']>['personas'][number]
-
-/** El estado se lee, no se adivina: la píldora siempre lleva su texto y el
- *  color es refuerzo. */
-function Chip(props: { tono: 'ok' | 'warn'; children: string }) {
-  const tonos = {
-    ok: { caja: 'bg-ok-soft', letra: 'text-ok' },
-    warn: { caja: 'bg-warn-soft', letra: 'text-warn' },
-  }
-  return (
-    <View
-      className={`min-h-[26px] justify-center rounded-full px-2.5 py-0.5 ${tonos[props.tono].caja}`}
-    >
-      <Text className={`text-label font-semibold ${tonos[props.tono].letra}`}>
-        {props.children}
-      </Text>
-    </View>
-  )
-}
 
 function FilaDePersona(props: { persona: Persona; hoy: Date; afiliada: boolean; periodo: number }) {
   // El "hasta" generado es opcional (string | null | undefined); el del
@@ -64,7 +45,7 @@ function FilaDePersona(props: { persona: Persona; hoy: Date; afiliada: boolean; 
   )
 }
 
-function Seccion(props: {
+function Unidad(props: {
   titulo: string
   detalle?: string
   personas: readonly Persona[]
@@ -122,23 +103,22 @@ export default function Pantalla() {
     .find((candidato) => candidato.id === id)
 
   return (
-    <ScrollView contentContainerClassName="px-4 pb-6">
-      <BarraDeSesion />
-      <Text className="mt-4 text-2xl font-bold text-ink">Padrón</Text>
+    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-6">
+      <Titulo>Padrón</Titulo>
 
-      {(arbol.isPending || lista.isPending) && (
-        <Text className="mt-8 text-sm text-ink-muted">Consultando el grupo…</Text>
-      )}
+      {(arbol.isPending || lista.isPending) && <Cargando>Consultando el grupo…</Cargando>}
       {(arbol.error ?? lista.error) && (
-        <View className="mt-8 rounded-lg bg-danger-soft p-4">
-          <Text className="text-sm text-danger">
-            No se pudo consultar el grupo: {(arbol.error ?? lista.error)?.message}
-          </Text>
-        </View>
+        <Falla>No se pudo consultar el grupo: {(arbol.error ?? lista.error)?.message}</Falla>
       )}
 
       {grupo && (
         <>
+          {/* La acción arriba de la lista, como pide la guía: nunca un
+              formulario colgado abajo. */}
+          <View className="mt-5">
+            <Accion href={`/grupos/${id}/alta`}>Alta de persona</Accion>
+          </View>
+
           {/* Ya vienen ordenadas por el servidor: por catalogo y, dentro de una
               rama, por nombre. Los dirigentes antes que los beneficiarios, que
               son los que uno busca cuando abre la unidad. Una unidad abierta
@@ -147,7 +127,7 @@ export default function Pantalla() {
             const suyas = personas.filter((persona) => persona.pertenencia.unidadId === unidad.id)
             const rama = ramaDelCatalogo(unidad.rama)
             return (
-              <Seccion
+              <Unidad
                 key={unidad.id}
                 titulo={unidad.nombre}
                 detalle={
@@ -164,23 +144,15 @@ export default function Pantalla() {
             )
           })}
 
-          {grupo.unidades.length === 0 && (
-            <View className="mt-6 rounded-lg border border-dashed border-line-strong p-4">
-              <Text className="text-sm text-ink-muted">
-                El grupo todavía no abrió ninguna unidad.
-              </Text>
-            </View>
-          )}
+          {grupo.unidades.length === 0 && <Vacio>El grupo todavía no abrió ninguna unidad.</Vacio>}
 
-          <Seccion
+          <Unidad
             titulo="Adherentes"
             personas={personas.filter((p) => p.pertenencia.categoria === 'adherente')}
             hoy={hoy}
             afiliados={afiliados}
             periodo={periodo}
           />
-
-          <AltaDePersona grupoId={id} unidadesAbiertas={grupo.unidades} />
         </>
       )}
     </ScrollView>

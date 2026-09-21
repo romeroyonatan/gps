@@ -13,8 +13,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
 import Constants from 'expo-constants'
 import { router, Stack, usePathname } from 'expo-router'
+import { StatusBar } from 'expo-status-bar'
+import { colorScheme } from 'nativewind'
 import { useEffect, useRef } from 'react'
 import { Text, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { BarraDeSesion } from '../src/BarraDeSesion'
+import { BarraDeTareas } from '../src/BarraDeTareas'
 import {
   ElegirRol,
   inicioDelRol,
@@ -25,6 +30,14 @@ import {
 import { Ingreso } from '../src/Ingreso'
 import { secretoDeSesion } from '../src/sesion'
 import '../global.css'
+
+// El oscuro sigue al sistema. Los tokens lo encienden con la clase `dark`
+// -`tokens.css` los redefine en `.dark:root`, y así vale igual para la web-,
+// que con `darkMode: 'class'` NativeWind no prende sola: por omisión se queda
+// en claro hasta que alguien le dice qué seguir. El jefe de grupo abre la app
+// de noche antes de la reunión, así que sigue al aparato y no a una
+// preferencia propia que habría que inventar y guardar.
+colorScheme.set('system')
 
 const urlDeLaApi =
   (Constants.expoConfig?.extra?.apiUrl as string | undefined) ??
@@ -93,9 +106,26 @@ function ConSesion(props: { actor: Actor; nombre: string | null }) {
     )
   }
 
+  // El grupo sobre el que manda el rol activo, si manda sobre uno: es lo que
+  // hace aparecer el menú de tareas, igual que en la web.
+  const grupoDelRol = rol.activo.ambito.tipo === 'grupo' ? rol.activo.ambito.id : null
+
+  // La cáscara: barra de sesión arriba, contenido en el medio, menú abajo. Las
+  // dos barras viven acá y no adentro de cada pantalla, que es lo que las hace
+  // quedarse quietas mientras la lista scrollea.
   return (
     <ProveedorDeRol rol={rol}>
-      <Stack screenOptions={{ headerShown: false }} />
+      <SafeAreaView className="flex-1 bg-surface" edges={['top']}>
+        {/* `auto` da vuelta la hora y la batería con el tema. */}
+        <StatusBar style="auto" />
+        <BarraDeSesion />
+        <View className="flex-1 bg-surface">
+          <Stack
+            screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}
+          />
+        </View>
+        {grupoDelRol && <BarraDeTareas grupoId={grupoDelRol} />}
+      </SafeAreaView>
     </ProveedorDeRol>
   )
 }

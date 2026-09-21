@@ -1,4 +1,4 @@
-const { colors, fontSize } = require('@gps/diseno/tailwind')
+const { colors, fontSize, variablesOscuras } = require('@gps/diseno/tailwind')
 
 module.exports = {
   // `src/` va en la lista: ahí viven el ingreso, la barra de sesión y el
@@ -7,5 +7,6 @@ module.exports = {
   presets: [require('nativewind/preset')],
   darkMode: 'class',
   theme: { extend: { colors, fontSize } },
-  plugins: [],
+  // Ver `variablesOscuras`: sin esto el oscuro no se enciende en el teléfono.
+  plugins: [variablesOscuras],
 }

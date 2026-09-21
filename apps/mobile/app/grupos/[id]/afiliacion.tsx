@@ -1,27 +1,28 @@
 import { useDeclaraciones, useDeclararAfiliacion } from '@gps/api'
 import { nombreDelTipo } from '@gps/personas/dominio'
-import { Link, useLocalSearchParams } from 'expo-router'
+import { useLocalSearchParams } from 'expo-router'
 import { Pressable, ScrollView, Text, View } from 'react-native'
+import { Cargando, Chip, Falla, FILA, Titulo, Vacio, Volver } from '../../../src/ui'
 
 type Declaracion = NonNullable<ReturnType<typeof useDeclaraciones>['data']>['declaraciones'][number]
 
 function Nomina(props: { declaracion: Declaracion }) {
   const aCobrar = new Set(props.declaracion.aCobrar.map((uno) => uno.personaId))
   return (
-    <View className="mt-2 overflow-hidden rounded-lg bg-white">
+    <View className="mt-2">
       {props.declaracion.afiliados.map((afiliado) => (
-        <View key={afiliado.personaId} className="border-b border-slate-200 px-4 py-3">
-          <Text className="text-sm font-medium text-slate-900">
-            {afiliado.apellidos}, {afiliado.nombres}
-          </Text>
-          <Text className="mt-0.5 text-xs text-slate-500">
-            {nombreDelTipo(afiliado.tipoDeDocumento)} {afiliado.numeroDeDocumento}
-            {aCobrar.has(afiliado.personaId) ? (
-              <Text className="text-amber-800"> · a cobrar</Text>
-            ) : (
-              <Text className="text-slate-400"> · ya afiliada</Text>
-            )}
-          </Text>
+        <View key={afiliado.personaId} className={FILA}>
+          <View className="min-w-0 flex-1">
+            <Text className="text-sm font-semibold text-ink">
+              {afiliado.apellidos}, {afiliado.nombres}
+            </Text>
+            <Text className="mt-0.5 text-xs text-ink-muted">
+              {nombreDelTipo(afiliado.tipoDeDocumento)} {afiliado.numeroDeDocumento}
+            </Text>
+          </View>
+          <Chip tono={aCobrar.has(afiliado.personaId) ? 'warn' : 'neutro'}>
+            {aCobrar.has(afiliado.personaId) ? 'A cobrar' : 'Ya afiliada'}
+          </Chip>
         </View>
       ))}
     </View>
@@ -34,63 +35,47 @@ export default function Pantalla() {
   const declarar = useDeclararAfiliacion()
 
   return (
-    <View className="flex-1 bg-slate-50">
-      <ScrollView contentContainerClassName="px-4 py-10">
-        <Link href={`/grupos/${id}`} className="text-sm text-slate-500">
-          ← Grupo
-        </Link>
-        <Text className="mt-1 text-lg font-semibold text-slate-900">Afiliación</Text>
+    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-10">
+      <Volver href={`/grupos/${id}`}>Grupo</Volver>
+      <Titulo>Declaraciones de afiliación</Titulo>
 
-        {consulta.isPending && <Text className="mt-8 text-sm text-slate-500">Consultando…</Text>}
+      {consulta.isPending && <Cargando>Consultando…</Cargando>}
+      {consulta.error && (
+        <Falla>No se pudieron consultar las declaraciones: {consulta.error.message}</Falla>
+      )}
 
-        {consulta.error && (
-          <View className="mt-8 rounded-lg bg-red-50 p-4">
-            <Text className="text-sm text-red-800">
-              No se pudieron consultar las declaraciones: {consulta.error.message}
-            </Text>
-          </View>
-        )}
-
-        {(consulta.data?.declaraciones ?? []).map((declaracion) => (
-          <View key={declaracion.id} className="mt-6">
-            <Text className="text-sm font-semibold text-slate-900">
-              {declaracion.fecha}
-              <Text className="font-normal text-slate-400">
-                {' '}
-                período {declaracion.periodo} · {declaracion.afiliados.length} en la nómina ·{' '}
-                {declaracion.aCobrar.length} a cobrar
-              </Text>
-            </Text>
-            <Nomina declaracion={declaracion} />
-          </View>
-        ))}
-
-        {consulta.data?.declaraciones.length === 0 && (
-          <View className="mt-6 rounded-lg bg-white p-4">
-            <Text className="text-sm text-slate-500">
-              El grupo todavía no tiene ninguna declaración.
-            </Text>
-          </View>
-        )}
-
-        {/* Lo menos frecuente, asi que va al final y no compite por lugar. */}
-        <Pressable
-          disabled={declarar.isPending}
-          onPress={() => declarar.mutate({ grupoId: id })}
-          className="mt-8 rounded-lg bg-slate-900 px-4 py-3"
-          style={declarar.isPending ? { opacity: 0.5 } : undefined}
-        >
-          <Text className="text-center text-sm font-medium text-white">
-            {declarar.isPending ? 'Declarando…' : 'Declarar afiliación extraordinaria'}
+      {(consulta.data?.declaraciones ?? []).map((declaracion) => (
+        <View key={declaracion.id} className="mt-6">
+          <Text className="text-lg font-bold text-ink">{declaracion.fecha}</Text>
+          <Text className="mt-0.5 text-label text-ink-muted">
+            Período {declaracion.periodo} · {declaracion.afiliados.length} en la nómina ·{' '}
+            {declaracion.aCobrar.length} a cobrar
           </Text>
-        </Pressable>
+          <Nomina declaracion={declaracion} />
+        </View>
+      ))}
 
-        {declarar.error && (
-          <View className="mt-2 rounded-lg bg-red-50 p-4">
-            <Text className="text-sm text-red-800">{declarar.error.message}</Text>
-          </View>
-        )}
-      </ScrollView>
-    </View>
+      {consulta.data?.declaraciones.length === 0 && (
+        <Vacio>El grupo todavía no tiene ninguna declaración.</Vacio>
+      )}
+
+      {/* Lo menos frecuente, así que va al final y no compite por lugar. Es el
+          botón secundario y no el negro: declarar fuera de término no es la
+          acción de esta pantalla, es la excepción. */}
+      <Pressable
+        accessibilityRole="button"
+        disabled={declarar.isPending}
+        onPress={() => declarar.mutate({ grupoId: id })}
+        className={`mt-8 min-h-12 items-center justify-center rounded-lg border border-line-strong px-3.5 ${
+          declarar.isPending ? 'opacity-40' : ''
+        }`}
+      >
+        <Text className="text-sm font-semibold text-ink">
+          {declarar.isPending ? 'Declarando…' : 'Declarar afiliación extraordinaria'}
+        </Text>
+      </Pressable>
+
+      {declarar.error && <Falla>{declarar.error.message}</Falla>}
+    </ScrollView>
   )
 }

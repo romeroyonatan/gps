@@ -38,71 +38,24 @@ import { useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
 import { Alert, Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { PadDeFirma } from '../../../componentes/PadDeFirma'
-import { BarraDeSesion } from '../../../src/BarraDeSesion'
+import { Aviso, Boton, BotonSecundario, Cargando, Chip, Falla, Titulo } from '../../../src/ui'
 
 type Permiso = PermisosQuery['permisos'][number]
 
 const CLASE_DE_INPUT = 'min-h-12 rounded-lg border border-line-strong px-3 py-2 text-base text-ink'
 
 /** El estado se lee, no se adivina: la píldora lleva su texto escrito y el
- *  color es refuerzo. */
-const TONO_DE_ESTADO: Record<string, string> = {
-  borrador: 'bg-surface-3 text-ink-muted',
-  emitido: 'bg-warn-soft text-warn',
-  firmado: 'bg-ok-soft text-ok',
-  anulado: 'bg-surface-3 text-ink-faint',
-}
+ *  color es refuerzo. El tono lo elige el estado; el resto lo pone `Chip`. */
+const TONO_DE_ESTADO = {
+  borrador: 'neutro',
+  emitido: 'warn',
+  firmado: 'ok',
+  anulado: 'neutro',
+} as const
 
 function Etiqueta(props: { estado: string }) {
-  const tono = TONO_DE_ESTADO[props.estado] ?? 'bg-surface-3 text-ink-muted'
-  const [caja, letra] = tono.split(' ')
-  return (
-    <View className={`min-h-[26px] justify-center rounded-full px-2.5 py-0.5 ${caja}`}>
-      <Text className={`text-label font-semibold ${letra}`}>{props.estado}</Text>
-    </View>
-  )
-}
-
-/** El botón negro: la acción principal de cada bloque. 48px de alto, el
- *  objetivo táctil de la guía. */
-function Boton(props: { onPress: () => void; disabled?: boolean; children: string }) {
-  return (
-    <Pressable
-      onPress={props.onPress}
-      disabled={props.disabled}
-      className={`min-h-12 items-center justify-center rounded-lg bg-accent px-4 ${props.disabled ? 'opacity-50' : ''}`}
-    >
-      <Text className="text-base font-semibold text-accent-ink">{props.children}</Text>
-    </Pressable>
-  )
-}
-
-function BotonSecundario(props: { onPress: () => void; children: string }) {
-  return (
-    <Pressable
-      onPress={props.onPress}
-      className="min-h-12 items-center justify-center rounded-lg border border-line-strong px-4"
-    >
-      <Text className="text-sm font-medium text-ink">{props.children}</Text>
-    </Pressable>
-  )
-}
-
-function Falla(props: { children: string | undefined }) {
-  if (!props.children) return null
-  return (
-    <View className="mt-2 rounded-lg bg-danger-soft p-3">
-      <Text className="text-xs text-danger">{props.children}</Text>
-    </View>
-  )
-}
-
-function Aviso(props: { children: string }) {
-  return (
-    <View className="mt-2 rounded-lg bg-warn-soft p-3">
-      <Text className="text-xs text-warn">{props.children}</Text>
-    </View>
-  )
+  const tono = TONO_DE_ESTADO[props.estado as keyof typeof TONO_DE_ESTADO] ?? 'neutro'
+  return <Chip tono={tono}>{props.estado}</Chip>
 }
 
 function Casilla(props: { marcada: boolean; onCambiar: () => void; children: React.ReactNode }) {
@@ -603,17 +556,12 @@ export default function Pantalla() {
   const firmantes = distrito ? firmantesRequeridos(id, distrito.id) : []
 
   return (
-    <ScrollView contentContainerClassName="px-4 pb-6">
-      <BarraDeSesion />
-      <Text className="mt-4 text-2xl font-bold text-ink">Permisos de salida</Text>
+    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-6">
+      <Titulo>Permisos de salida</Titulo>
 
-      {consulta.isPending && <Text className="mt-8 text-sm text-ink-muted">Consultando…</Text>}
+      {consulta.isPending && <Cargando>Consultando…</Cargando>}
       {consulta.error && (
-        <View className="mt-8 rounded-lg bg-danger-soft p-4">
-          <Text className="text-sm text-danger">
-            No se pudieron consultar los permisos: {consulta.error.message}
-          </Text>
-        </View>
+        <Falla>No se pudieron consultar los permisos: {consulta.error.message}</Falla>
       )}
 
       {actor &&

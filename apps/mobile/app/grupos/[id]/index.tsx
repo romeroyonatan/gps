@@ -9,11 +9,12 @@ import {
   useTesoreria,
 } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
-import { type Rama, ramaDelCatalogo } from '@gps/estructura/dominio'
+import type { Rama } from '@gps/estructura/dominio'
 import { firmantesRequeridos, puedeFirmarEnLaApp, repartirSalidas } from '@gps/salidas/dominio'
-import { Link, useLocalSearchParams } from 'expo-router'
+import { Link, router, useLocalSearchParams } from 'expo-router'
 import { Pressable, ScrollView, Text, View } from 'react-native'
-import { BarraDeSesion } from '../../../src/BarraDeSesion'
+import { COLOR_DE_RAMA } from '../../../src/ramas'
+import { Boton, Cargando, ChipDeRama, Falla, Seccion, Vacio, Volver } from '../../../src/ui'
 
 type Persona = NonNullable<ReturnType<typeof usePersonasDelGrupo>['data']>['personas'][number]
 type Permiso = NonNullable<ReturnType<typeof usePermisos>['data']>['permisos'][number]
@@ -23,17 +24,6 @@ const pesos = new Intl.NumberFormat('es-AR', {
   currency: 'ARS',
   maximumFractionDigits: 0,
 })
-
-/** El color de rama escrito entero, no armado con plantilla: Tailwind lee las
- *  clases del fuente y una interpolada nunca se genera. */
-const COLOR_DE_RAMA: Record<Rama, string> = {
-  castores: 'bg-rama-castores',
-  lobatos: 'bg-rama-lobatos',
-  scouts: 'bg-rama-scouts',
-  raiders: 'bg-rama-raiders',
-  rovers: 'bg-rama-rovers',
-  adultos: 'bg-rama-adultos',
-}
 
 /** La distribución por rama: barra de proporciones más una etiqueta por rama
  *  con su nombre escrito. El color nunca viaja solo. */
@@ -48,16 +38,9 @@ function PorRama(props: { ramas: readonly { rama: Rama; cuantos: number }[] }) {
       </View>
       <View className="mt-3 flex-row flex-wrap gap-2">
         {props.ramas.map((una) => (
-          <View
-            key={una.rama}
-            className="h-8 flex-row items-center gap-2 rounded-full bg-surface-3 px-3"
-          >
-            <View className={`h-2 w-2 rounded-full ${COLOR_DE_RAMA[una.rama]}`} />
-            <Text className="text-sm font-medium text-ink">
-              {ramaDelCatalogo(una.rama)?.nombre ?? una.rama}{' '}
-              <Text className="font-bold">{una.cuantos}</Text>
-            </Text>
-          </View>
+          <ChipDeRama key={una.rama} rama={una.rama}>
+            <Text className="font-bold"> {una.cuantos}</Text>
+          </ChipDeRama>
         ))}
       </View>
     </>
@@ -149,32 +132,19 @@ export default function Pantalla() {
   const cuenta = tesoreria.data?.cuentasDeGrupos.find((una) => una.grupoId === id)
 
   return (
-    <ScrollView contentContainerClassName="px-4 pb-6">
-      <BarraDeSesion />
-      <Link href="/" className="mt-4 text-label text-ink-muted">
-        ← Distrito {distrito?.numero}
-      </Link>
+    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-6">
+      <Volver href="/">Distrito {distrito?.numero}</Volver>
 
-      {(arbol.isPending || lista.isPending) && (
-        <Text className="mt-8 text-sm text-ink-muted">Consultando el grupo…</Text>
-      )}
+      {(arbol.isPending || lista.isPending) && <Cargando>Consultando el grupo…</Cargando>}
 
       {(arbol.error ?? lista.error) && (
-        <View className="mt-8 rounded-lg bg-danger-soft p-4">
-          <Text className="text-sm text-danger">
-            No se pudo consultar el grupo: {(arbol.error ?? lista.error)?.message}
-          </Text>
-        </View>
+        <Falla>No se pudo consultar el grupo: {(arbol.error ?? lista.error)?.message}</Falla>
       )}
 
       {/* La paridad que faltaba con la web: una dirección vieja o un grupo
           cerrado tienen que decirlo, no quedarse en blanco. */}
       {!grupo && !arbol.isPending && !lista.isPending && !(arbol.error ?? lista.error) && (
-        <View className="mt-8 rounded-lg border border-line-strong p-4">
-          <Text className="text-sm text-ink-muted">
-            No hay ningún grupo abierto con esa dirección.
-          </Text>
-        </View>
+        <Vacio>No hay ningún grupo abierto con esa dirección.</Vacio>
       )}
 
       {grupo && (
@@ -193,34 +163,31 @@ export default function Pantalla() {
                   ? '1 salida espera tu firma'
                   : `${reparto.esperanMiFirma.length} salidas esperan tu firma`}
               </Text>
-              <Link href={`/grupos/${id}/salidas`} asChild>
-                <Pressable className="mt-3 h-12 w-full items-center justify-center rounded-lg bg-accent px-6">
-                  <Text className="font-semibold text-accent-ink">Ver salidas</Text>
-                </Pressable>
-              </Link>
+              <View className="mt-3">
+                <Boton onPress={() => router.push(`/grupos/${id}/salidas`)}>Ver salidas</Boton>
+              </View>
             </View>
           )}
 
-          <View className="mt-5">
-            <View className="flex-row items-baseline justify-between">
-              <Text className="font-semibold text-ink">Gente</Text>
-              <Link href={`/grupos/${id}/afiliacion`} className="text-sm text-ink-muted">
-                ver afiliación
-              </Link>
-            </View>
-            <Text className="mt-1.5">
-              <Text className="text-3xl font-bold text-ink">{personas.length}</Text>{' '}
-              <Text className="text-sm text-ink-muted">
+          <Seccion
+            titulo="Gente"
+            enlace={{ texto: 'Afiliación', href: `/grupos/${id}/afiliacion` }}
+          >
+            <View className="mt-1.5 flex-row items-baseline gap-2.5">
+              <Text className="text-3xl font-bold text-ink">{personas.length}</Text>
+              <Text className="flex-1 text-sm text-ink-muted">
                 pertenecen · {personas.filter((persona) => !afiliados.has(persona.id)).length} sin
                 afiliar en {periodo}
               </Text>
-            </Text>
+            </View>
             <PorRama ramas={porRama(grupo.unidades, personas)} />
-          </View>
+          </Seccion>
 
           {cuenta && (
-            <View className="mt-5 border-t border-line pt-4">
-              <Text className="font-semibold text-ink">Cuenta corriente</Text>
+            <Seccion
+              titulo="Cuenta corriente"
+              enlace={{ texto: 'Movimientos', href: `/tesoreria/grupos/${id}` }}
+            >
               {/* El saldo positivo es deuda: así lo guarda tesorería. El signo
                   se escribe, no se deduce del color. */}
               <Text
@@ -235,21 +202,11 @@ export default function Pantalla() {
                   : cuenta.saldo < 0
                     ? 'A favor del grupo'
                     : 'Sin deuda'}
-                .{' '}
-                <Link href={`/tesoreria/grupos/${id}`} className="underline">
-                  Ver movimientos
-                </Link>
               </Text>
-            </View>
+            </Seccion>
           )}
 
-          <View className="mt-5 border-t border-line pt-4">
-            <View className="flex-row items-baseline justify-between">
-              <Text className="font-semibold text-ink">Salidas</Text>
-              <Link href={`/grupos/${id}/salidas`} className="text-sm text-ink-muted">
-                ver todas
-              </Link>
-            </View>
+          <Seccion titulo="Salidas" enlace={{ texto: 'Ver todas', href: `/grupos/${id}/salidas` }}>
             {permisos.isPending ? (
               <Text className="mt-1.5 text-sm text-ink-muted">Consultando las salidas…</Text>
             ) : (
@@ -272,10 +229,16 @@ export default function Pantalla() {
                   )}
               </View>
             )}
-            <Link href={`/grupos/${id}/plantel`} className="mt-3 text-sm text-ink-muted">
-              Plantel →
-            </Link>
-          </View>
+          </Seccion>
+
+          <Seccion
+            titulo="Plantel"
+            enlace={{ texto: 'Administrar', href: `/grupos/${id}/plantel` }}
+          >
+            <Text className="mt-1.5 text-sm text-ink-muted">
+              Quién conduce el grupo y quién tiene acceso.
+            </Text>
+          </Seccion>
         </>
       )}
     </ScrollView>

@@ -20,7 +20,7 @@ export function BarraDeSesion() {
   if (!quien || !rol?.activo) return null
 
   return (
-    <View className="h-11 flex-row items-center gap-2.5 border-b border-line">
+    <View className="h-11 flex-row items-center gap-2.5 border-b border-line bg-surface px-4">
       <Text className="text-base font-extrabold tracking-tight text-ink">GPS</Text>
       <CambioDeRol roles={rol.roles} activo={rol.activo} elegir={rol.elegir} />
       <Pressable
