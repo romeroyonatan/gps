@@ -14,7 +14,16 @@ import { Aviso, Boton, CAMPO, Campo, Falla, Nota, Titulo, Volver } from '../../.
 export default function Pantalla() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const hoy = aFechaDeCalendario(new Date())
-  const [datos, setDatos] = useState({ lugar: '', desde: hoy, hasta: hoy, comoSeViaja: '' })
+  const [datos, setDatos] = useState({
+    lugar: '',
+    direccion: '',
+    localidad: '',
+    provincia: '',
+    telefono: '',
+    desde: hoy,
+    hasta: hoy,
+    comoSeViaja: '',
+  })
   const crear = useCrearPermiso()
   const actor = useActor()
   const aviso = avisoDeAnticipacion(hoy, datos.desde)
@@ -50,6 +59,46 @@ export default function Pantalla() {
             className={CAMPO}
             value={datos.lugar}
             onChangeText={(lugar) => setDatos({ ...datos, lugar })}
+          />
+        </Campo>
+
+        <Campo etiqueta="Dirección">
+          <TextInput
+            className={CAMPO}
+            placeholder="Ruta 9 km 500"
+            value={datos.direccion}
+            onChangeText={(direccion) => setDatos({ ...datos, direccion })}
+          />
+        </Campo>
+
+        <View className="flex-row gap-3">
+          <View className="flex-1">
+            <Campo etiqueta="Localidad">
+              <TextInput
+                className={CAMPO}
+                value={datos.localidad}
+                onChangeText={(localidad) => setDatos({ ...datos, localidad })}
+              />
+            </Campo>
+          </View>
+          <View className="flex-1">
+            <Campo etiqueta="Provincia">
+              <TextInput
+                className={CAMPO}
+                value={datos.provincia}
+                onChangeText={(provincia) => setDatos({ ...datos, provincia })}
+              />
+            </Campo>
+          </View>
+        </View>
+
+        <Campo etiqueta="Teléfono de contacto durante la salida">
+          <TextInput
+            className={CAMPO}
+            keyboardType="phone-pad"
+            placeholder="11 5488-2210"
+            value={datos.telefono}
+            onChangeText={(telefono) => setDatos({ ...datos, telefono })}
           />
         </Campo>
 

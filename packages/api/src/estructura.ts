@@ -1,6 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { DistritosDocument } from './generated/graphql'
+import { DistritosDocument, type DistritosQuery } from './generated/graphql'
 import { useTransporte } from './proveedor'
+
+export type Distrito = DistritosQuery['distritos'][number]
+export type Grupo = Distrito['grupos'][number]
 
 export function useDistritos() {
   const transporte = useTransporte()
@@ -10,22 +13,30 @@ export function useDistritos() {
   })
 }
 
-/** Un grupo y su distrito, buscados en el árbol que ya está en cache: a un
- *  grupo se entra desde el directorio, así que estrenar `grupo(id)` sería
- *  pedir de nuevo lo que ya se tiene. Cuatro pantallas de mobile escribían
- *  este mismo `flatMap().find()`, y el distrito hace falta para el encabezado
- *  y para saber quién es el comisionado que firma.
+/** Un grupo y su distrito, buscados en el árbol que ya está en caché. Seis
+ *  pantallas hacían este mismo cruce a mano y en dos redacciones distintas
+ *  —`find`+`some` para el distrito, `flatMap`+`find` para el grupo—, que es
+ *  una sola pregunta escrita de dos formas.
  *
- *  `grupo` en `undefined` con la consulta ya resuelta quiere decir que no hay
- *  ninguno abierto con esa dirección -un enlace viejo, un grupo cerrado-, que
- *  es un estado que la pantalla tiene que dibujar. */
-export function useGrupo(grupoId: string) {
-  const { data, isPending, error } = useDistritos()
-  const distrito = data?.distritos.find((uno) => uno.grupos.some((grupo) => grupo.id === grupoId))
+ *  Reusa la consulta del árbol en vez de estrenar `grupo(id)`: TanStack Query
+ *  ya la tiene porque venís del directorio, y de paso trae el distrito, que es
+ *  lo que hace falta para saber quién es el comisionado. Son quince grupos; el
+ *  día que dejen de entrar en una consulta se agrega `grupo(id)` y se arregla
+ *  acá y en ningún otro lado. */
+export function useGrupo(grupoId: string): {
+  grupo: Grupo | undefined
+  distrito: Distrito | undefined
+  isPending: boolean
+  error: Error | null
+} {
+  const consulta = useDistritos()
+  const distrito = consulta.data?.distritos.find((candidato) =>
+    candidato.grupos.some((grupo) => grupo.id === grupoId),
+  )
   return {
+    grupo: distrito?.grupos.find((candidato) => candidato.id === grupoId),
     distrito,
-    grupo: distrito?.grupos.find((uno) => uno.id === grupoId),
-    isPending,
-    error,
+    isPending: consulta.isPending,
+    error: consulta.error,
   }
 }

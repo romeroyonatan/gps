@@ -222,6 +222,10 @@ export function crearServicioDeEstructura(core: Core): ServicioDeEstructura {
       return core.bd.select().from(grupos).orderBy(grupos.numero).all()
     },
 
+    async listarDistritosSinGrupos() {
+      return core.bd.select().from(distritos).orderBy(distritos.numero).all()
+    },
+
     async listarDistritos(_alcance) {
       // Tres consultas y el arbol se arma en memoria. Con la cantidad de
       // distritos y grupos de una diocesis alcanza de sobra; si algun dia deja

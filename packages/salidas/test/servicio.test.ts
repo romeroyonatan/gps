@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { alcanceSinLimites, type Reloj } from '@gps/core'
 import { sql } from 'drizzle-orm'
+import { numeroDeExpediente } from '../src/dominio/permisos'
 import { PermisoInvalido, PermisoNoEditable } from '../src/servidor/borradores'
 import { FirmaInvalida } from '../src/servidor/firmas'
 import {
@@ -15,7 +16,15 @@ import {
   TROPA,
 } from './montar'
 
-const datos = { lugar: 'Estancia La Paz', desde: '1970-03-01', hasta: '1970-03-03' }
+const datos = {
+  lugar: 'Estancia La Paz',
+  direccion: 'Ruta 9 km 500',
+  localidad: 'Los Patos',
+  provincia: 'Santa Fe',
+  telefono: '11 5488-2210',
+  desde: '1970-03-01',
+  hasta: '1970-03-03',
+}
 
 describe('crear y editar un borrador', () => {
   test('nace en borrador con sus datos', async () => {
@@ -54,6 +63,49 @@ describe('crear y editar un borrador', () => {
       lugar: 'Otro lado',
     })
     expect(editado.lugar).toBe('Otro lado')
+  })
+})
+
+describe('número de expediente', () => {
+  test('lo asigna al emitir y la serie va corrida', async () => {
+    const { servicio } = montar()
+    const uno = await servicio.emitir(alcanceSinLimites(), (await permisoConGente(servicio)).id)
+    const otro = await servicio.emitir(alcanceSinLimites(), (await permisoConGente(servicio)).id)
+    // El reloj de los tests está clavado en 1970, así que la serie es esa.
+    expect(numeroDeExpediente(uno.permiso)).toBe('SAL-1970-0001')
+    expect(numeroDeExpediente(otro.permiso)).toBe('SAL-1970-0002')
+  })
+
+  test('un borrador no tiene expediente', async () => {
+    const { servicio } = montar()
+    const permiso = await permisoConGente(servicio)
+    expect(numeroDeExpediente(permiso)).toBeNull()
+  })
+})
+
+describe('responsable a cargo', () => {
+  test('tiene que ser uno de los dirigentes que van', async () => {
+    const { servicio } = montar()
+    const permiso = await permisoConGente(servicio)
+    expect(
+      servicio.elegirResponsable(alcanceSinLimites(), permiso.id, 'persona_chico'),
+    ).rejects.toThrow(PermisoInvalido)
+  })
+
+  test('sacarlo de la salida lo suelta: el permiso no queda a cargo de quien ya no va', async () => {
+    const { servicio } = montar()
+    const permiso = await permisoConGente(servicio)
+    await servicio.quitarParticipante(alcanceSinLimites(), permiso.id, 'persona_jefe')
+    const [suelto] = await servicio.listarPermisos(alcanceSinLimites(), GRUPO_ID)
+    expect(suelto?.responsableId).toBeNull()
+  })
+
+  test('sin responsable no se emite', async () => {
+    const { servicio } = montar()
+    const permiso = await servicio.crearPermiso(alcanceSinLimites(), GRUPO_ID, datos)
+    await servicio.elegirUnidades(alcanceSinLimites(), permiso.id, [TROPA])
+    await servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_jefe')
+    expect(servicio.emitir(alcanceSinLimites(), permiso.id)).rejects.toThrow(PermisoInvalido)
   })
 })
 
@@ -144,6 +196,9 @@ describe('emitir', () => {
     expect(emitido.estado).toBe('emitido')
     expect(emitido.pdfId).not.toBeNull()
     expect(emitido.hashDelPdf).not.toBeNull()
+    // La huella del contenido es lo que después deja comprobar que el papel
+    // sigue diciendo lo mismo, sin depender de cómo esté dibujado.
+    expect(emitido.hashDelContenido).not.toBeNull()
   })
 
   test('sin ningun dirigente no se emite', async () => {

@@ -17,13 +17,16 @@ export function ModoElevado(props: { entorno: string }) {
   const [ahora, setAhora] = useState(() => Date.now())
 
   const hasta = quien?.elevadaHasta ?? null
+  const falta = hasta ? cuantoFalta(hasta, ahora) : null
+
+  // El reloj sólo corre mientras haya algo que contar: sin `falta` en las
+  // dependencias seguía haciendo un render por segundo para siempre después
+  // de vencida la elevación, contando un tiempo que ya no existe.
   useEffect(() => {
-    if (!hasta) return
+    if (!hasta || !falta) return
     const reloj = setInterval(() => setAhora(Date.now()), 1000)
     return () => clearInterval(reloj)
-  }, [hasta])
-
-  const falta = hasta ? cuantoFalta(hasta, ahora) : null
+  }, [hasta, falta])
 
   // Al vencer se vuelve a preguntar una sola vez: el servidor va a contestar
   // que ya no está elevada, y con eso desaparece todo lo global.

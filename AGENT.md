@@ -60,8 +60,15 @@ Ejemplo del final de la cadena: `salidas` —el permiso de salida— depende de 
 firmantes, qué candidatos hay según las unidades elegidas, qué mensaje se sella) y las
 pantallas usan esas mismas funciones; su `/servidor` se parte por caso de uso
 (`borradores.ts`, `emision.ts`, `firmas.ts`, `pdf.ts`, `consultas.ts`) y `servicio.ts` es
-sólo contrato y composición. El PDF se queda en `/servidor` aunque `pdf-lib` sea isomorfo:
-`/dominio` lo importa el navegador, y un import de valor entraría al bundle de mobile.
+sólo contrato y composición. El permiso lleva dos huellas: `hashDelPdf` es el sha256 del
+archivo emitido —lo que sellan las firmas— y `hashDelContenido` es el hash de
+`contenidoDelPermiso`, un texto canónico de lo que el papel dice. La segunda se imprime en
+cada hoja y permite verificar el contenido aunque se rediagrame el PDF. El número de
+expediente (`SAL-2026-0147`) es una serie corrida por año para toda la diócesis: se reserva
+al emitir dentro de una transacción y `UNIQUE (anio, numero)` evita duplicados. Si falla el
+PDF, el hueco queda; dos papeles con el mismo número, no. El PDF se queda en `/servidor`
+aunque `pdf-lib` sea isomorfo: `/dominio` lo importa el navegador, y un import de valor
+entraría al bundle de mobile.
 
 `archivos`, en cambio, **no se parte**: solicitar, confirmar y descargar son orquestación de
 efectos sin decisión separable, y quedan en su `servicio.ts`. Es el otro lado de la misma
@@ -130,6 +137,13 @@ al índice.
 
 **Mobile-first.** Todo se diseña primero a 375px. `sm:` y `md:` sólo agregan en
 pantallas grandes, nunca arreglan lo que se rompió en chicas.
+
+**La web angosta y la app son la misma pantalla.** A ancho de teléfono, `apps/web` tiene
+que verse igual —o lo más parecido posible— que la pantalla equivalente de `apps/mobile`:
+mismo orden de bloques, mismas alturas de fila, mismas píldoras, mismo pie. La mayoría de
+la gente entra por la web del teléfono, así que si las dos se separan es un bug de paridad
+y se arregla en ambas. La forma la manda el mockup de mobile; escritorio sólo agrega con
+`sm:`/`md:`. Cuando toques una pantalla, abrí la otra al lado antes de terminar.
 
 **Piezas de interfaz: mirar `apps/web/src/ui.tsx` antes de escribir markup.** Es la guía
 escrita una sola vez —no una librería de propósito general— y ya tiene esto:
@@ -292,6 +306,10 @@ Deuda conocida: **cerrar un grupo no cierra las pertenencias de su gente.** `est
 no puede hacerlo porque la dependencia va al revés —no conoce a `personas`—, y ningún
 otro módulo lo hace tampoco. `afiliacion` la esquiva filtrando por `gruposAbiertosEn` al
 declarar, pero `listarPersonas` de un grupo cerrado sigue devolviendo gente.
+
+También queda una deuda de paridad: mobile carga la salida con su dirección pero todavía
+no permite elegir al dirigente responsable, que sí se elige en la pantalla `Salida` de web.
+Una salida creada desde el teléfono se termina de armar en la web.
 
 La base es SQLite por Drizzle y llega a los módulos por `Core.bd`; las migraciones las
 declara cada módulo y las aplica `aplicarMigraciones` al arrancar. Sigue sin haber

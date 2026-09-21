@@ -696,12 +696,22 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
         .all()
 
       // Los equipos de ese grupo -hoy sólo Secretaría- más los diocesanos de
-      // su gente: los dos son plantel para quien mira la pantalla.
+      // su gente: los dos son plantel para quien mira la pantalla. El filtro de
+      // ámbito va en el WHERE: sin él entraban las Secretarías de los otros
+      // catorce grupos, y la pantalla las dibujaba como si fueran de éste.
       const filasDeEquipos = core.bd
-        .select({ integrante: integrantesDeEquipo })
+        .select({ integrante: integrantesDeEquipo, tipo: equipos.tipo })
         .from(integrantesDeEquipo)
         .innerJoin(equipos, eq(equipos.id, integrantesDeEquipo.equipoId))
-        .where(isNull(integrantesDeEquipo.revocadoEn))
+        .where(
+          and(
+            isNull(integrantesDeEquipo.revocadoEn),
+            or(
+              eq(equipos.ambitoTipo, 'diocesis'),
+              and(eq(equipos.ambitoTipo, 'grupo'), eq(equipos.ambitoId, grupoId)),
+            ),
+          ),
+        )
         .all()
 
       const cargosPorPersona = new Map<string, Cargo[]>()
@@ -711,10 +721,10 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
         cargosPorPersona.set(cargo.personaId, suyos)
       }
 
-      const equiposPorPersona = new Map<string, IntegranteDeEquipo[]>()
-      for (const { integrante } of filasDeEquipos) {
+      const equiposPorPersona = new Map<string, (IntegranteDeEquipo & { tipo: TipoDeEquipo })[]>()
+      for (const { integrante, tipo } of filasDeEquipos) {
         const suyos = equiposPorPersona.get(integrante.personaId) ?? []
-        suyos.push(integrante)
+        suyos.push({ ...integrante, tipo })
         equiposPorPersona.set(integrante.personaId, suyos)
       }
 

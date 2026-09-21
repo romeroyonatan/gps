@@ -65,6 +65,21 @@ enum Categoria {
   beneficiario
 }
 
+type CobranzaDelDistrito {
+  cobrado: Int!
+  declararon: Int!
+
+  """
+  Facturado menos cobrado del período. No es el saldo de las cuentas.
+  """
+  deuda: Int!
+  distritoId: ID!
+  facturado: Int!
+  grupos: Int!
+  numero: Int!
+  zona: String!
+}
+
 type CuentaDeGrupo {
   cerrado: Boolean!
   grupoId: ID!
@@ -240,6 +255,11 @@ type IntegranteDeEquipo {
   equipoId: ID!
   hasta: String
   id: ID!
+
+  """
+  De qué equipo es. Sin esto la pantalla los dibuja a todos iguales.
+  """
+  tipo: TipoDeEquipo!
 }
 
 """
@@ -316,9 +336,13 @@ type Mutation {
   crearPermiso(
     comoSeViaja: String
     desde: String!
+    direccion: String!
     grupoId: ID!
     hasta: String!
+    localidad: String!
     lugar: String!
+    provincia: String!
+    telefono: String!
   ): Permiso!
 
   """
@@ -331,6 +355,7 @@ type Mutation {
   """
   declararAfiliacion(grupoId: ID!): Declaracion!
   definirCuotaDeAfiliacion(importe: Int!, periodo: Int!): CuotaDeAfiliacion!
+  elegirResponsable(permisoId: ID!, personaId: ID!): Permiso!
   elegirUnidades(permisoId: ID!, unidadIds: [ID!]!): Permiso!
   emitirPermiso(permisoId: ID!): Emision!
 
@@ -431,15 +456,22 @@ type Permiso {
   adjuntos: [Adjunto!]!
   comoSeViaja: String
   desde: String!
+  direccion: String!
 
   """
   Los que figuran en el papel, tal como estaban al emitirse.
   """
   emitidos: [ParticipanteEmitido!]!
   estado: EstadoDePermiso!
+
+  """
+  El número de la serie: SAL-2026-0147. Null mientras sea borrador.
+  """
+  expediente: String
   firmas: [EstadoDeFirma!]!
   hasta: String!
   id: ID!
+  localidad: String!
   lugar: String!
 
   """
@@ -447,7 +479,10 @@ type Permiso {
   """
   participantes: [Participante!]!
   pdfId: ID
+  provincia: String!
   reemplazaA: ID
+  responsableId: ID
+  telefono: String!
 
   """
   Qué unidades del grupo van.
@@ -590,6 +625,11 @@ type Query {
   personas(grupoId: ID!): [Persona!]!
 
   """
+  Null si quien pregunta no es autoridad diocesana de Tesorería.
+  """
+  reporteDeCobranza(periodo: Int!): ReporteDeCobranza
+
+  """
   Devuelve la version de esta instancia.
   """
   version: Version!
@@ -605,6 +645,16 @@ enum Rama {
   raiders
   rovers
   scouts
+}
+
+type ReporteDeCobranza {
+  """
+  El cierre del período anterior, para comparar contra éste.
+  """
+  anterior: TotalesDelPeriodo!
+  periodo: Int!
+  porDistrito: [CobranzaDelDistrito!]!
+  totales: TotalesDelPeriodo!
 }
 
 type ResultadoDeReconciliacion {
@@ -703,6 +753,17 @@ enum TipoDeMovimientoDeTesoreria {
   anulacion_pago
   cargo_afiliacion
   pago
+}
+
+type TotalesDelPeriodo {
+  cobrado: Int!
+  declararon: Int!
+  deuda: Int!
+  distritos: Int!
+  facturado: Int!
+  grupos: Int!
+  periodo: Int!
+  personasCobradas: Int!
 }
 
 """

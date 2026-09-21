@@ -31,3 +31,18 @@ const PESOS = new Intl.NumberFormat('es-AR', {
 export function enPesos(importe: number): string {
   return PESOS.format(importe)
 }
+
+/** Cómo queda la cuenta al asentar un pago. Un saldo positivo es deuda. */
+export type ImputacionDelPago =
+  | { tipo: 'sinImporte' }
+  | { tipo: 'cancela' }
+  | { tipo: 'parcial'; resta: number }
+  | { tipo: 'aFavor'; sobra: number }
+
+export function imputacionDelPago(saldo: number, importe: number): ImputacionDelPago {
+  if (!importeEnPesosValido(importe)) return { tipo: 'sinImporte' }
+  const resta = saldo - importe
+  if (resta === 0) return { tipo: 'cancela' }
+  if (resta > 0) return { tipo: 'parcial', resta }
+  return { tipo: 'aFavor', sobra: -resta }
+}

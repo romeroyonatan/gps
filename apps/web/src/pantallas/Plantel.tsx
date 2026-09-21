@@ -139,7 +139,12 @@ export function Plantel(props: { grupoId: string }) {
           const jefatura = persona.cargos.find(
             (cargo) => cargo.cargo === JEFATURA && vigente(cargo, ahora),
           )
-          const secretaria = persona.equipos.find((equipo) => vigente(equipo, ahora))
+          // Por tipo y no el primero vigente: alguien del grupo puede estar
+          // además en un equipo diocesano, y sin el filtro se dibujaba como
+          // Secretaría —y la × revocaba el equipo equivocado—.
+          const secretaria = persona.equipos.find(
+            (equipo) => equipo.tipo === SECRETARIA && vigente(equipo, ahora),
+          )
 
           return (
             <li key={persona.id} className="border-b border-line py-3 last:border-b-0">

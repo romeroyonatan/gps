@@ -139,7 +139,18 @@ export function montar(opciones: { reloj?: Reloj; mundo?: Mundo } = {}) {
       },
     },
     conversorDeImagenes: { aJpeg: async (contenido) => contenido },
-    hash: (contenido) => `hash:${typeof contenido === 'string' ? contenido : contenido.length}`,
+    // Devuelve hexadecimal y no el contenido de vuelta: un hash de verdad es
+    // una cadena corta y sin saltos de línea, y el PDF lo imprime en el pie.
+    // Un falso que devolviera el texto entero probaría contra algo que no
+    // existe -y rompería al dibujarlo-.
+    hash: (contenido) => {
+      const texto = typeof contenido === 'string' ? contenido : contenido.join(',')
+      let acumulado = 0
+      for (const caracter of texto) {
+        acumulado = (acumulado * 31 + caracter.charCodeAt(0)) % 0xffffffff
+      }
+      return acumulado.toString(16).padStart(8, '0').repeat(8)
+    },
     nuevoId: (prefijo) => `${prefijo}_${++contador}`,
     nuevoSecreto: () => `secreto_${++contador}`,
   }
@@ -174,6 +185,7 @@ export function montar(opciones: { reloj?: Reloj; mundo?: Mundo } = {}) {
     obtenerGrupo: async (id) => mundo.grupos.find((grupo) => grupo.id === id) ?? null,
     distritoEstaAbierto: async (id) => id === DISTRITO_ID,
     listarGrupos: async () => mundo.grupos,
+    listarDistritosSinGrupos: async () => [],
     gruposAbiertosEn: async () => new Set(mundo.grupos.map((grupo) => grupo.id)),
   }
 
@@ -198,6 +210,10 @@ export function montar(opciones: { reloj?: Reloj; mundo?: Mundo } = {}) {
 export async function permisoConGente(servicio: ServicioDeSalidas) {
   const permiso = await servicio.crearPermiso(alcanceSinLimites(), GRUPO_ID, {
     lugar: 'Estancia La Paz',
+    direccion: 'Ruta 9 km 500',
+    localidad: 'Los Patos',
+    provincia: 'Santa Fe',
+    telefono: '11 5488-2210',
     desde: '1970-03-01',
     hasta: '1970-03-03',
     comoSeViaja: 'Micro contratado',
@@ -205,6 +221,7 @@ export async function permisoConGente(servicio: ServicioDeSalidas) {
   await servicio.elegirUnidades(alcanceSinLimites(), permiso.id, [TROPA])
   await servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_jefe')
   await servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_chico')
+  await servicio.elegirResponsable(alcanceSinLimites(), permiso.id, 'persona_jefe')
   return permiso
 }
 

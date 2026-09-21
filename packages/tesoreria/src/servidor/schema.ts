@@ -2,6 +2,7 @@ import { alcanceDe } from '@gps/core'
 import type { Builder } from '@gps/core/graphql'
 import { GraphQLError } from 'graphql'
 import {
+  type CobranzaDelDistrito,
   type CuentaDeGrupo,
   type CuotaDeAfiliacion,
   MEDIOS_DE_PAGO,
@@ -9,9 +10,11 @@ import {
   type MovimientoDeTesoreria,
   puedeConfigurarCuotas,
   puedeVerTesoreriaDeLaDiocesis,
+  type ReporteDeCobranza,
   type ResultadoDeReconciliacion,
   type ResumenDePendientes,
   type TipoDeMovimiento,
+  type TotalesDelPeriodo,
 } from '../dominio'
 import { CuotaUtilizada, DatosDePagoInvalidos, OperacionDenegada, PagoNoAnulable } from './servicio'
 
@@ -89,6 +92,48 @@ export function registrarSchema(builder: Builder): void {
       }),
     })
 
+  const CobranzaRef = builder.objectRef<CobranzaDelDistrito>('CobranzaDelDistrito').implement({
+    fields: (t) => ({
+      distritoId: t.exposeID('distritoId'),
+      numero: t.exposeInt('numero'),
+      zona: t.exposeString('zona'),
+      grupos: t.exposeInt('grupos'),
+      declararon: t.exposeInt('declararon'),
+      facturado: t.exposeInt('facturado'),
+      cobrado: t.exposeInt('cobrado'),
+      deuda: t.exposeInt('deuda', {
+        description: 'Facturado menos cobrado del período. No es el saldo de las cuentas.',
+      }),
+    }),
+  })
+  const TotalesRef = builder.objectRef<TotalesDelPeriodo>('TotalesDelPeriodo').implement({
+    fields: (t) => ({
+      periodo: t.exposeInt('periodo'),
+      distritos: t.exposeInt('distritos'),
+      grupos: t.exposeInt('grupos'),
+      declararon: t.exposeInt('declararon'),
+      personasCobradas: t.exposeInt('personasCobradas'),
+      facturado: t.exposeInt('facturado'),
+      cobrado: t.exposeInt('cobrado'),
+      deuda: t.exposeInt('deuda'),
+    }),
+  })
+  const ReporteRef = builder.objectRef<ReporteDeCobranza>('ReporteDeCobranza').implement({
+    fields: (t) => ({
+      periodo: t.exposeInt('periodo'),
+      porDistrito: t.field({
+        type: [CobranzaRef],
+        resolve: (reporte) => [...reporte.porDistrito],
+      }),
+      totales: t.field({ type: TotalesRef, resolve: (reporte) => reporte.totales }),
+      anterior: t.field({
+        type: TotalesRef,
+        description: 'El cierre del período anterior, para comparar contra éste.',
+        resolve: (reporte) => reporte.anterior,
+      }),
+    }),
+  })
+
   builder.queryField('cuotasDeAfiliacion', (t) =>
     t.field({
       type: [CuotaRef],
@@ -140,6 +185,21 @@ export function registrarSchema(builder: Builder): void {
         const alcance = alcanceDe(contexto)
         if (!puedeVerTesoreriaDeLaDiocesis(alcance.actor)) return null
         return contexto.tesoreria.resumenDePendientes(alcance)
+      },
+    }),
+  )
+
+  // Nullable y no lanza, por lo mismo que los otros dos campos diocesanos.
+  builder.queryField('reporteDeCobranza', (t) =>
+    t.field({
+      type: ReporteRef,
+      nullable: true,
+      description: 'Null si quien pregunta no es autoridad diocesana de Tesorería.',
+      args: { periodo: t.arg.int({ required: true }) },
+      resolve: (_padre, args, contexto) => {
+        const alcance = alcanceDe(contexto)
+        if (!puedeVerTesoreriaDeLaDiocesis(alcance.actor)) return null
+        return contexto.tesoreria.reporteDeCobranza(alcance, args.periodo)
       },
     }),
   )

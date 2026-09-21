@@ -4,11 +4,12 @@ import {
   useActor,
   useAgregarParticipante,
   useAnularPermiso,
-  useDistritos,
+  useElegirResponsable,
   useElegirUnidades,
   useEmitirPermiso,
   useFirmarEnApp,
   useFirmarEnPapel,
+  useGrupo,
   usePermisos,
   usePersonasDelGrupo,
   useQuitarAdjunto,
@@ -24,10 +25,10 @@ import type { Trazos } from '@gps/salidas/dominio'
 import {
   avisoDeAnticipacion,
   candidatos,
-  firmantesRequeridos,
+  esResponsablePosible,
   marcaSegunCategoria,
   puedeAdministrarPermisosDelGrupo,
-  puedeFirmarEnLaApp,
+  puedeFirmarComo,
   resumenDeParticipantes,
 } from '@gps/salidas/dominio'
 import { useState } from 'react'
@@ -37,8 +38,11 @@ import {
   BOTON_AL_MARGEN,
   BOTON_PRINCIPAL,
   BOTON_SECUNDARIO,
+  CAMPO,
   Cargando,
   Chip,
+  ELEGIBLE,
+  ELEGIDO,
   Falla,
   Vacio,
   Volver,
@@ -67,15 +71,13 @@ export function estadoDelPermiso(permiso: Permiso, miFirmaPendiente: boolean) {
 
 /** Elegir unidades y marcar quién va. Sólo mientras es borrador. */
 function Armado(props: { permiso: Permiso; grupoId: string }) {
-  const arbol = useDistritos()
+  const { grupo } = useGrupo(props.grupoId)
   const lista = usePersonasDelGrupo(props.grupoId)
   const elegirUnidades = useElegirUnidades()
   const agregar = useAgregarParticipante()
   const quitar = useQuitarParticipante()
+  const elegirResponsable = useElegirResponsable()
 
-  const grupo = arbol.data?.distritos
-    .flatMap((distrito) => distrito.grupos)
-    .find((uno) => uno.id === props.grupoId)
   const personas = lista.data?.personas ?? []
   const elegidas = props.permiso.unidadIds
   const puestos = new Set(props.permiso.participantes.map((uno) => uno.personaId))
@@ -91,6 +93,10 @@ function Armado(props: { permiso: Permiso; grupoId: string }) {
       },
     })),
     elegidas,
+  )
+  const aCargoPosibles = puedenIr.filter(
+    (persona) =>
+      puestos.has(persona.id) && marcaSegunCategoria(persona.pertenencia.categoria) === 'dirigente',
   )
 
   return (
@@ -151,6 +157,46 @@ function Armado(props: { permiso: Permiso; grupoId: string }) {
               </li>
             ))}
           </ul>
+        )}
+      </div>
+
+      <div>
+        <p className="font-semibold">¿Quién queda a cargo?</p>
+        {/* Sale de los dirigentes anotados y no del padrón entero: es la misma
+            regla que aplica el servidor al emitir, y ofrecer a alguien que no
+            viaja sería ofrecer lo que después se rechaza. */}
+        {aCargoPosibles.length === 0 ? (
+          <p className="mt-1 text-sm text-ink-faint">Anotá primero a un dirigente.</p>
+        ) : (
+          <select
+            value={
+              esResponsablePosible(
+                props.permiso.participantes.map((uno) => ({
+                  personaId: uno.personaId,
+                  marca: uno.marca as 'dirigente' | 'beneficiario',
+                })),
+                props.permiso.responsableId ?? null,
+              )
+                ? (props.permiso.responsableId ?? '')
+                : ''
+            }
+            onChange={(evento) =>
+              elegirResponsable.mutate({
+                permisoId: props.permiso.id,
+                personaId: evento.target.value,
+              })
+            }
+            className={`${CAMPO} mt-1.5 h-12`}
+          >
+            <option value="" disabled>
+              Elegí el dirigente a cargo
+            </option>
+            {aCargoPosibles.map((persona) => (
+              <option key={persona.id} value={persona.id}>
+                {nombreCompleto(persona)}
+              </option>
+            ))}
+          </select>
         )}
       </div>
     </div>
@@ -307,15 +353,9 @@ function Firmas(props: {
   const [modo, setModo] = useState<'trazo' | 'escaneo'>('trazo')
 
   // Quién puede firmar qué: la misma política pura que aplica el servidor, así
-  // la pantalla no ofrece un botón que después se rechaza. Sin distrito
-  // todavía no se sabe quién es el comisionado, y entonces nadie firma.
-  const firmantes = props.distritoId ? firmantesRequeridos(props.grupoId, props.distritoId) : []
-  const puedoFirmar = (cargo: TipoDeCargo) => {
-    const firmante = firmantes.find((uno) => uno.cargo === cargo)
-    return (
-      props.actor !== null && firmante !== undefined && puedeFirmarEnLaApp(props.actor, firmante)
-    )
-  }
+  // la pantalla no ofrece un botón que después se rechaza.
+  const puedoFirmar = (cargo: TipoDeCargo) =>
+    puedeFirmarComo(props.actor, cargo, props.grupoId, props.distritoId)
 
   const hechas = props.permiso.firmas.filter((firma) => firma.firmada)
   const pendientes = props.permiso.firmas.filter((firma) => !firma.firmada)
@@ -393,9 +433,7 @@ function Firmas(props: {
                   type="button"
                   onClick={() => setModo(uno)}
                   className={`min-h-11 flex-1 rounded-lg border text-sm font-semibold ${
-                    modo === uno
-                      ? 'border-accent bg-accent text-accent-ink'
-                      : 'border-line-strong text-ink hover:bg-surface-3'
+                    modo === uno ? ELEGIDO : `${ELEGIBLE} text-ink`
                   }`}
                 >
                   {uno === 'trazo' ? 'Firmar en pantalla' : 'Subir escaneo'}
@@ -435,15 +473,19 @@ function Detalle(props: {
   const hoy = aFechaDeCalendario(new Date())
   const aviso = avisoDeAnticipacion(hoy, permiso.desde)
 
-  const firmantes = props.distritoId ? firmantesRequeridos(props.grupoId, props.distritoId) : []
-  const miFirmaPendiente = permiso.firmas.some((firma) => {
-    if (firma.firmada) return false
-    const firmante = firmantes.find((uno) => uno.cargo === firma.cargo)
-    return (
-      props.actor !== null && firmante !== undefined && puedeFirmarEnLaApp(props.actor, firmante)
-    )
-  })
+  const miFirmaPendiente = permiso.firmas.some(
+    (firma) =>
+      !firma.firmada && puedeFirmarComo(props.actor, firma.cargo, props.grupoId, props.distritoId),
+  )
   const estado = estadoDelPermiso(permiso, miFirmaPendiente)
+  // Una sola línea de error para las cinco escrituras de la pantalla: la
+  // cadena estaba escrita dos veces y se evaluaba dos veces.
+  const problema =
+    emitir.error ?? anular.error ?? reEmitir.error ?? subir.error ?? quitarAdjunto.error
+  // De la nómina emitida, que es la que tiene los nombres congelados. En
+  // borrador todavía no hay foto y el nombre lo muestra el selector de Armado.
+  const responsable = permiso.emitidos.find((uno) => uno.personaId === permiso.responsableId)
+  const aCargo = responsable && `${responsable.apellidos}, ${responsable.nombres}`
 
   return (
     <>
@@ -452,10 +494,25 @@ function Detalle(props: {
         <h2 className="text-2xl font-bold">{permiso.lugar}</h2>
         <Chip tono={estado.tono}>{estado.texto}</Chip>
       </div>
+      {/* El borrador todavía no tiene número: se asigna al emitir. */}
+      {permiso.expediente && (
+        <p className="text-label tabular-nums text-ink-faint">{permiso.expediente}</p>
+      )}
       <p className="mt-1 text-sm tabular-nums text-ink-muted">
         {permiso.desde} a {permiso.hasta}
         {permiso.comoSeViaja && <span> · {permiso.comoSeViaja}</span>}
       </p>
+      {/* Lo que el permiso imprime para ubicar al grupo: se carga al crear la
+          salida, así que también se muestra acá y no sólo en el PDF. */}
+      <p className="mt-1 text-sm text-ink-muted">
+        {permiso.direccion}, {permiso.localidad}, {permiso.provincia} ·{' '}
+        <span className="tabular-nums">{permiso.telefono}</span>
+      </p>
+      {aCargo && (
+        <p className="mt-1 text-sm text-ink-muted">
+          A cargo: <span className="font-semibold text-ink">{aCargo}</span>
+        </p>
+      )}
 
       {permiso.estado === 'borrador' && props.administra && (
         <Armado permiso={permiso} grupoId={props.grupoId} />
@@ -579,14 +636,7 @@ function Detalle(props: {
         </p>
       )}
       {aviso && permiso.estado === 'borrador' && <Aviso>{aviso.mensaje}</Aviso>}
-      {(emitir.error ?? anular.error ?? reEmitir.error ?? subir.error ?? quitarAdjunto.error) && (
-        <Falla>
-          {
-            (emitir.error ?? anular.error ?? reEmitir.error ?? subir.error ?? quitarAdjunto.error)
-              ?.message
-          }
-        </Falla>
-      )}
+      {problema && <Falla>{problema.message}</Falla>}
 
       {/* Lo menos frecuente, al final y chiquito: el mismo criterio que
           "declarar extraordinaria" en afiliacion. Firmar no se deshace desde
@@ -613,12 +663,9 @@ function Detalle(props: {
  *  pagine, se agrega `permiso(id)` y se arregla en un solo lugar. */
 export function Salida(props: { grupoId: string; permisoId: string }) {
   const consulta = usePermisos(props.grupoId)
-  const arbol = useDistritos()
+  const { distrito } = useGrupo(props.grupoId)
   const actor = useActor()
 
-  const distrito = arbol.data?.distritos.find((candidato) =>
-    candidato.grupos.some((grupo) => grupo.id === props.grupoId),
-  )
   const permiso = consulta.data?.permisos.find((uno) => uno.id === props.permisoId)
 
   if (consulta.isPending) return <Cargando>Consultando la salida…</Cargando>

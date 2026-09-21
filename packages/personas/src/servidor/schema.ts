@@ -107,12 +107,17 @@ export function registrarSchema(builder: Builder): void {
   })
 
   const IntegranteRef = builder
-    .objectRef<IntegranteDeEquipo & { tipo?: TipoDeEquipo }>('IntegranteDeEquipo')
+    .objectRef<IntegranteDeEquipo & { tipo: TipoDeEquipo }>('IntegranteDeEquipo')
     .implement({
       description: 'La pertenencia de una persona a un equipo, con su periodo.',
       fields: (t) => ({
         id: t.exposeID('id'),
         equipoId: t.exposeID('equipoId'),
+        tipo: t.field({
+          type: TipoDeEquipoRef,
+          description: 'De qué equipo es. Sin esto la pantalla los dibuja a todos iguales.',
+          resolve: (integrante) => integrante.tipo,
+        }),
         desde: t.exposeString('desde'),
         hasta: t.exposeString('hasta', { nullable: true }),
       }),
@@ -322,17 +327,21 @@ export function registrarSchema(builder: Builder): void {
         desde: t.arg.string({ required: true }),
       },
       resolve: async (_padre, args, contexto) =>
-        await traduciendo(() =>
-          contexto.personas.integrarEquipo(alcanceDe(contexto).actor, {
+        await traduciendo(async () => {
+          const tipo = args.tipo as TipoDeEquipo
+          const integrante = await contexto.personas.integrarEquipo(alcanceDe(contexto).actor, {
             personaId: String(args.personaId),
-            tipo: args.tipo as TipoDeEquipo,
+            tipo,
             // Secretaría es del grupo; los otros dos son de la diócesis, que
             // no apunta a ninguna entidad. Lo valida el servicio igual.
-            ambitoTipo: args.tipo === 'secretaria' ? 'grupo' : 'diocesis',
+            ambitoTipo: tipo === 'secretaria' ? 'grupo' : 'diocesis',
             ambitoId: args.ambitoId === undefined ? null : String(args.ambitoId),
             desde: args.desde,
-          }),
-        ),
+          })
+          // El tipo es el que vino en el argumento: el servicio devuelve el
+          // integrante, y el equipo al que entró es justamente éste.
+          return { ...integrante, tipo }
+        }),
     }),
   )
 

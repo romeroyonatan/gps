@@ -11,6 +11,7 @@ export {
 } from './auth'
 export type { AlmacenDelCache, ParticionDelCache } from './cache'
 export { almacenPorPersona, useParticionDelCache } from './cache'
+export type { Distrito, Grupo } from './estructura'
 export { useDistritos, useGrupo } from './estructura'
 export type {
   AmbitoDeRol,
@@ -39,6 +40,7 @@ export {
   useAgregarParticipante,
   useAnularPermiso,
   useCrearPermiso,
+  useElegirResponsable,
   useElegirUnidades,
   useEmitirPermiso,
   useFirmarEnApp,
@@ -55,6 +57,7 @@ export {
   useDefinirCuotaDeAfiliacion,
   useGenerarDeudasPendientes,
   useRegistrarPago,
+  useReporteDeCobranza,
   useTesoreria,
 } from './tesoreria'
 export type { SecretoDeSesion, Transporte } from './transporte'

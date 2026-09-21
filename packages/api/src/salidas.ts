@@ -5,6 +5,7 @@ import {
   AnularPermisoDocument,
   ConfirmarSubidaDocument,
   CrearPermisoDocument,
+  ElegirResponsableDocument,
   ElegirUnidadesDocument,
   EmitirPermisoDocument,
   FirmarEnAppDocument,
@@ -53,11 +54,21 @@ export function useCrearPermiso() {
       variables: {
         grupoId: string
         lugar: string
+        direccion: string
+        localidad: string
+        provincia: string
+        telefono: string
         desde: string
         hasta: string
         comoSeViaja?: string | null
       },
     ) => transporte.ejecutar(CrearPermisoDocument, variables),
+  )
+}
+
+export function useElegirResponsable() {
+  return useMutacionDePermiso((transporte, variables: { permisoId: string; personaId: string }) =>
+    transporte.ejecutar(ElegirResponsableDocument, variables),
   )
 }
 

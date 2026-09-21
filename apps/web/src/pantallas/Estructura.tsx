@@ -175,10 +175,13 @@ export function Estructura() {
                 <h3>
                   <button
                     type="button"
+                    aria-expanded={distrito.abierto}
                     onClick={() =>
+                      // `previos` y no `cerrados`: leer del closure adentro del
+                      // updater es exactamente lo que el updater evita.
                       setCerrados((previos) => ({
                         ...previos,
-                        [distrito.id]: !cerrados[distrito.id],
+                        [distrito.id]: !previos[distrito.id],
                       }))
                     }
                     className="flex min-h-16 w-full items-center gap-3 bg-surface-3 px-4 py-2.5 text-left"

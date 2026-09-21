@@ -103,7 +103,11 @@ export default function Pantalla() {
           const jefatura = persona.cargos.find(
             (cargo) => cargo.cargo === JEFATURA && vigente(cargo, ahora),
           )
-          const secretaria = persona.equipos.find((equipo) => vigente(equipo, ahora))
+          // Puede integrar además un equipo diocesano: sólo Secretaría de
+          // grupo concede el vínculo que esta pantalla administra.
+          const secretaria = persona.equipos.find(
+            (equipo) => equipo.tipo === SECRETARIA && vigente(equipo, ahora),
+          )
 
           return (
             <View key={persona.id} className="border-b border-line py-3">

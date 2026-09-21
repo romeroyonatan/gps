@@ -3,6 +3,7 @@ import { type Builder, enumCompartido } from '@gps/core/graphql'
 import { TIPOS_DE_CARGO, type TipoDeCargo } from '@gps/personas/dominio'
 import { GraphQLError } from 'graphql'
 import { type Adjunto, ESTADOS, type Estado, type Permiso } from '../dominio/modelos'
+import { numeroDeExpediente } from '../dominio/permisos'
 import { PermisoInvalido, PermisoNoEditable } from './borradores'
 import { type EstadoDeFirma, FirmaInvalida } from './firmas'
 
@@ -105,9 +106,19 @@ export function registrarSchema(builder: Builder): void {
       id: t.exposeID('id'),
       estado: t.field({ type: EstadoRef, resolve: (permiso) => permiso.estado }),
       lugar: t.exposeString('lugar'),
+      direccion: t.exposeString('direccion'),
+      localidad: t.exposeString('localidad'),
+      provincia: t.exposeString('provincia'),
       desde: t.exposeString('desde'),
       hasta: t.exposeString('hasta'),
       comoSeViaja: t.exposeString('comoSeViaja', { nullable: true }),
+      responsableId: t.exposeID('responsableId', { nullable: true }),
+      telefono: t.exposeString('telefono'),
+      expediente: t.string({
+        description: 'El número de la serie: SAL-2026-0147. Null mientras sea borrador.',
+        nullable: true,
+        resolve: (permiso) => numeroDeExpediente(permiso),
+      }),
       pdfId: t.exposeID('pdfId', { nullable: true }),
       reemplazaA: t.exposeID('reemplazaA', { nullable: true }),
       unidadIds: t.idList({
@@ -211,6 +222,10 @@ export function registrarSchema(builder: Builder): void {
       args: {
         grupoId: t.arg.id({ required: true }),
         lugar: t.arg.string({ required: true }),
+        direccion: t.arg.string({ required: true }),
+        localidad: t.arg.string({ required: true }),
+        provincia: t.arg.string({ required: true }),
+        telefono: t.arg.string({ required: true }),
         desde: t.arg.string({ required: true }),
         hasta: t.arg.string({ required: true }),
         comoSeViaja: t.arg.string(),
@@ -219,11 +234,36 @@ export function registrarSchema(builder: Builder): void {
         await traduciendoErrores(() =>
           contexto.salidas.crearPermiso(alcanceDe(contexto), String(args.grupoId), {
             lugar: args.lugar,
+            direccion: args.direccion,
+            localidad: args.localidad,
+            provincia: args.provincia,
+            telefono: args.telefono,
             desde: args.desde,
             hasta: args.hasta,
             comoSeViaja: args.comoSeViaja ?? null,
           }),
         ),
+    }),
+  )
+
+  builder.mutationField('elegirResponsable', (t) =>
+    t.field({
+      type: PermisoRef,
+      args: {
+        permisoId: t.arg.id({ required: true }),
+        personaId: t.arg.id({ required: true }),
+      },
+      resolve: async (_padre, args, contexto) => {
+        const permisoId = String(args.permisoId)
+        await traduciendoErrores(() =>
+          contexto.salidas.elegirResponsable(
+            alcanceDe(contexto),
+            permisoId,
+            String(args.personaId),
+          ),
+        )
+        return await exigirPermiso(contexto, permisoId)
+      },
     }),
   )
 

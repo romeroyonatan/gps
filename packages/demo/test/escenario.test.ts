@@ -62,8 +62,17 @@ function montarContexto(hora: Date | (() => Date) = HORA, entorno: Entorno = 'de
     },
     conversorDeImagenes: { aJpeg: async (contenido: Uint8Array) => contenido },
     // Falso pero estable y sensible al contenido, que es lo que los tests miran.
-    hash: (contenido: Uint8Array | string) =>
-      `hash:${typeof contenido === 'string' ? contenido : contenido.join(',')}`,
+    // Hexadecimal, como un hash de verdad: la siembra emite permisos y el PDF
+    // imprime la huella en el pie, así que un falso que devuelva el contenido
+    // entero rompe al dibujarlo.
+    hash: (contenido: Uint8Array | string) => {
+      const texto = typeof contenido === 'string' ? contenido : contenido.join(',')
+      let acumulado = 0
+      for (const caracter of texto) {
+        acumulado = (acumulado * 31 + caracter.charCodeAt(0)) % 0xffffffff
+      }
+      return acumulado.toString(16).padStart(8, '0').repeat(8)
+    },
     nuevoId: (prefijo) => `${prefijo}_${++contador}`,
     nuevoSecreto: () => `secreto_${++contador}`,
   }

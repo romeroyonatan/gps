@@ -6,6 +6,7 @@ import type {
   CuotaDeAfiliacion,
   MedioDePago,
   MovimientoDeTesoreria,
+  ReporteDeCobranza,
   ResultadoDeReconciliacion,
   ResumenDePendientes,
 } from '../dominio'
@@ -13,6 +14,7 @@ import { crearOperacionesDeCargos } from './cargos'
 import { crearConsultasDeTesoreria } from './consultas'
 import { crearOperacionesDeCuotas } from './cuotas'
 import { crearOperacionesDePagos } from './pagos'
+import { crearReportesDeTesoreria } from './reportes'
 
 export { CuotaUtilizada, DatosDePagoInvalidos, OperacionDenegada, PagoNoAnulable } from './errores'
 
@@ -38,6 +40,7 @@ export interface ServicioDeTesoreria {
   anularPago(alcance: Alcance, pagoId: string): Promise<MovimientoDeTesoreria>
   listarMovimientos(alcance: Alcance, grupoId: string): Promise<readonly MovimientoDeTesoreria[]>
   listarCuentas(alcance: Alcance): Promise<readonly CuentaDeGrupo[]>
+  reporteDeCobranza(alcance: Alcance, periodo: number): Promise<ReporteDeCobranza>
 }
 
 /** Compone los casos de uso del módulo. Las dependencias llegan ya
@@ -54,6 +57,7 @@ export function crearServicioDeTesoreria(
     ...cargos,
     ...crearOperacionesDePagos(core, estructura),
     ...crearConsultasDeTesoreria(core, estructura),
+    ...crearReportesDeTesoreria(core, afiliacion, estructura),
   }
 
   // Es Tesorería quien conoce a Afiliación, nunca al revés: el evento es la
