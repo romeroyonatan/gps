@@ -18,7 +18,12 @@ import {
 } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import { nombreCompleto } from '@gps/personas/dominio'
-import { avisoDeAnticipacion, candidatos, type Trazos } from '@gps/salidas/dominio'
+import {
+  avisoDeAnticipacion,
+  candidatos,
+  cuentaRegresivaDeSalida,
+  type Trazos,
+} from '@gps/salidas/dominio'
 import * as DocumentPicker from 'expo-document-picker'
 import * as ImagePicker from 'expo-image-picker'
 import { Link, useLocalSearchParams } from 'expo-router'
@@ -373,7 +378,8 @@ function Tarjeta(props: { permiso: Permiso; grupoId: string }) {
   const { permiso } = props
   const emitir = useEmitirPermiso()
   const anular = useAnularPermiso()
-  const aviso = avisoDeAnticipacion(aFechaDeCalendario(new Date()), permiso.desde)
+  const hoy = aFechaDeCalendario(new Date())
+  const aviso = avisoDeAnticipacion(hoy, permiso.desde)
 
   return (
     <View className="mt-4 rounded-lg bg-white p-4">
@@ -384,7 +390,7 @@ function Tarjeta(props: { permiso: Permiso; grupoId: string }) {
         </View>
       </View>
       <Text className="mt-0.5 text-xs text-slate-500">
-        {permiso.desde} a {permiso.hasta}
+        {permiso.desde} a {permiso.hasta} · {cuentaRegresivaDeSalida(hoy, permiso.desde)}
         {permiso.comoSeViaja ? ` · ${permiso.comoSeViaja}` : ''}
       </Text>
 

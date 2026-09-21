@@ -12,8 +12,7 @@
  *  Manada de lobatos, la Tropa scout. Es el tipo, no el nombre propio -ese lo
  *  pone cada grupo-, y por eso vive en el catalogo y no en la tabla: se deriva
  *  de la rama y no lo elige nadie. Scouts y raiders llevan la rama en el tipo
- *  porque a las dos se les dice tropa; la de adultos es "Tropa" a secas, que
- *  es como se la nombra.
+ *  porque a las tres se les dice tropa.
  *
  *  Agregar una rama es cambio solo de codigo. Sacar o renombrar una NO lo es:
  *  `unidades` sigue guardando el id viejo, y la fila queda invisible
@@ -25,7 +24,13 @@ export const RAMAS = [
   { id: 'scouts', nombre: 'Scouts', desde: 10, hasta: 14, unidad: 'Tropa scout' },
   { id: 'raiders', nombre: 'Raiders', desde: 14, hasta: 17, unidad: 'Tropa raider' },
   { id: 'rovers', nombre: 'Rovers', desde: 17, hasta: 21, unidad: 'Clan' },
-  { id: 'adultos', nombre: 'Adultos', desde: 21, hasta: null, unidad: 'Tropa' },
+  {
+    id: 'adultos',
+    nombre: 'Adultos',
+    desde: 21,
+    hasta: null,
+    unidad: 'Tropa Scout Adultos',
+  },
 ] as const
 
 export type Rama = (typeof RAMAS)[number]['id']

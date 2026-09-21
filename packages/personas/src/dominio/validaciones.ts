@@ -17,6 +17,8 @@ export interface Problema {
     | 'nombres'
     | 'apellidos'
     | 'fechaDeNacimiento'
+    | 'domicilio'
+    | 'telefonoDeContacto'
     | 'unidad'
     | 'desde'
     | 'cargos'
@@ -52,6 +54,15 @@ export function validarPersona(datos: DatosDePersona, hoy: Date): readonly Probl
   }
   if (!datos.apellidos.trim()) {
     problemas.push({ campo: 'apellidos', mensaje: 'Los apellidos no pueden estar vacíos.' })
+  }
+  if (!datos.domicilio.trim()) {
+    problemas.push({ campo: 'domicilio', mensaje: 'El domicilio no puede estar vacío.' })
+  }
+  if (!datos.telefonoDeContacto.trim()) {
+    problemas.push({
+      campo: 'telefonoDeContacto',
+      mensaje: 'El teléfono de contacto no puede estar vacío.',
+    })
   }
 
   // Se valida el numero ya normalizado, que es como se va a guardar: si no, un

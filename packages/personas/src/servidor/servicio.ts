@@ -490,6 +490,8 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
         numeroDeDocumento,
         nombres: datos.nombres.trim(),
         apellidos: datos.apellidos.trim(),
+        domicilio: datos.domicilio.trim(),
+        telefonoDeContacto: datos.telefonoDeContacto.trim(),
         creadoEn: ahora,
         actualizadoEn: ahora,
       }

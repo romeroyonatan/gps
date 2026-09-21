@@ -1,6 +1,8 @@
 import { type PermisosQuery, useActor, useGrupo, usePermisos } from '@gps/api'
 import type { Actor } from '@gps/core'
+import { aFechaDeCalendario } from '@gps/core/fechas'
 import {
+  cuentaRegresivaDeSalida,
   puedeAdministrarPermisosDelGrupo,
   puedeFirmarComo,
   resumenDeParticipantes,
@@ -19,6 +21,7 @@ function Fila(props: {
   grupoId: string
   distritoId: string | undefined
   actor: Actor | null
+  hoy: string
 }) {
   const { permiso } = props
 
@@ -41,7 +44,7 @@ function Fila(props: {
           <Chip tono={estado.tono}>{estado.texto}</Chip>
         </span>
         <span className="text-label tabular-nums text-ink-muted">
-          {permiso.desde} a {permiso.hasta}
+          {permiso.desde} a {permiso.hasta} · {cuentaRegresivaDeSalida(props.hoy, permiso.desde)}
           {permiso.estado !== 'borrador' && permiso.emitidos.length > 0 && (
             <>
               {' · '}
@@ -62,6 +65,7 @@ export function Salidas(props: { grupoId: string }) {
   const consulta = usePermisos(props.grupoId)
   const { distrito } = useGrupo(props.grupoId)
   const actor = useActor()
+  const hoy = aFechaDeCalendario(new Date())
 
   const administra = actor !== null && puedeAdministrarPermisosDelGrupo(actor, props.grupoId)
   const permisos = consulta.data?.permisos ?? []
@@ -89,6 +93,7 @@ export function Salidas(props: { grupoId: string }) {
             grupoId={props.grupoId}
             distritoId={distrito?.id}
             actor={actor}
+            hoy={hoy}
           />
         ))}
       </ul>

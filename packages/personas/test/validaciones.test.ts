@@ -13,6 +13,8 @@ const valida: DatosDePersona = {
   nombres: 'María Luz',
   apellidos: 'Fernández Ruiz',
   fechaDeNacimiento: '2010-05-01',
+  domicilio: 'Av. Siempre Viva 742',
+  telefonoDeContacto: '11 5555-1234',
 }
 
 const campos = (datos: DatosDePersona) =>
@@ -30,6 +32,11 @@ describe('validarPersona', () => {
 
   test('los apellidos tampoco', () => {
     expect(campos({ ...valida, apellidos: '' })).toEqual(['apellidos'])
+  })
+
+  test('el domicilio y el teléfono de contacto son obligatorios', () => {
+    expect(campos({ ...valida, domicilio: ' ' })).toEqual(['domicilio'])
+    expect(campos({ ...valida, telefonoDeContacto: '' })).toEqual(['telefonoDeContacto'])
   })
 
   test('acumula todos los problemas, no corta en el primero', () => {

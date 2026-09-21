@@ -44,6 +44,8 @@ const VACIO: DatosDePersona = {
   nombres: '',
   apellidos: '',
   fechaDeNacimiento: '',
+  domicilio: '',
+  telefonoDeContacto: '',
 }
 
 /** Los meses con nombre, no con número: evita el error de 03/04 contra 04/03.
@@ -365,6 +367,28 @@ export function AltaDePersona(props: { grupoId: string }) {
               <p className="mt-1.5 text-sm text-danger">{problemaDe('numeroDeDocumento')}</p>
             )}
           </div>
+
+          <Campo etiqueta="Domicilio" problema={problemaDe('domicilio')}>
+            <input
+              className={`${CAMPO} h-13`}
+              value={datos.domicilio}
+              onChange={(evento) => setDatos({ ...datos, domicilio: evento.target.value })}
+              autoComplete="street-address"
+            />
+          </Campo>
+
+          <Campo
+            etiqueta="Teléfono de contacto / emergencias"
+            problema={problemaDe('telefonoDeContacto')}
+          >
+            <input
+              type="tel"
+              className={`${CAMPO} h-13`}
+              value={datos.telefonoDeContacto}
+              onChange={(evento) => setDatos({ ...datos, telefonoDeContacto: evento.target.value })}
+              autoComplete="tel"
+            />
+          </Campo>
 
           <div>
             <span className="text-sm font-semibold">Categoría</span>

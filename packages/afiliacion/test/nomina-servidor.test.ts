@@ -40,6 +40,8 @@ const MIEMBROS: readonly MiembroDelGrupo[] = [
       tipoDeDocumento: 'dni',
       numeroDeDocumento: '46118450',
       fechaDeNacimiento: '1960-12-01',
+      domicilio: 'Av. Siempre Viva 742',
+      telefonoDeContacto: '11 5555-1234',
       creadoEn: HORA,
       actualizadoEn: HORA,
     },

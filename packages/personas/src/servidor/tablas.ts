@@ -37,6 +37,8 @@ export const personas = sqliteTable(
     nombres: text('nombres').notNull(),
     apellidos: text('apellidos').notNull(),
     fechaDeNacimiento: text('fecha_de_nacimiento').notNull(),
+    domicilio: text('domicilio').notNull().default(''),
+    telefonoDeContacto: text('telefono_de_contacto').notNull().default(''),
     ...marcas,
   },
   (tabla) => [unique().on(tabla.tipoDeDocumento, tabla.numeroDeDocumento)],

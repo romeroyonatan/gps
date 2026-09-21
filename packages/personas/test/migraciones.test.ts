@@ -57,7 +57,9 @@ beforeEach(() => {
 
 const insertar = (id: string, tipo: string, numero: string) =>
   bd.run(
-    sql`INSERT INTO personas VALUES (${id}, ${tipo}, ${numero}, 'Ana', 'Perez', '2010-05-01', 0, 0)`,
+    sql`INSERT INTO personas
+        (id, tipo_de_documento, numero_de_documento, nombres, apellidos, fecha_de_nacimiento, creado_en, actualizado_en)
+        VALUES (${id}, ${tipo}, ${numero}, 'Ana', 'Perez', '2010-05-01', 0, 0)`,
   )
 
 describe('migraciones de personas', () => {
@@ -287,6 +289,7 @@ describe('pertenencias y cargos', () => {
       '0005_baja_grupo_de_cargo',
       '0006_equipos_y_revocacion',
       '0007_eventos_de_autoridad',
+      '0008_datos-personales',
     ])
   })
 })

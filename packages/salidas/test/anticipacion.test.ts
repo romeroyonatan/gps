@@ -1,6 +1,15 @@
 import { describe, expect, test } from 'bun:test'
-import { avisoDeAnticipacion } from '../src/dominio/anticipacion'
+import { avisoDeAnticipacion, cuentaRegresivaDeSalida } from '../src/dominio/anticipacion'
 import { DIAS_DE_ANTICIPACION } from '../src/dominio/config'
+
+describe('cuentaRegresivaDeSalida', () => {
+  test('cuenta los días futuros y nombra hoy y las salidas empezadas', () => {
+    expect(cuentaRegresivaDeSalida('2026-10-01', '2026-10-15')).toBe('Faltan 14 días')
+    expect(cuentaRegresivaDeSalida('2026-10-01', '2026-10-02')).toBe('Faltan 1 día')
+    expect(cuentaRegresivaDeSalida('2026-10-01', '2026-10-01')).toBe('Sale hoy')
+    expect(cuentaRegresivaDeSalida('2026-10-02', '2026-10-01')).toBe('Empezó hace 1 día')
+  })
+})
 
 describe('avisoDeAnticipacion', () => {
   test('con la anticipacion justa no avisa', () => {

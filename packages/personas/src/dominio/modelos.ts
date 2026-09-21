@@ -21,6 +21,8 @@ export interface Persona extends Marcas {
    *  se ordena igual lexicografica que cronologicamente, y es exactamente lo
    *  que emite y espera un <input type="date">. */
   readonly fechaDeNacimiento: string
+  readonly domicilio: string
+  readonly telefonoDeContacto: string
 }
 
 /** Lo que entra por el alta: la Persona sin lo que pone el servidor. Derivarlo

@@ -10,6 +10,7 @@ import unidades from '../../migraciones/0002_unidades.sql' with { type: 'text' }
 import bajaRamasDelGrupo from '../../migraciones/0003_baja_ramas_del_grupo.sql' with {
   type: 'text',
 }
+import tropaScoutAdultos from '../../migraciones/0004_tropa_scout_adultos.sql' with { type: 'text' }
 
 /** Las migraciones del modulo, en orden. Agregar una es generarla con
  *  `bunx drizzle-kit generate --name <x>` y sumarle una linea a esta lista. */
@@ -18,4 +19,5 @@ export const migraciones: readonly Migracion[] = [
   { nombre: '0001_cierre', sql: cierre },
   { nombre: '0002_unidades', sql: unidades },
   { nombre: '0003_baja_ramas_del_grupo', sql: bajaRamasDelGrupo },
+  { nombre: '0004_tropa_scout_adultos', sql: tropaScoutAdultos },
 ]

@@ -141,6 +141,8 @@ export function registrarSchema(builder: Builder): void {
       fechaDeNacimiento: t.exposeString('fechaDeNacimiento', {
         description: 'Fecha de calendario en formato aaaa-mm-dd, sin hora ni zona horaria.',
       }),
+      domicilio: t.exposeString('domicilio'),
+      telefonoDeContacto: t.exposeString('telefonoDeContacto'),
       pertenencia: t.field({ type: PertenenciaRef, resolve: (persona) => persona.pertenencia }),
       cargos: t.field({
         type: [CargoRef],
@@ -165,6 +167,8 @@ export function registrarSchema(builder: Builder): void {
       nombres: t.string({ required: true }),
       apellidos: t.string({ required: true }),
       fechaDeNacimiento: t.string({ required: true }),
+      domicilio: t.string({ required: true }),
+      telefonoDeContacto: t.string({ required: true }),
     }),
   })
 

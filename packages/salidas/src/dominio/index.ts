@@ -1,4 +1,4 @@
-export { avisoDeAnticipacion } from './anticipacion'
+export { avisoDeAnticipacion, cuentaRegresivaDeSalida } from './anticipacion'
 export { DIAS_DE_ANTICIPACION } from './config'
 export { type FirmanteRequerido, firmantesRequeridos, mensajeASellar } from './firmas'
 export type {

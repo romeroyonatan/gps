@@ -153,6 +153,8 @@ const valida: DatosDePersona = {
   nombres: 'María Luz',
   apellidos: 'Fernández Ruiz',
   fechaDeNacimiento: '1950-05-01',
+  domicilio: 'Av. Siempre Viva 742',
+  telefonoDeContacto: '11 5555-1234',
 }
 
 const actor = (rol: 'jefeDeGrupo' | 'secretariaDeGrupo', grupoId = 'grupo_1'): Actor => ({
@@ -350,6 +352,8 @@ describe('crearPersona', () => {
       nombres: 'María Luz',
       apellidos: 'Fernández Ruiz',
       fechaDeNacimiento: '1950-05-01',
+      domicilio: 'Av. Siempre Viva 742',
+      telefonoDeContacto: '11 5555-1234',
       creadoEn: HORA,
       actualizadoEn: HORA,
     })
