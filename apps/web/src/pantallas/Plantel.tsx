@@ -10,6 +10,7 @@ import {
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import { estaVigente, nombreCompleto, puedeAdministrarPlantelDeGrupo } from '@gps/personas/dominio'
 import { useState } from 'react'
+import { Aviso, Cargando, Chip, Falla, Nota, Titulo } from '../ui'
 
 /** Lo que esta pantalla administra: la jefatura del grupo y su Secretaría.
  *  Los demás cargos se cargan al dar de alta a la persona; acá están los dos
@@ -24,20 +25,20 @@ const vigente = (periodo: { desde: string; hasta?: string | null }, hoy: Date) =
 
 function Etiqueta(props: { children: React.ReactNode; onQuitar?: () => void; quitando?: boolean }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">
+    <Chip>
       {props.children}
       {props.onQuitar && (
         <button
           type="button"
           onClick={props.onQuitar}
           disabled={props.quitando}
-          className="text-slate-400 hover:text-red-700"
+          className="text-ink-faint hover:text-danger disabled:opacity-40"
           aria-label="Quitar"
         >
           ×
         </button>
       )}
-    </span>
+    </Chip>
   )
 }
 
@@ -72,7 +73,7 @@ function Enlace(props: { personaId: string; nombre: string }) {
         type="button"
         onClick={() => invitar.mutate({ personaId: props.personaId, tipo: 'activacion' })}
         disabled={invitar.isPending}
-        className="text-xs font-medium text-slate-500 hover:text-slate-900"
+        className="min-h-9 text-label font-medium text-ink-muted hover:text-ink disabled:opacity-40"
       >
         {invitar.isPending ? 'Generando…' : 'Generar enlace de acceso'}
       </button>
@@ -80,19 +81,17 @@ function Enlace(props: { personaId: string; nombre: string }) {
   }
 
   return (
-    <div className="mt-1.5 rounded-lg bg-amber-50 p-2">
-      <p className="text-xs text-amber-900">
-        Este enlace le da acceso a {props.nombre} y se ve una sola vez. Vence en siete días.
-      </p>
-      <p className="mt-1 text-xs break-all text-amber-800">{url}</p>
+    <Aviso>
+      Este enlace le da acceso a {props.nombre} y se ve una sola vez. Vence en siete días.
+      <span className="mt-1.5 block break-all">{url}</span>
       <button
         type="button"
         onClick={compartir}
-        className="mt-1.5 text-xs font-medium text-amber-900 underline"
+        className="mt-2 block min-h-9 font-semibold underline"
       >
         {copiado ? 'Copiado' : 'Compartir'}
       </button>
-    </div>
+    </Aviso>
   )
 }
 
@@ -113,13 +112,9 @@ export function Plantel(props: { grupoId: string }) {
   // el servidor rechace.
   const puede = actor !== null && puedeAdministrarPlantelDeGrupo(actor, props.grupoId)
 
-  if (isPending) return <p className="mt-8 text-sm text-slate-500">Consultando el plantel…</p>
+  if (isPending) return <Cargando>Consultando el plantel…</Cargando>
   if (error) {
-    return (
-      <p className="mt-8 rounded-lg bg-red-50 p-4 text-sm break-words text-red-800">
-        No se pudo consultar el plantel: {error.message}
-      </p>
-    )
+    return <Falla>No se pudo consultar el plantel: {error.message}</Falla>
   }
 
   const adultos = data.personas.filter(
@@ -127,21 +122,19 @@ export function Plantel(props: { grupoId: string }) {
   )
 
   return (
-    <section className="mt-8">
-      <h2 className="text-lg font-medium text-slate-900">Plantel</h2>
-      <p className="mt-1 text-sm text-slate-500">
-        Quién administra este grupo. Los cargos y los equipos son lo que da acceso: al sacarlos, se
-        pierde en el pedido siguiente.
-      </p>
+    <section>
+      <Titulo acompaña="Quién administra este grupo. Los cargos y los equipos son lo que da acceso: al sacarlos, se pierde en el pedido siguiente.">
+        Plantel
+      </Titulo>
 
       {!puede && (
-        <p className="mt-4 rounded-lg bg-slate-100 p-3 text-sm text-slate-600">
+        <Nota>
           Podés ver el plantel, pero no cambiarlo: eso lo hace la jefatura o la Secretaría de este
           grupo.
-        </p>
+        </Nota>
       )}
 
-      <ul className="mt-4 divide-y divide-slate-200 overflow-hidden rounded-lg bg-white">
+      <ul className="mt-4">
         {adultos.map((persona) => {
           const jefatura = persona.cargos.find(
             (cargo) => cargo.cargo === JEFATURA && vigente(cargo, ahora),
@@ -149,8 +142,8 @@ export function Plantel(props: { grupoId: string }) {
           const secretaria = persona.equipos.find((equipo) => vigente(equipo, ahora))
 
           return (
-            <li key={persona.id} className="px-4 py-3">
-              <p className="text-sm font-medium text-slate-900">{nombreCompleto(persona)}</p>
+            <li key={persona.id} className="border-b border-line py-3 last:border-b-0">
+              <p className="text-sm font-semibold">{nombreCompleto(persona)}</p>
 
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 {jefatura && (
@@ -188,7 +181,7 @@ export function Plantel(props: { grupoId: string }) {
                       })
                     }
                     disabled={asignar.isPending}
-                    className="text-xs font-medium text-slate-500 hover:text-slate-900"
+                    className="min-h-9 text-label font-medium text-ink-muted hover:text-ink"
                   >
                     + Jefatura
                   </button>
@@ -205,7 +198,7 @@ export function Plantel(props: { grupoId: string }) {
                       })
                     }
                     disabled={integrar.isPending}
-                    className="text-xs font-medium text-slate-500 hover:text-slate-900"
+                    className="min-h-9 text-label font-medium text-ink-muted hover:text-ink"
                   >
                     + Secretaría
                   </button>
@@ -221,12 +214,7 @@ export function Plantel(props: { grupoId: string }) {
       {[asignar.error, revocarCargo.error, integrar.error, revocarEquipo.error]
         .filter((problema) => problema !== null)
         .map((problema) => (
-          <p
-            key={problema.message}
-            className="mt-4 rounded-lg bg-red-50 p-3 text-sm break-words text-red-800"
-          >
-            {problema.message}
-          </p>
+          <Falla key={problema.message}>{problema.message}</Falla>
         ))}
     </section>
   )

@@ -93,7 +93,9 @@ export function useNombreDelAmbito() {
   }
 }
 
-/** El conmutador de rol, al lado de la marca.
+/** El conmutador de rol. Vive en dos lugares -la cabecera del teléfono y el
+ *  pie de la barra de tareas-, y por eso la hoja se abre para donde haya
+ *  lugar: abajo en la cabecera, arriba cuando cuelga del pie.
  *
  *  Con una sola función no hay control: se muestra el ámbito y nada más. No se
  *  ofrece un menú de una sola opción. */
@@ -101,14 +103,32 @@ export function CambioDeRol(props: {
   roles: readonly Funcion[]
   activo: Funcion
   elegir: (funcion: Funcion) => void
+  hacia?: 'abajo' | 'arriba'
+  /** Si el ámbito puede ocupar dos líneas. En el pie de la barra sobra alto y
+   *  falta ancho, así que un nombre largo se lee entero; en la cabecera del
+   *  teléfono la franja mide 44px y ahí se recorta. */
+  envuelve?: boolean
 }) {
   const { roles, activo, elegir } = props
+  const arriba = props.hacia === 'arriba'
   const nombreDelAmbito = useNombreDelAmbito()
   const [, navegar] = useLocation()
   const [abierta, abrir] = useState(false)
 
+  // El tope de ancho es lo que hace que `truncate` haga algo: sin él la caja
+  // crece con el texto y se sale. `max-w-full` lo topa contra la columna del
+  // pie y `min-w-0` lo deja encogerse en la fila de la cabecera.
   if (roles.length === 1) {
-    return <span className="truncate text-sm text-ink-muted">{nombreDelAmbito(activo)}</span>
+    return (
+      <span
+        className={`block min-w-0 max-w-full text-sm text-ink-muted ${
+          props.envuelve ? 'text-pretty' : 'truncate'
+        }`}
+        title={nombreDelAmbito(activo)}
+      >
+        {nombreDelAmbito(activo)}
+      </span>
+    )
   }
 
   return (
@@ -117,7 +137,8 @@ export function CambioDeRol(props: {
         type="button"
         onClick={() => abrir(!abierta)}
         aria-expanded={abierta}
-        className={`inline-flex min-h-9 min-w-0 items-center gap-1.5 rounded-full border px-2.5 text-sm font-semibold ${
+        title={nombreDelAmbito(activo)}
+        className={`inline-flex min-h-9 min-w-0 max-w-full items-center gap-1.5 rounded-full border px-2.5 text-sm font-semibold ${
           abierta
             ? 'border-accent bg-accent text-accent-ink'
             : 'border-line-strong text-ink hover:bg-surface-3'
@@ -137,9 +158,15 @@ export function CambioDeRol(props: {
             type="button"
             aria-label="Cerrar"
             onClick={() => abrir(false)}
-            className="fixed inset-0 top-11 z-10 cursor-default bg-ink/10"
+            className={`fixed inset-0 z-10 cursor-default bg-velo backdrop-blur-sm ${
+              arriba ? '' : 'top-11'
+            }`}
           />
-          <div className="absolute inset-x-0 top-11 z-20 border-b border-line bg-surface shadow-sm">
+          <div
+            className={`absolute inset-x-0 z-20 border-line bg-surface shadow-md ${
+              arriba ? 'bottom-full mb-2 rounded-lg border' : 'top-11 border-b'
+            }`}
+          >
             <p className="px-5 pb-1 pt-2 text-label text-ink-muted">Entrar como</p>
             {roles.map((funcion) => {
               const esActivo = claveDelRol(funcion) === claveDelRol(activo)

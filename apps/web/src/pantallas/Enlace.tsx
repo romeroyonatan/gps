@@ -1,4 +1,5 @@
 import { useInvitacion } from '@gps/api'
+import { BOTON_SECUNDARIO, Cargando, Falla, Nota, Titulo } from '../ui'
 
 /** Por qué no sirve un enlace. Se explican los tres casos por separado porque
  *  para quien lo abrió son problemas distintos: uno vencido se vuelve a pedir,
@@ -22,21 +23,13 @@ export function Enlace(props: { tipo: 'activacion' | 'recuperacion'; secreto: st
   const { data, isPending, error } = useInvitacion(props.secreto)
   const invitacion = data?.invitacion
 
-  if (isPending) return <p className="mt-8 text-sm text-slate-500">Un momento…</p>
+  if (isPending) return <Cargando>Un momento…</Cargando>
   if (error) {
-    return (
-      <p className="mt-8 rounded-lg bg-red-50 p-4 text-sm break-words text-red-800">
-        No se pudo leer el enlace: {error.message}
-      </p>
-    )
+    return <Falla>No se pudo leer el enlace: {error.message}</Falla>
   }
 
   if (invitacion?.estado !== 'valida') {
-    return (
-      <p className="mt-8 rounded-lg bg-slate-100 p-4 text-sm text-slate-700">
-        {PORQUE[invitacion?.estado ?? 'vencida'] ?? PORQUE.vencida}
-      </p>
-    )
+    return <Nota>{PORQUE[invitacion?.estado ?? 'vencida'] ?? PORQUE.vencida}</Nota>
   }
 
   const recupera = invitacion.tipo === 'recuperacion'
@@ -45,24 +38,24 @@ export function Enlace(props: { tipo: 'activacion' | 'recuperacion'; secreto: st
   const proveedor = invitacion.proveedorAReemplazar ?? 'google'
 
   return (
-    <section className="mt-8">
-      <h2 className="text-lg font-medium text-slate-900">
-        {recupera ? 'Recuperar el acceso' : 'Activar el acceso'}
-      </h2>
+    <section>
+      <Titulo>{recupera ? 'Recuperar el acceso' : 'Activar el acceso'}</Titulo>
 
-      <div className="mt-4 rounded-lg bg-white p-4">
-        <p className="text-sm text-slate-500">Este enlace es para</p>
-        <p className="mt-0.5 text-base font-medium text-slate-900">{invitacion.persona}</p>
-        {invitacion.grupo && <p className="mt-1 text-sm text-slate-600">{invitacion.grupo}</p>}
+      {/* Bloque gris en vez de tarjeta con sombra: agrupa igual y se ve igual
+          en web y en React Native. */}
+      <div className="mt-5 rounded-lg bg-surface-3 p-4">
+        <p className="text-label text-ink-muted">Este enlace es para</p>
+        <p className="mt-1 text-xl font-bold">{invitacion.persona}</p>
+        {invitacion.grupo && <p className="mt-1 text-sm text-ink-muted">{invitacion.grupo}</p>}
       </div>
 
-      <p className="mt-4 text-sm text-slate-600">
+      <p className="mt-4 text-base text-ink-muted">
         {recupera
           ? 'Al continuar, la cuenta que uses queda vinculada a esa persona y se cierran todas ' +
             'las sesiones abiertas: vas a tener que entrar de nuevo en cada dispositivo.'
           : 'Al continuar, la cuenta que uses queda vinculada a esa persona.'}
       </p>
-      <p className="mt-2 text-sm text-slate-600">
+      <p className="mt-2 text-base text-ink-muted">
         Si no sos esa persona, cerrá esta página: el enlace se usa una sola vez.
       </p>
 
@@ -71,7 +64,7 @@ export function Enlace(props: { tipo: 'activacion' | 'recuperacion'; secreto: st
           <a
             key={cual}
             href={`/auth/${cual}/iniciar?intencion=${props.tipo}&secreto=${encodeURIComponent(props.secreto)}`}
-            className="block rounded-lg border border-slate-300 bg-white px-4 py-3 text-center text-sm font-medium text-slate-900 hover:bg-slate-50"
+            className={`${BOTON_SECUNDARIO} min-h-12 text-base`}
           >
             Continuar con{' '}
             {cual === 'apple' ? 'Apple' : cual === 'demo' ? 'el perfil demo' : 'Google'}

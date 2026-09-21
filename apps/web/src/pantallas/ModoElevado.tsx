@@ -37,16 +37,16 @@ export function ModoElevado(props: { entorno: string }) {
     return (
       <a
         href={enlaceDeElevacion(props.entorno === 'demo' ? 'demo' : 'google', 'administrador')}
-        className="mt-4 block rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900"
+        className="mt-4 flex min-h-11 items-center rounded-lg bg-warn-soft px-4 text-sm text-warn"
       >
         Elevarse para administrar todo →{' '}
-        <span className="text-amber-700">pide volver a identificarte</span>
+        <span className="opacity-80">pide volver a identificarte</span>
       </a>
     )
   }
 
   return (
-    <div className="mt-4 rounded-lg bg-amber-100 px-4 py-2 text-sm text-amber-900">
+    <div className="mt-4 rounded-lg bg-warn-soft px-4 py-2.5 text-sm text-warn">
       Modo elevado: ves y modificás toda la diócesis. Vence en {falta}. Todo lo que escribas queda
       auditado.
     </div>

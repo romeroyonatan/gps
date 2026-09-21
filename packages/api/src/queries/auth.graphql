@@ -3,6 +3,7 @@ query PersonaActual {
   personaActual {
     personaId
     nombres
+    apellidos
     esAdministradorDesignado
     estaElevado
     elevadaHasta
