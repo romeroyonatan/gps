@@ -38,6 +38,33 @@ export const BOTON_AL_MARGEN =
  *  pantalla: hoy hay una sola. */
 export const FILA = 'flex min-h-14 items-center gap-3 border-b border-line py-2 last:border-b-0'
 
+/* ── Iconos ─────────────────────────────────────────────────────────────── */
+
+/** El único dibujo de la guía: trazo de 1.7, sin relleno, hereda el color del
+ *  texto. Son los `d` de los `<path>` y nada más —no hay librería de iconos—,
+ *  así que un icono nuevo es una constante con sus trazos, no una dependencia. */
+export function Icono(props: { trazos: readonly string[]; className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={props.className ?? 'size-6 shrink-0'}
+    >
+      {props.trazos.map((trazo) => (
+        <path key={trazo} d={trazo} />
+      ))}
+    </svg>
+  )
+}
+
+/** Abre, cierra y lleva adelante. Rotado 90° es el que apunta abajo. */
+export const CHEVRON = ['m9 18 6-6-6-6'] as const
+
 /* ── Encabezado ─────────────────────────────────────────────────────────── */
 
 /** El camino de vuelta, siempre igual y siempre arriba del título. */
