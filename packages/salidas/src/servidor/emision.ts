@@ -4,11 +4,11 @@ import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Estructura } from '@gps/estructura/dominio'
 import { nombreDeLaUnidad } from '@gps/estructura/dominio'
 import { nombreDelCargo, type Personas } from '@gps/personas/dominio'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, max } from 'drizzle-orm'
 import { avisoDeAnticipacion } from '../dominio/anticipacion'
 import { firmantesRequeridos } from '../dominio/firmas'
 import type { Aviso, Permiso } from '../dominio/modelos'
-import { puedeTransicionar, validarParticipantes } from '../dominio/permisos'
+import { contenidoDelPermiso, puedeTransicionar, validarParticipantes } from '../dominio/permisos'
 import type { crearOperacionesDeBorrador } from './borradores'
 import { PermisoInvalido, PermisoNoEditable } from './borradores'
 import { armarPdf } from './pdf'
@@ -42,7 +42,7 @@ export function crearOperacionesDeEmision(
         .from(participantes)
         .where(eq(participantes.permisoId, permisoId))
         .all()
-      const problemas = validarParticipantes(elegidos)
+      const problemas = validarParticipantes(elegidos, permiso.responsableId)
       if (problemas.length > 0) throw new PermisoInvalido(problemas)
 
       const grupo = await estructura.obtenerGrupo(permiso.grupoId)
@@ -99,16 +99,59 @@ export function crearOperacionesDeEmision(
         }),
       )
 
+      // El numero de expediente se reserva antes de dibujar: va impreso en el
+      // PDF, asi que tiene que existir antes de armarlo. La reserva es leer el
+      // mayor del anio y escribir el siguiente, las dos cosas en la misma
+      // transaccion y sin nada asincronico en el medio; el UNIQUE de la tabla
+      // es lo que hace que dos emisiones a la vez no se queden con el mismo.
+      //
+      // Si despues falla el PDF, el numero queda sin usar: una serie con
+      // huecos es lo normal en un registro de expedientes, y dos papeles con
+      // el mismo numero no.
+      //
+      // El anio es el de la emision y no el de la salida: la serie la abre el
+      // dia que se registra, igual que en un libro de mesa de entradas. Una
+      // salida de enero presentada en diciembre entra en la serie de diciembre.
+      const ahora = core.reloj.ahora()
+      const anioDeExpediente = Number(aFechaDeCalendario(ahora).slice(0, 4))
+      const numeroDeExpediente = core.bd.transaction((tx) => {
+        const fila = tx
+          .select({ mayor: max(permisos.numeroDeExpediente) })
+          .from(permisos)
+          .where(eq(permisos.anioDeExpediente, anioDeExpediente))
+          .get()
+        const siguiente = (fila?.mayor ?? 0) + 1
+        tx.update(permisos)
+          .set({ anioDeExpediente, numeroDeExpediente: siguiente, actualizadoEn: ahora })
+          .where(eq(permisos.id, permisoId))
+          .run()
+        return siguiente
+      })
+      const conExpediente = { ...permiso, anioDeExpediente, numeroDeExpediente }
+
+      // La huella se calcula antes de dibujar: es de lo que el papel dice, no
+      // de como quedo dibujado, y el PDF la imprime en el pie.
+      const huella = core.hash(
+        contenidoDelPermiso({
+          permiso: conExpediente,
+          unidades: borradores.unidadesElegidas(permisoId),
+          participantes: foto,
+        }),
+      )
+
       const pdf = await armarPdf({
-        permiso,
+        permiso: conExpediente,
+        huella,
+        // Recien emitido: la huella es la que se acaba de calcular.
+        alterado: false,
         grupo,
         unidades: nombresDeUnidades,
         participantes: foto,
+        responsable: foto.find((uno) => uno.personaId === permiso.responsableId) ?? null,
         firmas: lineas,
         escaneos: [],
       })
 
-      const ahora = core.reloj.ahora()
       const guardado = await archivos.guardarContenido({
         nombre: `permiso-${permisoId}.pdf`,
         tipo: 'application/pdf',
@@ -128,6 +171,7 @@ export function crearOperacionesDeEmision(
             estado: 'emitido',
             pdfId: guardado.id,
             hashDelPdf: guardado.sha256,
+            hashDelContenido: huella,
             actualizadoEn: ahora,
           })
           .where(eq(permisos.id, permisoId))
@@ -166,8 +210,11 @@ export function crearOperacionesDeEmision(
         ...anulado,
         id: core.nuevoId('permiso'),
         estado: 'borrador',
+        anioDeExpediente: null,
+        numeroDeExpediente: null,
         pdfId: null,
         hashDelPdf: null,
+        hashDelContenido: null,
         reemplazaA: anulado.id,
         creadoEn: ahora,
         actualizadoEn: ahora,

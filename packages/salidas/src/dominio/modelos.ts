@@ -20,6 +20,13 @@ export interface Permiso extends Marcas {
   readonly grupoId: string
   readonly estado: Estado
   readonly lugar: string
+  /** Donde queda, para llegar: la calle, la localidad y la provincia. Tres
+   *  campos y no un texto libre porque el papel los imprime como una direccion
+   *  postal y quien lo lee busca la provincia sola -es lo que decide si la
+   *  salida sale de la diocesis-. */
+  readonly direccion: string
+  readonly localidad: string
+  readonly provincia: string
   /** aaaa-mm-dd las dos. Texto y no Date por la misma razon que en el resto del
    *  sistema: una salida empieza un dia del almanaque, no en un instante con
    *  zona horaria. */
@@ -28,10 +35,29 @@ export interface Permiso extends Marcas {
   /** Como se viaja, si corresponde: "micro contratado", "en las camionetas de
    *  los padres". Libre porque es lo que se escribe en el papel. */
   readonly comoSeViaja: string | null
+  /** Quien queda a cargo de la actividad: uno de los dirigentes que van. Es el
+   *  dato con que la diocesis ubica al grupo durante la salida, asi que se
+   *  imprime en el permiso y se exige para emitir. Null mientras el borrador no
+   *  lo eligio -al crearlo todavia no hay nadie anotado-. */
+  readonly responsableId: string | null
+  /** Con quien se ubica al grupo durante la salida. Se pide al crearla y no
+   *  sale de la persona: el telefono util es el del que anda con el telefono
+   *  esos tres dias, que no siempre es el suyo de siempre. */
+  readonly telefono: string
+  /** El numero de expediente, en dos partes: el anio de la serie y el lugar
+   *  que ocupa en ella. Se asignan al emitir -un borrador no es un expediente-
+   *  y no se tocan nunca mas. Null mientras sea borrador. */
+  readonly anioDeExpediente: number | null
+  readonly numeroDeExpediente: number | null
   /** El del PDF emitido, que es lo que las firmas sellan. Null mientras sea
    *  borrador. */
   readonly pdfId: string | null
   readonly hashDelPdf: string | null
+  /** La huella de lo que el papel dice, calculada al emitir sobre los datos y
+   *  no sobre los bytes del PDF. Es lo que permite comprobar despues que el
+   *  contenido no cambio -y se imprime en el pie, cosa que el hash del PDF no
+   *  puede: un archivo no contiene su propio hash-. */
+  readonly hashDelContenido: string | null
   /** De que permiso anulado salio este, si se re-emitio. */
   readonly reemplazaA: string | null
 }

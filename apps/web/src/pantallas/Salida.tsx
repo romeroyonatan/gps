@@ -5,6 +5,7 @@ import {
   useAgregarParticipante,
   useAnularPermiso,
   useDistritos,
+  useElegirResponsable,
   useElegirUnidades,
   useEmitirPermiso,
   useFirmarEnApp,
@@ -24,6 +25,7 @@ import type { Trazos } from '@gps/salidas/dominio'
 import {
   avisoDeAnticipacion,
   candidatos,
+  esResponsablePosible,
   firmantesRequeridos,
   marcaSegunCategoria,
   puedeAdministrarPermisosDelGrupo,
@@ -37,6 +39,7 @@ import {
   BOTON_AL_MARGEN,
   BOTON_PRINCIPAL,
   BOTON_SECUNDARIO,
+  CAMPO,
   Cargando,
   Chip,
   Falla,
@@ -72,6 +75,7 @@ function Armado(props: { permiso: Permiso; grupoId: string }) {
   const elegirUnidades = useElegirUnidades()
   const agregar = useAgregarParticipante()
   const quitar = useQuitarParticipante()
+  const elegirResponsable = useElegirResponsable()
 
   const grupo = arbol.data?.distritos
     .flatMap((distrito) => distrito.grupos)
@@ -91,6 +95,10 @@ function Armado(props: { permiso: Permiso; grupoId: string }) {
       },
     })),
     elegidas,
+  )
+  const aCargoPosibles = puedenIr.filter(
+    (persona) =>
+      puestos.has(persona.id) && marcaSegunCategoria(persona.pertenencia.categoria) === 'dirigente',
   )
 
   return (
@@ -151,6 +159,46 @@ function Armado(props: { permiso: Permiso; grupoId: string }) {
               </li>
             ))}
           </ul>
+        )}
+      </div>
+
+      <div>
+        <p className="font-semibold">¿Quién queda a cargo?</p>
+        {/* Sale de los dirigentes anotados y no del padrón entero: es la misma
+            regla que aplica el servidor al emitir, y ofrecer a alguien que no
+            viaja sería ofrecer lo que después se rechaza. */}
+        {aCargoPosibles.length === 0 ? (
+          <p className="mt-1 text-sm text-ink-faint">Anotá primero a un dirigente.</p>
+        ) : (
+          <select
+            value={
+              esResponsablePosible(
+                props.permiso.participantes.map((uno) => ({
+                  personaId: uno.personaId,
+                  marca: uno.marca as 'dirigente' | 'beneficiario',
+                })),
+                props.permiso.responsableId ?? null,
+              )
+                ? (props.permiso.responsableId ?? '')
+                : ''
+            }
+            onChange={(evento) =>
+              elegirResponsable.mutate({
+                permisoId: props.permiso.id,
+                personaId: evento.target.value,
+              })
+            }
+            className={`${CAMPO} mt-1.5 h-12`}
+          >
+            <option value="" disabled>
+              Elegí el dirigente a cargo
+            </option>
+            {aCargoPosibles.map((persona) => (
+              <option key={persona.id} value={persona.id}>
+                {nombreCompleto(persona)}
+              </option>
+            ))}
+          </select>
         )}
       </div>
     </div>
@@ -444,6 +492,10 @@ function Detalle(props: {
     )
   })
   const estado = estadoDelPermiso(permiso, miFirmaPendiente)
+  // De la nómina emitida, que es la que tiene los nombres congelados. En
+  // borrador todavía no hay foto y el nombre lo muestra el selector de Armado.
+  const responsable = permiso.emitidos.find((uno) => uno.personaId === permiso.responsableId)
+  const aCargo = responsable && `${responsable.apellidos}, ${responsable.nombres}`
 
   return (
     <>
@@ -452,10 +504,25 @@ function Detalle(props: {
         <h2 className="text-2xl font-bold">{permiso.lugar}</h2>
         <Chip tono={estado.tono}>{estado.texto}</Chip>
       </div>
+      {/* El borrador todavía no tiene número: se asigna al emitir. */}
+      {permiso.expediente && (
+        <p className="text-label tabular-nums text-ink-faint">{permiso.expediente}</p>
+      )}
       <p className="mt-1 text-sm tabular-nums text-ink-muted">
         {permiso.desde} a {permiso.hasta}
         {permiso.comoSeViaja && <span> · {permiso.comoSeViaja}</span>}
       </p>
+      {/* Lo que el permiso imprime para ubicar al grupo: se carga al crear la
+          salida, así que también se muestra acá y no sólo en el PDF. */}
+      <p className="mt-1 text-sm text-ink-muted">
+        {permiso.direccion}, {permiso.localidad}, {permiso.provincia} ·{' '}
+        <span className="tabular-nums">{permiso.telefono}</span>
+      </p>
+      {aCargo && (
+        <p className="mt-1 text-sm text-ink-muted">
+          A cargo: <span className="font-semibold text-ink">{aCargo}</span>
+        </p>
+      )}
 
       {permiso.estado === 'borrador' && props.administra && (
         <Armado permiso={permiso} grupoId={props.grupoId} />

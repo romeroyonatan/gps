@@ -3,9 +3,15 @@ fragment DatosDelPermiso on Permiso {
   id
   estado
   lugar
+  direccion
+  localidad
+  provincia
   desde
   hasta
   comoSeViaja
+  responsableId
+  telefono
+  expediente
   pdfId
   reemplazaA
   unidadIds
@@ -48,6 +54,10 @@ query Permisos($grupoId: ID!) {
 mutation CrearPermiso(
   $grupoId: ID!
   $lugar: String!
+  $direccion: String!
+  $localidad: String!
+  $provincia: String!
+  $telefono: String!
   $desde: String!
   $hasta: String!
   $comoSeViaja: String
@@ -55,10 +65,20 @@ mutation CrearPermiso(
   crearPermiso(
     grupoId: $grupoId
     lugar: $lugar
+    direccion: $direccion
+    localidad: $localidad
+    provincia: $provincia
+    telefono: $telefono
     desde: $desde
     hasta: $hasta
     comoSeViaja: $comoSeViaja
   ) {
+    ...DatosDelPermiso
+  }
+}
+
+mutation ElegirResponsable($permisoId: ID!, $personaId: ID!) {
+  elegirResponsable(permisoId: $permisoId, personaId: $personaId) {
     ...DatosDelPermiso
   }
 }
