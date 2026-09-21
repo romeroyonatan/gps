@@ -10,6 +10,7 @@ import {
 } from '@gps/api'
 import type { Actor } from '@gps/core'
 import { nombreCompleto } from '@gps/personas/dominio'
+import { puedeVerTesoreriaDeLaDiocesis } from '@gps/tesoreria/dominio'
 import { type ReactNode, useEffect, useRef } from 'react'
 import { Link, Route, Switch, useLocation, useRoute } from 'wouter'
 import { Afiliacion } from './pantallas/Afiliacion'
@@ -33,6 +34,7 @@ import { NuevaCuota } from './pantallas/NuevaCuota'
 import { NuevaSalida } from './pantallas/NuevaSalida'
 import { Plantel } from './pantallas/Plantel'
 import { RegistrarPago } from './pantallas/RegistrarPago'
+import { Reportes } from './pantallas/Reportes'
 import { Salida } from './pantallas/Salida'
 import { Salidas } from './pantallas/Salidas'
 import { Tesoreria } from './pantallas/Tesoreria'
@@ -60,6 +62,15 @@ function Salir(props: { personaId: string }) {
       Salir
     </button>
   )
+}
+
+/** Una entrada del menú de tareas. `exacta` es para las raíces: sin eso, la
+ *  raíz queda encendida en todas las pantallas que cuelgan de ella. */
+interface Tarea {
+  readonly texto: string
+  readonly href: string
+  readonly trazos: readonly string[]
+  readonly exacta?: boolean
 }
 
 /** Las tareas del grupo, en el mismo orden en los dos lugares donde se
@@ -100,31 +111,67 @@ const TAREAS = [
   },
 ] as const
 
-/** El menú de tareas del grupo. Es uno solo con dos formas: columna al
- *  costado desde `md`, barra fija abajo en el teléfono —donde llega el
- *  pulgar—. Sólo aparece cuando el rol activo manda sobre un grupo. */
-function Tareas(props: { grupoId: string; forma: 'columna' | 'barra' }) {
+const tareasDelGrupo = (grupoId: string): readonly Tarea[] =>
+  TAREAS.map((tarea) => ({
+    texto: tarea.texto,
+    href: tarea.a(grupoId),
+    trazos: tarea.trazos,
+    // "Principal" es la raíz del grupo: sin esto quedaría encendida en todas
+    // las demás, que cuelgan de ella.
+    exacta: tarea.texto === 'Principal',
+  }))
+
+/** Las tareas de Tesorería diocesana, que no manda sobre ningún grupo y por
+ *  eso no tenía menú. La solapa "Pagos" del mockup no está: un pago se carga
+ *  desde la cuenta del grupo al que se le imputa, y una lista suelta de todos
+ *  los pagos no responde ninguna pregunta que alguien se haga. */
+const TAREAS_DE_TESORERIA: readonly Tarea[] = [
+  {
+    texto: 'Deuda',
+    href: '/tesoreria',
+    exacta: true,
+    trazos: [
+      'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z',
+      'M12 6.5v11M14.6 9.6A2.7 2.7 0 0 0 12 8.2c-1.4 0-2.5.8-2.5 1.9s1.1 1.9 2.5 1.9 2.5.8 2.5 1.9-1.1 1.9-2.5 1.9a2.7 2.7 0 0 1-2.6-1.4',
+    ],
+  },
+  {
+    texto: 'Reportes',
+    href: '/tesoreria/reportes',
+    trazos: ['M4 20h16', 'M7 20V12M12 20V5M17 20v-6'],
+  },
+  {
+    texto: 'Cuotas',
+    href: '/tesoreria/configuracion',
+    trazos: ['M6.5 3h8L18 6.5V21h-11.5V3Z', 'M9.5 10h5M9.5 14h5M9.5 17.5h3'],
+  },
+]
+
+/** El menú de tareas. Es uno solo con dos formas: columna al costado desde
+ *  `md`, barra fija abajo en el teléfono —donde llega el pulgar—. Quién se lo
+ *  lleva lo decide el rol activo: el grupo si manda sobre uno, Tesorería si
+ *  mira la diócesis. */
+function Tareas(props: { tareas: readonly Tarea[]; etiqueta: string; forma: 'columna' | 'barra' }) {
   const [donde] = useLocation()
-  const tareas = TAREAS.map((tarea) => {
-    const href = tarea.a(props.grupoId)
-    // "Principal" es la raíz del grupo, así que exacto: si no, quedaría
-    // encendida en todas las demás, que cuelgan de ella.
-    const activa = tarea.texto === 'Principal' ? donde === href : donde.startsWith(href)
-    return { ...tarea, href, activa }
-  })
+  const tareas = props.tareas.map((tarea) => ({
+    ...tarea,
+    activa: tarea.exacta ? donde === tarea.href : donde.startsWith(tarea.href),
+  }))
 
   if (props.forma === 'barra') {
     return (
       <nav
-        aria-label="Tareas del grupo"
-        className="dark fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 bg-surface pb-[env(safe-area-inset-bottom)] text-ink md:hidden"
+        aria-label={props.etiqueta}
+        // `flex` y no `grid-cols-N`: la cantidad de tareas cambia con el rol y
+        // Tailwind lee las clases del fuente, así que no se puede interpolar.
+        className="dark fixed inset-x-0 bottom-0 z-20 flex bg-surface pb-[env(safe-area-inset-bottom)] text-ink md:hidden"
       >
         {tareas.map((tarea) => (
           <Link
             key={tarea.texto}
             href={tarea.href}
             aria-current={tarea.activa ? 'page' : undefined}
-            className={`flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium ${
+            className={`flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium ${
               tarea.activa ? 'text-ink' : 'text-ink-muted'
             }`}
           >
@@ -137,7 +184,7 @@ function Tareas(props: { grupoId: string; forma: 'columna' | 'barra' }) {
   }
 
   return (
-    <nav aria-label="Tareas del grupo" className="hidden md:block">
+    <nav aria-label={props.etiqueta} className="hidden md:block">
       <ul className="space-y-0.5">
         {tareas.map((tarea) => (
           <li key={tarea.texto}>
@@ -168,6 +215,7 @@ function Rutas() {
       <Route path="/tesoreria/grupos/:id">
         {(params) => <CuentaDeGrupo grupoId={params.id} />}
       </Route>
+      <Route path="/tesoreria/reportes" component={Reportes} />
       <Route path="/tesoreria/configuracion/nueva" component={NuevaCuota} />
       <Route path="/tesoreria/configuracion" component={ConfiguracionDeCuotas} />
       <Route path="/tesoreria" component={Tesoreria} />
@@ -203,9 +251,9 @@ function Cascara(props: {
   /** Lo mismo que `cabecera`, pero abriendo hacia arriba: cuelga del pie de la
    *  barra de tareas, donde no hay lugar para una hoja que baje. */
   pie?: ReactNode
-  /** El grupo del rol activo, si manda sobre uno: es lo que hace aparecer la
-   *  barra de tareas, negra al costado y negra al pie. */
-  grupoId?: string
+  /** El menú del rol activo, si tiene uno: es lo que hace aparecer la barra
+   *  de tareas, negra al costado y negra al pie. */
+  menu?: { etiqueta: string; tareas: readonly Tarea[] }
   children: ReactNode
 }) {
   return (
@@ -213,11 +261,11 @@ function Cascara(props: {
       {/* La barra de tareas es negra en las dos formas: `dark` le da vuelta los
           tokens adentro, así que lo que cuelga de ella -el conmutador de rol,
           la salida- se dibuja solo, sin una paleta aparte. */}
-      {props.grupoId && (
+      {props.menu && (
         <aside className="dark sticky top-0 hidden h-dvh w-52 shrink-0 flex-col bg-surface px-3 py-4 text-ink md:flex">
           <span className="px-3 text-base font-extrabold tracking-[-0.02em]">GPS</span>
           <div className="mt-6 flex-1">
-            <Tareas grupoId={props.grupoId} forma="columna" />
+            <Tareas tareas={props.menu.tareas} etiqueta={props.menu.etiqueta} forma="columna" />
           </div>
           {/* De quién es la sesión abierta y sobre qué manda: en un aparato
               compartido las dos cosas se responden acá, no en un avatar. */}
@@ -237,7 +285,7 @@ function Cascara(props: {
 
       <div className="min-w-0 flex-1">
         <header
-          className={`relative flex h-11 items-center gap-2.5 border-b border-line px-5 ${props.grupoId ? 'md:hidden' : ''}`}
+          className={`relative flex h-11 items-center gap-2.5 border-b border-line px-5 ${props.menu ? 'md:hidden' : ''}`}
         >
           <span className="shrink-0 text-base font-extrabold tracking-[-0.02em]">GPS</span>
           {props.cabecera ?? <span className="text-xs text-ink-muted">Gestión para Scouts</span>}
@@ -251,13 +299,15 @@ function Cascara(props: {
         {/* En el teléfono la barra de tareas va fija abajo -ahí llega el
             pulgar-, y este hueco es su alto: sin él tapa la última fila. */}
         <main
-          className={`mx-auto w-full max-w-[1180px] px-5 py-7 ${props.grupoId ? 'pb-24 md:pb-7' : ''}`}
+          className={`mx-auto w-full max-w-[1180px] px-5 py-7 ${props.menu ? 'pb-24 md:pb-7' : ''}`}
         >
           {props.children}
         </main>
       </div>
 
-      {props.grupoId && <Tareas grupoId={props.grupoId} forma="barra" />}
+      {props.menu && (
+        <Tareas tareas={props.menu.tareas} etiqueta={props.menu.etiqueta} forma="barra" />
+      )}
     </div>
   )
 }
@@ -319,7 +369,15 @@ function ConSesion(props: {
     )
   }
 
+  // El rol decide el menú: el grupo si manda sobre uno; si no, y si mira la
+  // diócesis, el de Tesorería. Quien no tiene ninguno de los dos -el
+  // comisionado- sigue sin barra, que es lo que había antes para todos.
   const grupoId = rol.activo.ambito.tipo === 'grupo' ? rol.activo.ambito.id : null
+  const menu = grupoId
+    ? { etiqueta: 'Tareas del grupo', tareas: tareasDelGrupo(grupoId) }
+    : puedeVerTesoreriaDeLaDiocesis(props.actor)
+      ? { etiqueta: 'Tareas de Tesorería', tareas: TAREAS_DE_TESORERIA }
+      : undefined
 
   return (
     <Cascara
@@ -335,7 +393,7 @@ function ConSesion(props: {
         />
       }
       nombre={props.quienEs ?? undefined}
-      grupoId={grupoId ?? undefined}
+      menu={menu}
     >
       <ModoElevado entorno={props.entorno} />
       <Rutas />

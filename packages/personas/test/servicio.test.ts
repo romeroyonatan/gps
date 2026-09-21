@@ -70,6 +70,7 @@ function estructuraFalsa(grupos: readonly GrupoConUnidades[] = [GRUPO]): Estruct
     }),
     obtenerGrupo: async (id) => grupos.find((grupo) => grupo.id === id) ?? null,
     listarGrupos: async () => grupos,
+    listarDistritosSinGrupos: async () => [],
     distritoEstaAbierto: async (id) => DISTRITOS_ABIERTOS.has(id),
     // Personas no usa gruposAbiertosEn: se implementa solo para satisfacer la
     // interfaz. Los GrupoConUnidades de este archivo tienen cerradoEn: null.

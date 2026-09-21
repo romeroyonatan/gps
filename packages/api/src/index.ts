@@ -55,6 +55,7 @@ export {
   useDefinirCuotaDeAfiliacion,
   useGenerarDeudasPendientes,
   useRegistrarPago,
+  useReporteDeCobranza,
   useTesoreria,
 } from './tesoreria'
 export type { SecretoDeSesion, Transporte } from './transporte'

@@ -1,87 +1,97 @@
 import { useDefinirCuotaDeAfiliacion, useTesoreria } from '@gps/api'
-import { Link } from 'expo-router'
+import { importeEnPesosValido } from '@gps/tesoreria/dominio'
 import { useState } from 'react'
-import { Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native'
+import { Text, TextInput, View } from 'react-native'
+import {
+  BotonPrincipal,
+  CAMPO,
+  Campo,
+  Cargando,
+  Falla,
+  Filtros,
+  Pantalla,
+  pesos,
+  Titulo,
+  Vacio,
+  Volver,
+} from '../../componentes/ui'
 
-const pesos = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS',
-  maximumFractionDigits: 0,
-})
-
-export default function Pantalla() {
+export default function Pantalla_() {
   const consulta = useTesoreria()
   const definir = useDefinirCuotaDeAfiliacion()
-  const [periodoElegido, setPeriodoElegido] = useState<number | null>(null)
+  const [periodoElegido, setPeriodoElegido] = useState<string | null>(null)
   const [importe, setImporte] = useState('')
+
   const periodos = consulta.data?.periodosConfigurablesDeAfiliacion ?? []
-  const periodo = periodoElegido ?? periodos[0]
+  const cuotas = consulta.data?.cuotasDeAfiliacion ?? []
+  const periodo = periodoElegido ?? (periodos[0] !== undefined ? String(periodos[0]) : null)
+  const monto = Number(importe.replace(/\D/g, ''))
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50">
-      <ScrollView contentContainerClassName="px-4 py-10">
-        <Link href="/tesoreria" className="text-sm text-slate-500">
-          ← Tesorería
-        </Link>
-        <Text className="mt-1 text-lg font-semibold text-slate-900">Configuración de cuotas</Text>
-        <Text className="mt-1 text-sm text-slate-500">
-          Cada período comienza en marzo y conserva su importe histórico.
-        </Text>
+    <Pantalla>
+      <Volver href="/tesoreria">Tesorería</Volver>
+      <Titulo acompaña="Cada período comienza en marzo y conserva su importe histórico.">
+        Cuotas de afiliación
+      </Titulo>
 
-        <View className="mt-6 rounded-lg bg-white p-4">
-          <Text className="text-sm text-slate-700">Período de afiliación</Text>
-          <View className="mt-2 flex-row flex-wrap gap-2">
-            {periodos.map((uno) => (
-              <Pressable
-                key={uno}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: periodo === uno }}
-                onPress={() => setPeriodoElegido(uno)}
-                className={`rounded-full px-3 py-2 ${periodo === uno ? 'bg-slate-900' : 'bg-slate-100'}`}
-              >
-                <Text className={periodo === uno ? 'text-white' : 'text-slate-700'}>
-                  {uno}/{uno + 1}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <TextInput
-            accessibilityLabel="Importe en pesos"
-            placeholder="Importe en pesos"
-            keyboardType="number-pad"
-            value={importe}
-            onChangeText={setImporte}
-            className="mt-3 rounded border border-slate-300 px-3 py-2 text-sm"
-          />
-          <Pressable
-            disabled={definir.isPending || periodo === undefined}
-            onPress={() => {
-              if (periodo !== undefined) definir.mutate({ periodo, importe: Number(importe) })
-            }}
-            className="mt-3 rounded bg-slate-900 px-4 py-3 disabled:opacity-50"
-          >
-            <Text className="text-center text-sm font-medium text-white">
-              {definir.isPending ? 'Guardando…' : 'Guardar cuota'}
-            </Text>
-          </Pressable>
-          {definir.error && (
-            <Text className="mt-2 text-sm text-red-700">{definir.error.message}</Text>
-          )}
-        </View>
+      {consulta.isPending && <Cargando>Consultando…</Cargando>}
+      {consulta.error && <Falla>{consulta.error.message}</Falla>}
 
-        <Text className="mt-6 text-sm font-semibold text-slate-900">Historial</Text>
-        <View className="mt-2 overflow-hidden rounded-lg bg-white">
-          {(consulta.data?.cuotasDeAfiliacion ?? []).map((cuota) => (
-            <View
-              key={cuota.periodo}
-              className="flex-row justify-between border-b border-slate-200 px-4 py-3"
+      {periodo !== null && (
+        <>
+          <Campo etiqueta="Período de afiliación">
+            <Filtros
+              opciones={periodos.map((uno) => ({ id: String(uno), etiqueta: `${uno}/${uno + 1}` }))}
+              valor={periodo}
+              onElegir={setPeriodoElegido}
+            />
+          </Campo>
+
+          <Campo etiqueta="Importe de la cuota">
+            <TextInput
+              accessibilityLabel="Importe en pesos"
+              keyboardType="number-pad"
+              placeholder="9000"
+              value={importe}
+              onChangeText={setImporte}
+              className={CAMPO}
+            />
+          </Campo>
+
+          <View className="mt-5">
+            <BotonPrincipal
+              disabled={definir.isPending || !importeEnPesosValido(monto)}
+              onPress={() => definir.mutate({ periodo: Number(periodo), importe: monto })}
             >
-              <Text className="text-sm">Período {cuota.periodo}</Text>
-              <Text className="text-sm font-semibold">{pesos.format(cuota.importe)}</Text>
-            </View>
-          ))}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+              {definir.isPending ? 'Guardando…' : 'Guardar cuota'}
+            </BotonPrincipal>
+          </View>
+          {definir.error && <Falla>{definir.error.message}</Falla>}
+        </>
+      )}
+
+      <Text className="mt-6 text-lg font-bold text-ink">Historial</Text>
+      <View className="mt-2">
+        {cuotas.map((cuota) => (
+          <View
+            key={cuota.periodo}
+            className="min-h-14 flex-row items-center justify-between gap-3 border-b border-line py-2"
+          >
+            <Text className="shrink text-sm font-semibold text-ink">
+              Período {cuota.periodo}
+              <Text className="font-normal text-ink-muted">
+                {'  '}marzo {cuota.periodo} a febrero {cuota.periodo + 1}
+              </Text>
+            </Text>
+            <Text className="shrink-0 text-sm font-bold text-ink">
+              {pesos.format(cuota.importe)}
+            </Text>
+          </View>
+        ))}
+      </View>
+      {cuotas.length === 0 && !consulta.isPending && (
+        <Vacio>Todavía no hay ninguna cuota definida.</Vacio>
+      )}
+    </Pantalla>
   )
 }

@@ -174,6 +174,7 @@ export function montar(opciones: { reloj?: Reloj; mundo?: Mundo } = {}) {
     obtenerGrupo: async (id) => mundo.grupos.find((grupo) => grupo.id === id) ?? null,
     distritoEstaAbierto: async (id) => id === DISTRITO_ID,
     listarGrupos: async () => mundo.grupos,
+    listarDistritosSinGrupos: async () => [],
     gruposAbiertosEn: async () => new Set(mundo.grupos.map((grupo) => grupo.id)),
   }
 

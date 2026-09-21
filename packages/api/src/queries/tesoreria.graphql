@@ -74,3 +74,37 @@ mutation GenerarDeudasPendientes {
     periodosSinCuota
   }
 }
+
+query ReporteDeCobranza($periodo: Int!) {
+  reporteDeCobranza(periodo: $periodo) {
+    periodo
+    porDistrito {
+      distritoId
+      numero
+      zona
+      grupos
+      declararon
+      facturado
+      cobrado
+      deuda
+    }
+    totales {
+      periodo
+      distritos
+      grupos
+      declararon
+      personasCobradas
+      facturado
+      cobrado
+      deuda
+    }
+    anterior {
+      periodo
+      declararon
+      personasCobradas
+      facturado
+      cobrado
+      deuda
+    }
+  }
+}

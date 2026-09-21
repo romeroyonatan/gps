@@ -1,175 +1,116 @@
-import {
-  type MedioDePago,
-  useAnularPago,
-  useCuentaDeGrupo,
-  useRegistrarPago,
-  useTesoreria,
-} from '@gps/api'
+import { useActor, useAnularPago, useCuentaDeGrupo, useTesoreria } from '@gps/api'
+import { puedeRegistrarPagos, puedeVerTesoreriaDeLaDiocesis } from '@gps/tesoreria/dominio'
 import { Link, useLocalSearchParams } from 'expo-router'
-import { useState } from 'react'
-import { Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native'
+import { Pressable, Text, View } from 'react-native'
+import { Cargando, Falla, Pantalla, pesos, Titulo, Vacio, Volver } from '../../../../componentes/ui'
 
-const pesos = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS',
-  maximumFractionDigits: 0,
-})
+const NOMBRE_DEL_MOVIMIENTO = {
+  cargo_afiliacion: 'Afiliación',
+  pago: 'Pago',
+} as const
 
-export default function Pantalla() {
+export default function Pantalla_() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const resumen = useTesoreria()
   const consulta = useCuentaDeGrupo(id)
-  const registrar = useRegistrarPago()
   const anular = useAnularPago(id)
-  const [fecha, setFecha] = useState('')
-  const [importe, setImporte] = useState('')
-  const [medio, setMedio] = useState<MedioDePago>('transferencia')
-  const [referencia, setReferencia] = useState('')
-  const [observacion, setObservacion] = useState('')
+  const actor = useActor()
+
   const cuenta = resumen.data?.cuentasDeGrupos.find((una) => una.grupoId === id)
   const movimientos = consulta.data?.movimientosDeTesoreria ?? []
-  const anulados = new Set(movimientos.map((uno) => uno.anulaA).filter(Boolean))
+  const pagosAnulados = new Set(movimientos.map((uno) => uno.anulaA).filter(Boolean))
+
+  const escribe = actor !== null && puedeRegistrarPagos(actor)
+  // Si hay camino de vuelta depende de por dónde se entra: para la jefatura
+  // esto es una de las tareas de su grupo, no una fila de la lista diocesana.
+  const desdeLaDiocesis = actor !== null && puedeVerTesoreriaDeLaDiocesis(actor)
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50">
-      <ScrollView contentContainerClassName="px-4 py-10">
-        <Link href="/tesoreria" className="text-sm text-slate-500">
-          ← Tesorería
-        </Link>
-        <Text className="mt-1 text-lg font-semibold text-slate-900">
-          {cuenta ? `Grupo Scout Nº${cuenta.numero} - ${cuenta.nombre}` : 'Cuenta del grupo'}
-        </Text>
-        {cuenta && (
-          <Text className="mt-1 text-sm text-slate-600">
-            Saldo: {pesos.format(Math.abs(cuenta.saldo))}
-            {cuenta.saldo < 0 ? ' a favor' : cuenta.saldo > 0 ? ' de deuda' : ''}
+    <Pantalla>
+      {desdeLaDiocesis && <Volver href="/tesoreria">Tesorería</Volver>}
+      <Titulo>{cuenta ? `Grupo ${cuenta.numero} — ${cuenta.nombre}` : 'Cuenta del grupo'}</Titulo>
+
+      {cuenta && (
+        <View className="mt-5">
+          {/* El saldo positivo es deuda: así lo guarda tesorería. El signo se
+              escribe, no se deduce del color. */}
+          <Text className={`text-2xl font-bold ${cuenta.saldo > 0 ? 'text-danger' : 'text-ink'}`}>
+            {cuenta.saldo > 0 ? '−' : ''}
+            {pesos.format(Math.abs(cuenta.saldo))}
           </Text>
-        )}
-
-        <View className="mt-6 rounded-lg bg-white p-4">
-          <Text className="text-sm font-semibold text-slate-900">Registrar pago externo</Text>
-          <View className="mt-3 flex-row gap-2">
-            <TextInput
-              accessibilityLabel="Fecha del pago"
-              placeholder="aaaa-mm-dd"
-              value={fecha}
-              onChangeText={setFecha}
-              className="flex-1 rounded border border-slate-300 px-3 py-2 text-sm"
-            />
-            <TextInput
-              accessibilityLabel="Importe"
-              placeholder="Importe"
-              keyboardType="number-pad"
-              value={importe}
-              onChangeText={setImporte}
-              className="flex-1 rounded border border-slate-300 px-3 py-2 text-sm"
-            />
-          </View>
-          <View className="mt-2 flex-row gap-2">
-            {(['transferencia', 'efectivo', 'otro'] as const).map((uno) => (
-              <Pressable
-                key={uno}
-                onPress={() => setMedio(uno)}
-                className={`rounded-full px-3 py-2 ${medio === uno ? 'bg-slate-900' : 'bg-slate-100'}`}
-              >
-                <Text className={`text-xs ${medio === uno ? 'text-white' : 'text-slate-700'}`}>
-                  {uno}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <TextInput
-            accessibilityLabel="Referencia opcional"
-            placeholder="Referencia opcional"
-            value={referencia}
-            onChangeText={setReferencia}
-            className="mt-2 rounded border border-slate-300 px-3 py-2 text-sm"
-          />
-          <TextInput
-            accessibilityLabel="Observación opcional"
-            placeholder="Observación opcional"
-            value={observacion}
-            onChangeText={setObservacion}
-            multiline
-            className="mt-2 rounded border border-slate-300 px-3 py-2 text-sm"
-          />
-          <Pressable
-            disabled={registrar.isPending}
-            onPress={() =>
-              registrar.mutate(
-                {
-                  grupoId: id,
-                  fecha,
-                  importe: Number(importe),
-                  medioDePago: medio,
-                  referencia,
-                  observacion,
-                },
-                {
-                  onSuccess: () => {
-                    setImporte('')
-                    setReferencia('')
-                    setObservacion('')
-                  },
-                },
-              )
-            }
-            className="mt-3 rounded bg-slate-900 px-4 py-3"
-          >
-            <Text className="text-center text-sm font-medium text-white">
-              {registrar.isPending ? 'Registrando…' : 'Registrar pago'}
-            </Text>
-          </Pressable>
-          {registrar.error && (
-            <Text className="mt-2 text-sm text-red-700">{registrar.error.message}</Text>
-          )}
+          <Text className="mt-0.5 text-sm text-ink-muted">
+            {cuenta.saldo > 0 ? 'De deuda' : cuenta.saldo < 0 ? 'A favor del grupo' : 'Sin deuda'}.
+          </Text>
         </View>
+      )}
 
-        <Text className="mt-6 text-sm font-semibold text-slate-900">Movimientos</Text>
-        {consulta.isPending && <Text className="mt-3 text-sm text-slate-500">Consultando…</Text>}
-        {consulta.error && (
-          <Text className="mt-3 text-sm text-red-700">{consulta.error.message}</Text>
+      {/* La acción arriba de la lista y no un formulario colgado abajo:
+          asentar un pago es una tarea que termina, y tiene su pantalla. */}
+      {escribe && (
+        <View className="mt-5 flex-row">
+          <Link href={`/tesoreria/grupos/${id}/pago`} asChild>
+            <Pressable className="min-h-11 items-center justify-center rounded-lg bg-accent px-3.5 active:bg-accent-strong">
+              <Text className="text-sm font-semibold text-accent-ink">Registrar pago externo</Text>
+            </Pressable>
+          </Link>
+        </View>
+      )}
+
+      <Text className="mt-6 text-lg font-bold text-ink">
+        Movimientos
+        {movimientos.length > 0 && (
+          <Text className="text-label font-medium text-ink-muted"> {movimientos.length}</Text>
         )}
-        <View className="mt-3 overflow-hidden rounded-lg bg-white">
-          {movimientos.map((movimiento) => (
-            <View key={movimiento.id} className="border-b border-slate-200 px-4 py-3">
-              <View className="flex-row justify-between gap-3">
-                <Text className="flex-1 text-sm">
-                  {movimiento.fecha} ·{' '}
-                  {movimiento.tipo === 'cargo_afiliacion'
-                    ? 'Afiliación'
-                    : movimiento.tipo === 'pago'
-                      ? 'Pago'
-                      : 'Anulación'}
-                </Text>
-                <Text className="text-sm font-semibold">
-                  {movimiento.tipo === 'pago' ? '−' : '+'}
-                  {pesos.format(movimiento.importe)}
-                </Text>
-              </View>
-              {movimiento.cantidad && (
-                <Text className="mt-1 text-xs text-slate-500">
-                  {movimiento.cantidad} × {pesos.format(movimiento.cuota ?? 0)}
-                </Text>
-              )}
-              {movimiento.tipo === 'pago' && !anulados.has(movimiento.id) && (
-                <Pressable
-                  disabled={anular.isPending}
-                  onPress={() => anular.mutate({ pagoId: movimiento.id })}
-                >
-                  <Text className="mt-2 text-xs text-red-700">Anular pago</Text>
-                </Pressable>
-              )}
+      </Text>
+      {consulta.isPending && <Cargando>Consultando…</Cargando>}
+      {consulta.error && <Falla>{consulta.error.message}</Falla>}
+
+      <View className="mt-2">
+        {movimientos.map((movimiento) => (
+          <View key={movimiento.id} className="border-b border-line py-3">
+            <View className="flex-row items-baseline justify-between gap-3">
+              <Text className="shrink text-base text-ink">
+                {movimiento.fecha} ·{' '}
+                {NOMBRE_DEL_MOVIMIENTO[movimiento.tipo as keyof typeof NOMBRE_DEL_MOVIMIENTO] ??
+                  'Anulación de pago'}
+              </Text>
+              {/* Un cargo suma deuda y un pago la baja: el signo dice de qué
+                  lado va el movimiento, no si el número es grande. */}
+              <Text className="shrink-0 text-base font-bold text-ink">
+                {movimiento.tipo === 'pago' ? '−' : '+'}
+                {pesos.format(Math.abs(movimiento.importe))}
+              </Text>
             </View>
-          ))}
-        </View>
-        {movimientos.length === 0 && !consulta.isPending && (
-          <Text className="mt-3 text-sm text-slate-500">
-            La cuenta todavía no tiene movimientos.
-          </Text>
-        )}
-        {anular.error && <Text className="mt-2 text-sm text-red-700">{anular.error.message}</Text>}
-      </ScrollView>
-    </SafeAreaView>
+            {movimiento.cantidad && (
+              <Text className="mt-0.5 text-label text-ink-muted">
+                {movimiento.cantidad} × {pesos.format(movimiento.cuota ?? 0)}
+              </Text>
+            )}
+            {movimiento.referencia && (
+              <Text className="mt-0.5 text-label text-ink-muted">
+                Referencia: {movimiento.referencia}
+              </Text>
+            )}
+            {/* El pago no se edita: si está mal, se anula y se carga de nuevo.
+                Queda el rastro de los dos asientos. */}
+            {escribe && movimiento.tipo === 'pago' && !pagosAnulados.has(movimiento.id) && (
+              <Pressable
+                accessibilityRole="button"
+                disabled={anular.isPending}
+                onPress={() => anular.mutate({ pagoId: movimiento.id })}
+                className="mt-1.5 min-h-9 justify-center"
+              >
+                <Text className="text-label text-ink-faint">Anular pago</Text>
+              </Pressable>
+            )}
+          </View>
+        ))}
+      </View>
+
+      {movimientos.length === 0 && !consulta.isPending && (
+        <Vacio>La cuenta todavía no tiene movimientos.</Vacio>
+      )}
+      {anular.error && <Falla>{anular.error.message}</Falla>}
+    </Pantalla>
   )
 }
