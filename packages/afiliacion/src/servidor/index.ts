@@ -33,6 +33,8 @@ export type { ServicioDeAfiliacion } from './servicio'
 export {
   DeclaracionDenegada,
   FechaInvalida,
+  GrupoInexistente,
   NadaQueDeclarar,
+  NominaFueraDeAlcance,
   YaDeclaroHoy,
 } from './servicio'

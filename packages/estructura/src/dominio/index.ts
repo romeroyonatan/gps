@@ -13,5 +13,5 @@ export {
 } from './politicas'
 export type { Estructura } from './publico'
 export type { Rama } from './ramas'
-export { etiquetaDeEdades, RAMAS, ramaDelCatalogo } from './ramas'
+export { etiquetaDeEdades, RAMAS, ramaDelCatalogo, ramaParaEdad } from './ramas'
 export { nombreDeLaUnidad, ramasDeLasUnidades } from './unidades'

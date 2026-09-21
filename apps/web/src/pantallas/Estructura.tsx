@@ -3,15 +3,21 @@ import { aFechaDeCalendario } from '@gps/core/fechas'
 import { etiquetaDeEdades, ramaDelCatalogo, type Unidad } from '@gps/estructura/dominio'
 import { puedeVerPersonasDelGrupo } from '@gps/personas/dominio'
 import { Link } from 'wouter'
+import { Cargando, ChipDeRama, Falla, Titulo, Vacio } from '../ui'
 
-/** El nombre propio y, en gris, el tramo de edad de su rama. Se muestra el
- *  nombre y no la rama porque es lo que distingue dos tropas del mismo grupo. */
+/** El nombre propio de la unidad y, en gris, el tramo de edad de su rama. Se
+ *  muestra el nombre y no la rama porque es lo que distingue dos tropas del
+ *  mismo grupo; la rama viaja igual, en el punto de color de la etiqueta. */
 function EtiquetaDeUnidad(props: { unidad: Pick<Unidad, 'rama' | 'nombre'> }) {
   const rama = ramaDelCatalogo(props.unidad.rama)
   if (!rama) return null
   return (
-    <li className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-700">
-      {props.unidad.nombre} <span className="text-slate-400">{etiquetaDeEdades(rama)}</span>
+    <li>
+      <ChipDeRama rama={props.unidad.rama}>
+        <span className="font-normal text-ink-faint">
+          {props.unidad.nombre} · {etiquetaDeEdades(rama)}
+        </span>
+      </ChipDeRama>
     </li>
   )
 }
@@ -29,14 +35,15 @@ function Grupo(props: {
 }) {
   const contenido = (
     <>
-      <p className={`text-sm font-medium ${props.seAbre ? 'text-slate-900' : 'text-slate-500'}`}>
-        <span className="text-slate-400">Grupo Scout Nº{props.numero} -</span> {props.nombre}
+      <p className={`text-sm font-semibold ${props.seAbre ? 'text-ink' : 'text-ink-muted'}`}>
+        <span className="font-normal text-ink-faint">Grupo Scout Nº{props.numero} —</span>{' '}
+        {props.nombre}
       </p>
       {props.jefes.length > 0 && (
-        <p className="mt-0.5 text-xs text-slate-500">{props.jefes.join(' · ')}</p>
+        <p className="mt-0.5 text-xs text-ink-muted">{props.jefes.join(' · ')}</p>
       )}
       {props.unidades.length === 0 ? (
-        <p className="mt-1.5 text-xs text-slate-400">Todavía no abrió ninguna unidad</p>
+        <p className="mt-1.5 text-xs text-ink-faint">Todavía no abrió ninguna unidad</p>
       ) : (
         <ul className="mt-1.5 flex flex-wrap gap-1.5">
           {props.unidades.map((unidad) => (
@@ -48,16 +55,16 @@ function Grupo(props: {
   )
 
   return (
-    <li>
+    <li className="border-b border-line last:border-b-0">
       {props.seAbre ? (
         <Link
           href={`/grupos/${props.id}`}
-          className="block px-4 py-3 hover:bg-slate-50 active:bg-slate-100"
+          className="flex min-h-[72px] flex-col justify-center py-3 active:bg-surface-3"
         >
           {contenido}
         </Link>
       ) : (
-        <div className="px-4 py-3">{contenido}</div>
+        <div className="flex min-h-[72px] flex-col justify-center py-3">{contenido}</div>
       )}
     </li>
   )
@@ -83,30 +90,18 @@ export function Estructura() {
 
   return (
     <>
-      <Link href="/tesoreria" className="mt-6 inline-block text-sm font-medium text-slate-700">
-        Tesorería →
-      </Link>
+      <Titulo enlace={{ texto: 'Tesorería', href: '/tesoreria' }}>Directorio</Titulo>
 
-      {isPending && <p className="mt-8 text-sm text-slate-500">Consultando la estructura…</p>}
+      {isPending && <Cargando>Consultando la estructura…</Cargando>}
+      {error && <Falla>No se pudo consultar la estructura: {error.message}</Falla>}
+      {data?.distritos.length === 0 && <Vacio>No hay distritos cargados todavía.</Vacio>}
 
-      {error && (
-        <p className="mt-8 rounded-lg bg-red-50 p-4 text-sm break-words text-red-800">
-          No se pudo consultar la estructura: {error.message}
-        </p>
-      )}
-
-      {data?.distritos.length === 0 && (
-        <p className="mt-8 rounded-lg bg-white p-4 text-sm text-slate-500 shadow-sm">
-          No hay distritos cargados todavía.
-        </p>
-      )}
-
-      <div className="mt-8 space-y-6">
+      <div className="mt-6 space-y-6">
         {data?.distritos.map((distrito) => (
           <section key={distrito.id}>
-            <h2 className="text-sm font-semibold text-slate-900">Distrito {distrito.numero}</h2>
-            <p className="text-xs text-slate-500">{distrito.zona}</p>
-            <ul className="mt-2 divide-y divide-slate-200 rounded-lg bg-white shadow-sm">
+            <h3 className="text-lg font-bold">Distrito {distrito.numero}</h3>
+            <p className="text-label text-ink-muted">{distrito.zona}</p>
+            <ul className="mt-2">
               {distrito.grupos.map((grupo) => (
                 <Grupo
                   key={grupo.id}

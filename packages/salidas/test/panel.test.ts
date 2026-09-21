@@ -1,93 +1,80 @@
 import { describe, expect, test } from 'bun:test'
-import type { Actor } from '@gps/core'
-import { firmantesRequeridos } from '../src/dominio/firmas'
-import { repartirSalidas, type SalidaDelPanel } from '../src/dominio/panel'
+import { type PermisoDelPanel, repartirSalidas } from '../src/dominio/panel'
 
-const firmantes = firmantesRequeridos('g1', 'd1')
+const HOY = '2026-09-20'
 
-function actorCon(rol: string, tipo: 'grupo' | 'distrito', id: string): Actor {
+function permiso(
+  id: string,
+  estado: PermisoDelPanel['estado'],
+  desde: string,
+  firmadas: readonly boolean[],
+): PermisoDelPanel & { id: string } {
+  const cargos = ['jefeDeGrupo', 'director', 'comisionadoDeDistrito'] as const
   return {
-    personaId: 'x',
-    roles: [{ rol, ambito: { tipo, id } } as never],
-    esAdministradorDesignado: false,
-    estaElevado: false,
+    id,
+    estado,
+    desde,
+    firmas: cargos.map((cargo, indice) => ({ cargo, firmada: firmadas[indice] ?? false })),
   }
 }
 
-const jefe = actorCon('jefeDeGrupo', 'grupo', 'g1')
-
-function salida(datos: Partial<SalidaDelPanel> & { id: string }) {
-  return {
-    estado: 'emitido',
-    hasta: '2026-01-10',
-    firmas: [
-      { cargo: 'jefeDeGrupo', firmada: false },
-      { cargo: 'director', firmada: false },
-      { cargo: 'comisionadoDeDistrito', firmada: false },
-    ],
-    ...datos,
-  } as SalidaDelPanel & { id: string }
-}
-
-const ids = (salidas: readonly { id: string }[]) => salidas.map((una) => una.id)
+const soyJefeDeGrupo = (cargo: string) => cargo === 'jefeDeGrupo'
 
 describe('repartirSalidas', () => {
-  test('separa la firma propia de la ajena: firmar es personal', () => {
-    const tuya = salida({ id: 'tuya' })
-    const ajena = salida({
-      id: 'ajena',
-      firmas: [
-        { cargo: 'jefeDeGrupo', firmada: true },
-        { cargo: 'director', firmada: false },
+  test('un emitido con mi firma pendiente espera mi firma', () => {
+    const { esperanMiFirma, esperanOtraFirma } = repartirSalidas(
+      [permiso('a', 'emitido', '2026-10-11', [false, false, false])],
+      HOY,
+      soyJefeDeGrupo,
+    )
+    expect(esperanMiFirma.map((uno) => uno.id)).toEqual(['a'])
+    expect(esperanOtraFirma).toEqual([])
+  })
+
+  test('si ya firmé, el mismo permiso pasa a esperar la de otro', () => {
+    // Es la distinción que hace el inicio: "esperan tu firma" pide una acción
+    // y "falta el distrito" no pide ninguna.
+    const { esperanMiFirma, esperanOtraFirma } = repartirSalidas(
+      [permiso('a', 'emitido', '2026-10-11', [true, true, false])],
+      HOY,
+      soyJefeDeGrupo,
+    )
+    expect(esperanMiFirma).toEqual([])
+    expect(esperanOtraFirma.map((uno) => uno.id)).toEqual(['a'])
+  })
+
+  test('quien no firma nada nunca tiene salidas esperando su firma', () => {
+    const { esperanMiFirma, esperanOtraFirma } = repartirSalidas(
+      [permiso('a', 'emitido', '2026-10-11', [false, false, false])],
+      HOY,
+      () => false,
+    )
+    expect(esperanMiFirma).toEqual([])
+    expect(esperanOtraFirma.map((uno) => uno.id)).toEqual(['a'])
+  })
+
+  test('próximas son las firmadas que todavía no pasaron, incluida la de hoy', () => {
+    const { proximas } = repartirSalidas(
+      [
+        permiso('vieja', 'firmado', '2026-09-19', [true, true, true]),
+        permiso('hoy', 'firmado', HOY, [true, true, true]),
+        permiso('futura', 'firmado', '2026-10-11', [true, true, true]),
       ],
-    })
-
-    const panel = repartirSalidas([tuya, ajena], jefe, firmantes, '2026-01-01')
-
-    expect(ids(panel.esperanTuFirma)).toEqual(['tuya'])
-    expect(ids(panel.esperanLaDeOtro)).toEqual(['ajena'])
-    expect(panel.proximas).toEqual([])
-  })
-
-  test('el permiso de otro grupo espera la firma de otro, aunque el cargo sea el mismo', () => {
-    const panel = repartirSalidas([salida({ id: 'a' })], jefe, firmantesRequeridos('g2', 'd1'), '')
-
-    expect(ids(panel.esperanLaDeOtro)).toEqual(['a'])
-  })
-
-  test('las tres firmadas y el borrador son próximas mientras no hayan vuelto', () => {
-    const firmado = salida({
-      id: 'firmado',
-      estado: 'firmado',
-      firmas: [{ cargo: 'jefeDeGrupo', firmada: true }],
-    })
-    const borrador = salida({ id: 'borrador', estado: 'borrador', firmas: [] })
-    const vieja = salida({ id: 'vieja', estado: 'firmado', firmas: [], hasta: '2025-12-31' })
-
-    const panel = repartirSalidas([firmado, borrador, vieja], jefe, firmantes, '2026-01-01')
-
-    expect(ids(panel.proximas)).toEqual(['firmado', 'borrador'])
-  })
-
-  test('la firma que falta sigue faltando aunque la salida ya haya pasado', () => {
-    const panel = repartirSalidas(
-      [salida({ id: 'pasada', hasta: '2025-01-01' })],
-      jefe,
-      firmantes,
-      '2026-01-01',
+      HOY,
+      soyJefeDeGrupo,
     )
-
-    expect(ids(panel.esperanTuFirma)).toEqual(['pasada'])
+    expect(proximas.map((uno) => uno.id)).toEqual(['hoy', 'futura'])
   })
 
-  test('el permiso anulado no está en ninguna de las tres', () => {
-    const panel = repartirSalidas(
-      [salida({ id: 'a', estado: 'anulado', firmas: [] })],
-      jefe,
-      firmantes,
-      '2026-01-01',
+  test('borrador y anulado no van a ninguna pila', () => {
+    const reparto = repartirSalidas(
+      [
+        permiso('b', 'borrador', '2026-10-11', []),
+        permiso('x', 'anulado', '2026-10-11', [true, false, false]),
+      ],
+      HOY,
+      soyJefeDeGrupo,
     )
-
-    expect(panel).toEqual({ esperanTuFirma: [], esperanLaDeOtro: [], proximas: [] })
+    expect(reparto).toEqual({ esperanMiFirma: [], esperanOtraFirma: [], proximas: [] })
   })
 })

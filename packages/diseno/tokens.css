@@ -40,6 +40,11 @@
   --accent-ink: #ffffff;
   --focus: #000000;
 
+  /* El velo de la capa flotante (hoja, modal): atenúa lo de atrás. Negro en
+     los dos temas a propósito, y por eso NO sale de `ink`: en oscuro `ink` es
+     blanco y un velo blanco aclara la pantalla en vez de apagarla. */
+  --velo: rgb(0 0 0 / 0.35);
+
   /* Estado. Siempre acompañados de texto: el color es refuerzo, nunca el dato. */
   --ok: #0b5f42;
   --ok-soft: #e8f5ef; /* afiliado, pago */
@@ -83,6 +88,9 @@
   --accent-line: #3a3a3a;
   --accent-ink: #000000;
   --focus: #ffffff;
+
+  /* Más opaco que en claro: sobre una página casi negra, un 35% no se ve. */
+  --velo: rgb(0 0 0 / 0.6);
 
   --ok: #6fcfa6;
   --ok-soft: #0f2a21;

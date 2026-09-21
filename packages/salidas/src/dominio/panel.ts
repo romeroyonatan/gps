@@ -1,54 +1,47 @@
-import type { Actor } from '@gps/core'
 import type { TipoDeCargo } from '@gps/personas/dominio'
-import type { FirmanteRequerido } from './firmas'
-import { puedeFirmarEnLaApp } from './politicas'
+import type { Estado } from './modelos'
 
-/** Lo poco que hace falta saber de un permiso para repartirlo en el panel. Es
- *  estructural a propósito: lo cumple tanto el modelo del servidor como lo que
- *  devuelve la consulta de GraphQL, y así las pantallas no traducen nada. */
-export interface SalidaDelPanel {
-  readonly estado: string
-  /** aaaa-mm-dd, el día que vuelven. */
-  readonly hasta: string
+/** Lo mínimo que hace falta para repartir un permiso en el panel. Estructural
+ *  y no `Permiso`, porque lo que llega a las pantallas es lo que devuelve
+ *  GraphQL: trae las firmas adentro y no trae el hash ni las marcas. */
+export interface PermisoDelPanel {
+  readonly estado: Estado
+  readonly desde: string
   readonly firmas: readonly { readonly cargo: TipoDeCargo; readonly firmada: boolean }[]
 }
 
-/** Las tres filas con que abre el grupo: qué espera a quien mira, qué espera a
- *  otro, y qué viene.
+/** Cómo se reparten las salidas de un grupo: lo que espera una firma de quien
+ *  mira, lo que espera la de otro, y lo firmado que todavía no pasó.
  *
- *  Quién firma qué lo decide `puedeFirmarEnLaApp`, la misma política que aplica
- *  el servidor: firmar es personal, así que "espera tu firma" es exactamente
- *  "hay una firma pendiente de un cargo que ocupás vos".
+ *  Las tres son excluyentes y salen del mismo dato, por eso viven juntas: el
+ *  inicio las cuenta y la pantalla de salidas marca cada tarjeta con lo mismo,
+ *  y dos implementaciones de "espera tu firma" terminan contradiciéndose.
  *
- *  Las dos filas de firmas no miran el almanaque: una firma que falta sigue
- *  faltando aunque la salida haya pasado, y esconderla dejaría el permiso
- *  colgado sin que nadie se entere. La tercera sí: "próximas" son las que
- *  todavía no volvieron. */
-export function repartirSalidas<T extends SalidaDelPanel>(
-  salidas: readonly T[],
-  actor: Actor,
-  firmantes: readonly FirmanteRequerido[],
+ *  Quién puede firmar llega por parámetro: que alguien ocupe un cargo lo sabe
+ *  `politicas`, no esto. Lo de acá es sólo en qué pila cae cada permiso. */
+export function repartirSalidas<P extends PermisoDelPanel>(
+  permisos: readonly P[],
   hoy: string,
-): { esperanTuFirma: readonly T[]; esperanLaDeOtro: readonly T[]; proximas: readonly T[] } {
-  const esperanTuFirma: T[] = []
-  const esperanLaDeOtro: T[] = []
-  const proximas: T[] = []
+  puedoFirmar: (cargo: TipoDeCargo) => boolean,
+): { esperanMiFirma: readonly P[]; esperanOtraFirma: readonly P[]; proximas: readonly P[] } {
+  const esperanMiFirma: P[] = []
+  const esperanOtraFirma: P[] = []
+  const proximas: P[] = []
 
-  for (const salida of salidas) {
-    if (salida.estado === 'anulado') continue
-
-    const pendientes = salida.firmas.filter((firma) => !firma.firmada)
-    if (salida.estado === 'emitido' && pendientes.length > 0) {
-      const tuya = pendientes.some((firma) => {
-        const firmante = firmantes.find((uno) => uno.cargo === firma.cargo)
-        return firmante !== undefined && puedeFirmarEnLaApp(actor, firmante)
-      })
-      ;(tuya ? esperanTuFirma : esperanLaDeOtro).push(salida)
-      continue
+  for (const permiso of permisos) {
+    if (permiso.estado === 'emitido') {
+      const pendientes = permiso.firmas.filter((firma) => !firma.firmada)
+      // Emitido sin firmas pendientes no existe -entra la tercera y pasa a
+      // firmado-, pero si llegara no va en ninguna pila: no espera nada.
+      if (pendientes.length === 0) continue
+      if (pendientes.some((firma) => puedoFirmar(firma.cargo))) esperanMiFirma.push(permiso)
+      else esperanOtraFirma.push(permiso)
+      // Compara texto: aaaa-mm-dd ordena igual lexicográfica que
+      // cronológicamente. El día de la salida todavía cuenta como próxima.
+    } else if (permiso.estado === 'firmado' && permiso.desde >= hoy) {
+      proximas.push(permiso)
     }
-
-    if (salida.hasta >= hoy) proximas.push(salida)
   }
 
-  return { esperanTuFirma, esperanLaDeOtro, proximas }
+  return { esperanMiFirma, esperanOtraFirma, proximas }
 }

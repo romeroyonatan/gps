@@ -1,13 +1,32 @@
 import { useGenerarDeudasPendientes, useTesoreria } from '@gps/api'
 import { useState } from 'react'
 import { Link } from 'wouter'
+import {
+  BOTON_PRINCIPAL,
+  Cargando,
+  Falla,
+  FILA,
+  Filtros,
+  Seccion,
+  Titulo,
+  Vacio,
+  Volver,
+} from '../ui'
 
 type Filtro = 'todos' | 'deuda' | 'favor' | 'cero'
+
 const pesos = new Intl.NumberFormat('es-AR', {
   style: 'currency',
   currency: 'ARS',
   maximumFractionDigits: 0,
 })
+
+const FILTROS = [
+  { id: 'todos', etiqueta: 'Todos' },
+  { id: 'deuda', etiqueta: 'Con deuda' },
+  { id: 'favor', etiqueta: 'Saldo a favor' },
+  { id: 'cero', etiqueta: 'Saldo cero' },
+] as const satisfies readonly { id: Filtro; etiqueta: string }[]
 
 export function Tesoreria() {
   const consulta = useTesoreria()
@@ -27,33 +46,26 @@ export function Tesoreria() {
 
   return (
     <>
-      <Link href="/" className="mt-6 inline-block text-sm text-slate-500 hover:text-slate-900">
-        ← Inicio
-      </Link>
-      <div className="mt-1 flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">Tesorería</h2>
-        {configura && (
-          <Link href="/tesoreria/configuracion" className="text-sm text-slate-600">
-            Configurar cuotas
-          </Link>
-        )}
-      </div>
+      <Volver href="/">Directorio</Volver>
+      <Titulo
+        enlace={configura ? { texto: 'Cuotas', href: '/tesoreria/configuracion' } : undefined}
+      >
+        Tesorería
+      </Titulo>
 
-      {consulta.isPending && <p className="mt-8 text-sm text-slate-500">Consultando cuentas…</p>}
-      {consulta.error && (
-        <p className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-800">
-          {consulta.error.message}
-        </p>
-      )}
+      {consulta.isPending && <Cargando>Consultando cuentas…</Cargando>}
+      {consulta.error && <Falla>{consulta.error.message}</Falla>}
 
+      {/* Lo que exige acción va arriba de todo, y sólo aparece si hay algo que
+          hacer: un bloque destacado que dice "0" no destaca nada. */}
       {pendientes && pendientes.cantidad > 0 && (
-        <section className="mt-6 rounded-lg bg-amber-50 p-4">
-          <p className="text-sm text-amber-900">
+        <section className="mt-5 rounded-lg bg-warn-soft p-4">
+          <p className="font-semibold text-warn">
             Hay {pendientes.cantidad}{' '}
             {pendientes.cantidad === 1 ? 'deuda pendiente' : 'deudas pendientes'}.
           </p>
           {pendientes.periodosSinCuota.length > 0 && (
-            <p className="mt-1 text-xs text-amber-800">
+            <p className="mt-1 text-label tabular-nums text-warn">
               Falta configurar la cuota de: {pendientes.periodosSinCuota.join(', ')}.
             </p>
           )}
@@ -61,46 +73,32 @@ export function Tesoreria() {
             type="button"
             disabled={generar.isPending}
             onClick={() => generar.mutate()}
-            className="mt-3 rounded-lg bg-amber-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className={`${BOTON_PRINCIPAL} mt-3 sm:w-fit`}
           >
             {generar.isPending ? 'Generando…' : `Generar ${pendientes.cantidad} deudas pendientes`}
           </button>
         </section>
       )}
 
-      <section className="mt-6">
-        <h3 className="text-sm font-semibold">Cuentas de grupos</h3>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {(['todos', 'deuda', 'favor', 'cero'] as const).map((uno) => (
-            <button
-              key={uno}
-              type="button"
-              onClick={() => setFiltro(uno)}
-              className={`rounded-full px-3 py-1.5 text-xs ${filtro === uno ? 'bg-slate-900 text-white' : 'bg-white text-slate-600'}`}
-            >
-              {uno === 'todos'
-                ? 'Todos'
-                : uno === 'deuda'
-                  ? 'Con deuda'
-                  : uno === 'favor'
-                    ? 'Saldo a favor'
-                    : 'Saldo cero'}
-            </button>
-          ))}
+      <Seccion titulo="Cuentas de grupos" cuantos={cuentas.length}>
+        <div className="mt-3">
+          <Filtros opciones={FILTROS} valor={filtro} onElegir={setFiltro} />
         </div>
-        <ul className="mt-3 divide-y divide-slate-200 overflow-hidden rounded-lg bg-white shadow-sm">
+        <ul className="mt-3">
           {cuentas.map((cuenta) => (
-            <li key={cuenta.grupoId}>
+            <li key={cuenta.grupoId} className="border-b border-line last:border-b-0">
               <Link
                 href={`/tesoreria/grupos/${cuenta.grupoId}`}
-                className="flex items-center justify-between gap-3 px-4 py-3"
+                className={`${FILA} justify-between border-b-0 active:bg-surface-3`}
               >
-                <span className="text-sm">
-                  Grupo Scout Nº{cuenta.numero} - {cuenta.nombre}
+                <span className="min-w-0 text-sm font-semibold">
+                  Grupo Scout Nº{cuenta.numero} — {cuenta.nombre}
                   {cuenta.cerrado ? ' (cerrado)' : ''}
                 </span>
+                {/* El signo y la palabra dicen de qué lado va el saldo; el
+                    color es refuerzo, nunca el dato. */}
                 <strong
-                  className={`shrink-0 text-sm ${cuenta.saldo > 0 ? 'text-red-700' : cuenta.saldo < 0 ? 'text-emerald-700' : 'text-slate-500'}`}
+                  className={`shrink-0 text-sm tabular-nums ${cuenta.saldo > 0 ? 'text-danger' : cuenta.saldo < 0 ? 'text-ok' : 'text-ink-muted'}`}
                 >
                   {pesos.format(Math.abs(cuenta.saldo))}
                   {cuenta.saldo < 0 ? ' a favor' : ''}
@@ -110,9 +108,9 @@ export function Tesoreria() {
           ))}
         </ul>
         {cuentas.length === 0 && !consulta.isPending && (
-          <p className="mt-3 text-sm text-slate-500">No hay grupos para este filtro.</p>
+          <Vacio>No hay grupos para este filtro.</Vacio>
         )}
-      </section>
+      </Seccion>
     </>
   )
 }

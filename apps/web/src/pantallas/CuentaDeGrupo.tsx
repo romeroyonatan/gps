@@ -1,12 +1,6 @@
-import {
-  type MedioDePago,
-  useAnularPago,
-  useCuentaDeGrupo,
-  useRegistrarPago,
-  useTesoreria,
-} from '@gps/api'
-import { type FormEvent, useState } from 'react'
-import { Link } from 'wouter'
+import { useActor, useAnularPago, useCuentaDeGrupo, useTesoreria } from '@gps/api'
+import { puedeRegistrarPagos, puedeVerTesoreriaDeLaDiocesis } from '@gps/tesoreria/dominio'
+import { Accion, BOTON_AL_MARGEN, Cargando, Falla, Seccion, Titulo, Vacio, Volver } from '../ui'
 
 const pesos = new Intl.NumberFormat('es-AR', {
   style: 'currency',
@@ -14,159 +8,95 @@ const pesos = new Intl.NumberFormat('es-AR', {
   maximumFractionDigits: 0,
 })
 
+const NOMBRE_DEL_MOVIMIENTO = {
+  cargo_afiliacion: 'Afiliación',
+  pago: 'Pago',
+} as const
+
 export function CuentaDeGrupo(props: { grupoId: string }) {
   const resumen = useTesoreria()
   const consulta = useCuentaDeGrupo(props.grupoId)
-  const registrar = useRegistrarPago()
   const anular = useAnularPago(props.grupoId)
-  const [fecha, setFecha] = useState('')
-  const [importe, setImporte] = useState('')
-  const [medio, setMedio] = useState<MedioDePago>('transferencia')
-  const [referencia, setReferencia] = useState('')
-  const [observacion, setObservacion] = useState('')
+  const actor = useActor()
 
   const cuenta = resumen.data?.cuentasDeGrupos.find((una) => una.grupoId === props.grupoId)
   const movimientos = consulta.data?.movimientosDeTesoreria ?? []
   const pagosAnulados = new Set(movimientos.map((uno) => uno.anulaA).filter(Boolean))
 
-  function enviar(evento: FormEvent) {
-    evento.preventDefault()
-    registrar.mutate(
-      {
-        grupoId: props.grupoId,
-        fecha,
-        importe: Number(importe),
-        medioDePago: medio,
-        referencia,
-        observacion,
-      },
-      {
-        onSuccess: () => {
-          setImporte('')
-          setReferencia('')
-          setObservacion('')
-        },
-      },
-    )
-  }
+  const escribe = actor !== null && puedeRegistrarPagos(actor)
+  // Si hay camino de vuelta depende de por dónde se entra. Para Tesorería
+  // diocesana esto cuelga de /tesorería y el enlace la devuelve al panorama.
+  // Para la jefatura es una de las cinco tareas de su grupo: la barra ya la
+  // tiene a la vista y un "← Grupo" arriba sólo repetiría lo que ya está.
+  const desdeLaDiocesis = actor !== null && puedeVerTesoreriaDeLaDiocesis(actor)
 
   return (
     <>
-      <Link href="/tesoreria" className="mt-6 inline-block text-sm text-slate-500">
-        ← Tesorería
-      </Link>
-      <h2 className="mt-1 text-lg font-semibold">
-        {cuenta ? `Grupo Scout Nº${cuenta.numero} - ${cuenta.nombre}` : 'Cuenta del grupo'}
-      </h2>
+      {desdeLaDiocesis && <Volver href="/tesoreria">Tesorería</Volver>}
+      <Titulo>{cuenta ? `Grupo ${cuenta.numero} — ${cuenta.nombre}` : 'Cuenta del grupo'}</Titulo>
+
       {cuenta && (
-        <p className="mt-1 text-sm text-slate-600">
-          Saldo:{' '}
-          <strong>
+        <section className="mt-5">
+          {/* El saldo positivo es deuda: así lo guarda tesorería. El signo se
+              escribe, no se deduce del color. */}
+          <p
+            className={`text-2xl font-bold tabular-nums ${cuenta.saldo > 0 ? 'text-danger' : 'text-ink'}`}
+          >
+            {cuenta.saldo > 0 ? '−' : ''}
             {pesos.format(Math.abs(cuenta.saldo))}
-            {cuenta.saldo < 0 ? ' a favor' : cuenta.saldo > 0 ? ' de deuda' : ''}
-          </strong>
-        </p>
+          </p>
+          <p className="mt-0.5 text-sm text-ink-muted">
+            {cuenta.saldo > 0 ? 'De deuda' : cuenta.saldo < 0 ? 'A favor del grupo' : 'Sin deuda'}.
+          </p>
+        </section>
       )}
 
-      <section className="mt-6 rounded-lg bg-white p-4 shadow-sm">
-        <h3 className="text-sm font-semibold">Registrar pago externo</h3>
-        <form onSubmit={enviar} className="mt-3 space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <label className="text-xs text-slate-600">
-              Fecha
-              <input
-                type="date"
-                required
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="text-xs text-slate-600">
-              Importe
-              <input
-                inputMode="numeric"
-                required
-                value={importe}
-                onChange={(e) => setImporte(e.target.value)}
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
-              />
-            </label>
-          </div>
-          <label className="block text-xs text-slate-600">
-            Medio
-            <select
-              value={medio}
-              onChange={(e) => setMedio(e.target.value as MedioDePago)}
-              className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
-            >
-              <option value="transferencia">Transferencia</option>
-              <option value="efectivo">Efectivo</option>
-              <option value="otro">Otro</option>
-            </select>
-          </label>
-          <label className="block text-xs text-slate-600">
-            Referencia opcional
-            <input
-              value={referencia}
-              onChange={(e) => setReferencia(e.target.value)}
-              className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="block text-xs text-slate-600">
-            Observación opcional
-            <textarea
-              value={observacion}
-              onChange={(e) => setObservacion(e.target.value)}
-              className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={registrar.isPending}
-            className="w-full rounded bg-slate-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {registrar.isPending ? 'Registrando…' : 'Registrar pago'}
-          </button>
-        </form>
-        {registrar.error && <p className="mt-2 text-sm text-red-700">{registrar.error.message}</p>}
-      </section>
+      {/* La acción arriba de la lista y no un formulario colgado abajo:
+          asentar un pago es una tarea que termina, y tiene su pantalla. */}
+      {escribe && (
+        <div className="mt-5">
+          <Accion href={`/tesoreria/grupos/${props.grupoId}/pago`}>Registrar pago externo</Accion>
+        </div>
+      )}
 
-      <section className="mt-6">
-        <h3 className="text-sm font-semibold">Movimientos</h3>
-        {consulta.isPending && <p className="mt-3 text-sm text-slate-500">Consultando…</p>}
-        {consulta.error && <p className="mt-3 text-sm text-red-700">{consulta.error.message}</p>}
-        <ul className="mt-3 divide-y divide-slate-200 overflow-hidden rounded-lg bg-white shadow-sm">
+      <Seccion titulo="Movimientos" cuantos={movimientos.length}>
+        {consulta.isPending && <Cargando>Consultando…</Cargando>}
+        {consulta.error && <Falla>{consulta.error.message}</Falla>}
+
+        <ul className="mt-2">
           {movimientos.map((movimiento) => (
-            <li key={movimiento.id} className="px-4 py-3">
-              <div className="flex justify-between gap-3 text-sm">
-                <span>
+            <li key={movimiento.id} className="border-b border-line py-3 last:border-b-0">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="tabular-nums">
                   {movimiento.fecha} ·{' '}
-                  {movimiento.tipo === 'cargo_afiliacion'
-                    ? 'Afiliación'
-                    : movimiento.tipo === 'pago'
-                      ? 'Pago'
-                      : 'Anulación de pago'}
+                  {NOMBRE_DEL_MOVIMIENTO[movimiento.tipo as keyof typeof NOMBRE_DEL_MOVIMIENTO] ??
+                    'Anulación de pago'}
                 </span>
-                <strong>
+                {/* Un cargo suma deuda y un pago la baja: el signo dice de qué
+                    lado va el movimiento, no si el número es grande. */}
+                <strong className="shrink-0 tabular-nums">
                   {movimiento.tipo === 'pago' ? '−' : '+'}
                   {pesos.format(movimiento.importe)}
                 </strong>
               </div>
               {movimiento.cantidad && (
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-0.5 text-label tabular-nums text-ink-muted">
                   {movimiento.cantidad} × {pesos.format(movimiento.cuota ?? 0)}
                 </p>
               )}
               {movimiento.referencia && (
-                <p className="mt-1 text-xs text-slate-500">Referencia: {movimiento.referencia}</p>
+                <p className="mt-0.5 text-label text-ink-muted">
+                  Referencia: {movimiento.referencia}
+                </p>
               )}
-              {movimiento.tipo === 'pago' && !pagosAnulados.has(movimiento.id) && (
+              {/* El pago no se edita: si está mal, se anula y se carga de
+                  nuevo. Queda el rastro de los dos asientos. */}
+              {escribe && movimiento.tipo === 'pago' && !pagosAnulados.has(movimiento.id) && (
                 <button
                   type="button"
                   disabled={anular.isPending}
                   onClick={() => anular.mutate({ pagoId: movimiento.id })}
-                  className="mt-2 text-xs text-red-700 disabled:opacity-50"
+                  className={`${BOTON_AL_MARGEN} mt-1.5`}
                 >
                   Anular pago
                 </button>
@@ -174,11 +104,12 @@ export function CuentaDeGrupo(props: { grupoId: string }) {
             </li>
           ))}
         </ul>
+
         {movimientos.length === 0 && !consulta.isPending && (
-          <p className="mt-3 text-sm text-slate-500">La cuenta todavía no tiene movimientos.</p>
+          <Vacio>La cuenta todavía no tiene movimientos.</Vacio>
         )}
-        {anular.error && <p className="mt-2 text-sm text-red-700">{anular.error.message}</p>}
-      </section>
+        {anular.error && <Falla>{anular.error.message}</Falla>}
+      </Seccion>
     </>
   )
 }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { etiquetaDeEdades, RAMAS, ramaDelCatalogo } from '../src/dominio/ramas'
+import { etiquetaDeEdades, RAMAS, ramaDelCatalogo, ramaParaEdad } from '../src/dominio/ramas'
 
 describe('catalogo de RAMAS', () => {
   test('tiene las seis ramas, de menor a mayor edad', () => {
@@ -64,5 +64,36 @@ describe('ramaDelCatalogo', () => {
     // deja ids viejos dando vueltas en los datos, y el helper tiene que poder
     // decir "no esta" sin tirar.
     expect(ramaDelCatalogo('inexistente' as never)).toBeUndefined()
+  })
+})
+
+describe('ramaParaEdad', () => {
+  test('cada edad cae en la rama de su tramo', () => {
+    expect(ramaParaEdad(5)?.id).toBe('castores')
+    expect(ramaParaEdad(6)?.id).toBe('castores')
+    expect(ramaParaEdad(8)?.id).toBe('lobatos')
+    expect(ramaParaEdad(12)?.id).toBe('scouts')
+    expect(ramaParaEdad(15)?.id).toBe('raiders')
+    expect(ramaParaEdad(19)?.id).toBe('rovers')
+  })
+
+  test('el borde es del que empieza: hasta es exclusivo', () => {
+    // El de 10 ya es scout, no lobato. Es donde se equivocan las dos copias
+    // de esta regla que hubiera si viviera en las pantallas.
+    expect(ramaParaEdad(10)?.id).toBe('scouts')
+    expect(ramaParaEdad(14)?.id).toBe('raiders')
+    expect(ramaParaEdad(17)?.id).toBe('rovers')
+    expect(ramaParaEdad(21)?.id).toBe('adultos')
+  })
+
+  test('adultos está abierta hacia arriba', () => {
+    expect(ramaParaEdad(40)?.id).toBe('adultos')
+    expect(ramaParaEdad(95)?.id).toBe('adultos')
+  })
+
+  test('por debajo de castores no hay rama', () => {
+    // Devolver la primera sería inventar que el de 3 años entra en alguna.
+    expect(ramaParaEdad(4)).toBeUndefined()
+    expect(ramaParaEdad(0)).toBeUndefined()
   })
 })

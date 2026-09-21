@@ -1,4 +1,5 @@
 import { periodoDe } from '@gps/afiliacion/dominio'
+import type { TipoDeCargo } from '@gps/api'
 import {
   useActor,
   useAfiliadosEn,
@@ -9,7 +10,7 @@ import {
 } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import { type Rama, ramaDelCatalogo } from '@gps/estructura/dominio'
-import { firmantesRequeridos, repartirSalidas } from '@gps/salidas/dominio'
+import { firmantesRequeridos, puedeFirmarEnLaApp, repartirSalidas } from '@gps/salidas/dominio'
 import { Link, useLocalSearchParams } from 'expo-router'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { BarraDeSesion } from '../../../src/BarraDeSesion'
@@ -130,17 +131,20 @@ export default function Pantalla() {
   )
   const grupo = distrito?.grupos.find((candidato) => candidato.id === id)
 
-  // Las tres filas las reparte el dominio, con la misma política de firma que
-  // aplica el servidor: firmar es personal.
-  const panel =
-    actor && distrito
-      ? repartirSalidas(
-          permisos.data?.permisos ?? [],
-          actor,
-          firmantesRequeridos(id, distrito.id),
-          aFechaDeCalendario(hoy),
-        )
-      : { esperanTuFirma: [], esperanLaDeOtro: [], proximas: [] }
+  // El reparto es la misma función pura que usa la web, así que "espera tu
+  // firma" quiere decir lo mismo en los dos lados. Quién firma qué lo decide
+  // `puedeFirmarEnLaApp` contra los tres firmantes del permiso: sin distrito
+  // todavía no se sabe quién es el comisionado, y entonces nadie firma nada.
+  const firmantes = distrito ? firmantesRequeridos(id, distrito.id) : []
+  const puedoFirmar = (cargo: TipoDeCargo) => {
+    const firmante = firmantes.find((uno) => uno.cargo === cargo)
+    return actor !== null && firmante !== undefined && puedeFirmarEnLaApp(actor, firmante)
+  }
+  const reparto = repartirSalidas(
+    permisos.data?.permisos ?? [],
+    aFechaDeCalendario(hoy),
+    puedoFirmar,
+  )
 
   const cuenta = tesoreria.data?.cuentasDeGrupos.find((una) => una.grupoId === id)
 
@@ -182,12 +186,12 @@ export default function Pantalla() {
           {/* Lo que exige acción va arriba de todo, y sólo aparece si hay algo
               que hacer: un bloque destacado que dice "0" no destaca nada. Dice
               "tu firma" porque el dominio ya lo decidió. */}
-          {panel.esperanTuFirma.length > 0 && (
+          {reparto.esperanMiFirma.length > 0 && (
             <View className="mt-5 rounded-lg bg-warn-soft p-4">
               <Text className="font-semibold text-warn">
-                {panel.esperanTuFirma.length === 1
+                {reparto.esperanMiFirma.length === 1
                   ? '1 salida espera tu firma'
-                  : `${panel.esperanTuFirma.length} salidas esperan tu firma`}
+                  : `${reparto.esperanMiFirma.length} salidas esperan tu firma`}
               </Text>
               <Link href={`/grupos/${id}/salidas`} asChild>
                 <Pressable className="mt-3 h-12 w-full items-center justify-center rounded-lg bg-accent px-6">
@@ -252,18 +256,18 @@ export default function Pantalla() {
               <View className="mt-1.5">
                 <FilaDeSalidas
                   titulo="Esperan tu firma"
-                  salidas={panel.esperanTuFirma}
+                  salidas={reparto.esperanMiFirma}
                   grupoId={id}
                 />
                 <FilaDeSalidas
-                  titulo="Esperan la de otro"
-                  salidas={panel.esperanLaDeOtro}
+                  titulo="Firmadas, falta el resto"
+                  salidas={reparto.esperanOtraFirma}
                   grupoId={id}
                 />
-                <FilaDeSalidas titulo="Próximas" salidas={panel.proximas} grupoId={id} />
-                {panel.esperanTuFirma.length === 0 &&
-                  panel.esperanLaDeOtro.length === 0 &&
-                  panel.proximas.length === 0 && (
+                <FilaDeSalidas titulo="Próximas" salidas={reparto.proximas} grupoId={id} />
+                {reparto.esperanMiFirma.length === 0 &&
+                  reparto.esperanOtraFirma.length === 0 &&
+                  reparto.proximas.length === 0 && (
                     <Text className="text-sm text-ink-muted">No hay ninguna salida anotada.</Text>
                   )}
               </View>

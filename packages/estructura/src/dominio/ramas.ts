@@ -47,3 +47,17 @@ const RAMA_POR_ID = new Map(RAMAS.map((rama) => [rama.id, rama]))
 export function ramaDelCatalogo(id: Rama): (typeof RAMAS)[number] | undefined {
   return RAMA_POR_ID.get(id)
 }
+
+/** Que rama le corresponde a una edad. `hasta` es exclusivo -el de 10 ya es
+ *  scout, no lobato- y Adultos esta abierta hacia arriba.
+ *
+ *  Es lo que deja que el alta proponga la unidad en vez de pedirla: la edad ya
+ *  dice a donde va, y elegirla a mano es corregir una sugerencia, no completar
+ *  un campo vacio. Vive en el dominio porque es la misma regla que el grupo
+ *  aplica en el mundo, y la van a querer las dos apps.
+ *
+ *  Undefined por debajo de castores: el de 3 anios no entra en ninguna rama, y
+ *  devolver la primera seria inventar que si. */
+export function ramaParaEdad(edad: number): (typeof RAMAS)[number] | undefined {
+  return RAMAS.find((rama) => edad >= rama.desde && (rama.hasta === null || edad < rama.hasta))
+}

@@ -15,6 +15,7 @@ const colors = {
   'ink-muted': 'var(--ink-muted)',
   'ink-faint': 'var(--ink-faint)',
   'ink-inverse': 'var(--ink-inverse)',
+  velo: 'var(--velo)',
   line: 'var(--line)',
   'line-strong': 'var(--line-strong)',
   accent: 'var(--accent)',
