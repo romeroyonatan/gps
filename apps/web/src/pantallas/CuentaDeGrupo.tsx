@@ -1,12 +1,17 @@
 import { useActor, useAnularPago, useCuentaDeGrupo, useTesoreria } from '@gps/api'
 import { puedeRegistrarPagos, puedeVerTesoreriaDeLaDiocesis } from '@gps/tesoreria/dominio'
-import { Accion, BOTON_AL_MARGEN, Cargando, Falla, Seccion, Titulo, Vacio, Volver } from '../ui'
-
-const pesos = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS',
-  maximumFractionDigits: 0,
-})
+import {
+  Accion,
+  BOTON_AL_MARGEN,
+  Cargando,
+  Falla,
+  pesos,
+  Saldo,
+  Seccion,
+  Titulo,
+  Vacio,
+  Volver,
+} from '../ui'
 
 const NOMBRE_DEL_MOVIMIENTO = {
   cargo_afiliacion: 'Afiliación',
@@ -35,21 +40,7 @@ export function CuentaDeGrupo(props: { grupoId: string }) {
       {desdeLaDiocesis && <Volver href="/tesoreria">Tesorería</Volver>}
       <Titulo>{cuenta ? `Grupo ${cuenta.numero} — ${cuenta.nombre}` : 'Cuenta del grupo'}</Titulo>
 
-      {cuenta && (
-        <section className="mt-5">
-          {/* El saldo positivo es deuda: así lo guarda tesorería. El signo se
-              escribe, no se deduce del color. */}
-          <p
-            className={`text-2xl font-bold tabular-nums ${cuenta.saldo > 0 ? 'text-danger' : 'text-ink'}`}
-          >
-            {cuenta.saldo > 0 ? '−' : ''}
-            {pesos.format(Math.abs(cuenta.saldo))}
-          </p>
-          <p className="mt-0.5 text-sm text-ink-muted">
-            {cuenta.saldo > 0 ? 'De deuda' : cuenta.saldo < 0 ? 'A favor del grupo' : 'Sin deuda'}.
-          </p>
-        </section>
-      )}
+      {cuenta && <Saldo importe={cuenta.saldo} className="mt-5" />}
 
       {/* La acción arriba de la lista y no un formulario colgado abajo:
           asentar un pago es una tarea que termina, y tiene su pantalla. */}

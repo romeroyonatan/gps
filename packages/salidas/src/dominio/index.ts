@@ -27,6 +27,7 @@ export {
 export {
   accesoAlModulo,
   puedeAdministrarPermisosDelGrupo,
+  puedeFirmarComo,
   puedeFirmarEnLaApp,
   puedeVerPermisoDelGrupo,
 } from './politicas'

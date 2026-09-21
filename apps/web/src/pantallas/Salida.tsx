@@ -4,11 +4,11 @@ import {
   useActor,
   useAgregarParticipante,
   useAnularPermiso,
-  useDistritos,
   useElegirUnidades,
   useEmitirPermiso,
   useFirmarEnApp,
   useFirmarEnPapel,
+  useGrupo,
   usePermisos,
   usePersonasDelGrupo,
   useQuitarAdjunto,
@@ -24,10 +24,9 @@ import type { Trazos } from '@gps/salidas/dominio'
 import {
   avisoDeAnticipacion,
   candidatos,
-  firmantesRequeridos,
   marcaSegunCategoria,
   puedeAdministrarPermisosDelGrupo,
-  puedeFirmarEnLaApp,
+  puedeFirmarComo,
   resumenDeParticipantes,
 } from '@gps/salidas/dominio'
 import { useState } from 'react'
@@ -39,6 +38,8 @@ import {
   BOTON_SECUNDARIO,
   Cargando,
   Chip,
+  ELEGIBLE,
+  ELEGIDO,
   Falla,
   Vacio,
   Volver,
@@ -67,15 +68,12 @@ export function estadoDelPermiso(permiso: Permiso, miFirmaPendiente: boolean) {
 
 /** Elegir unidades y marcar quién va. Sólo mientras es borrador. */
 function Armado(props: { permiso: Permiso; grupoId: string }) {
-  const arbol = useDistritos()
+  const { grupo } = useGrupo(props.grupoId)
   const lista = usePersonasDelGrupo(props.grupoId)
   const elegirUnidades = useElegirUnidades()
   const agregar = useAgregarParticipante()
   const quitar = useQuitarParticipante()
 
-  const grupo = arbol.data?.distritos
-    .flatMap((distrito) => distrito.grupos)
-    .find((uno) => uno.id === props.grupoId)
   const personas = lista.data?.personas ?? []
   const elegidas = props.permiso.unidadIds
   const puestos = new Set(props.permiso.participantes.map((uno) => uno.personaId))
@@ -307,15 +305,9 @@ function Firmas(props: {
   const [modo, setModo] = useState<'trazo' | 'escaneo'>('trazo')
 
   // Quién puede firmar qué: la misma política pura que aplica el servidor, así
-  // la pantalla no ofrece un botón que después se rechaza. Sin distrito
-  // todavía no se sabe quién es el comisionado, y entonces nadie firma.
-  const firmantes = props.distritoId ? firmantesRequeridos(props.grupoId, props.distritoId) : []
-  const puedoFirmar = (cargo: TipoDeCargo) => {
-    const firmante = firmantes.find((uno) => uno.cargo === cargo)
-    return (
-      props.actor !== null && firmante !== undefined && puedeFirmarEnLaApp(props.actor, firmante)
-    )
-  }
+  // la pantalla no ofrece un botón que después se rechaza.
+  const puedoFirmar = (cargo: TipoDeCargo) =>
+    puedeFirmarComo(props.actor, cargo, props.grupoId, props.distritoId)
 
   const hechas = props.permiso.firmas.filter((firma) => firma.firmada)
   const pendientes = props.permiso.firmas.filter((firma) => !firma.firmada)
@@ -393,9 +385,7 @@ function Firmas(props: {
                   type="button"
                   onClick={() => setModo(uno)}
                   className={`min-h-11 flex-1 rounded-lg border text-sm font-semibold ${
-                    modo === uno
-                      ? 'border-accent bg-accent text-accent-ink'
-                      : 'border-line-strong text-ink hover:bg-surface-3'
+                    modo === uno ? ELEGIDO : `${ELEGIBLE} text-ink`
                   }`}
                 >
                   {uno === 'trazo' ? 'Firmar en pantalla' : 'Subir escaneo'}
@@ -435,15 +425,15 @@ function Detalle(props: {
   const hoy = aFechaDeCalendario(new Date())
   const aviso = avisoDeAnticipacion(hoy, permiso.desde)
 
-  const firmantes = props.distritoId ? firmantesRequeridos(props.grupoId, props.distritoId) : []
-  const miFirmaPendiente = permiso.firmas.some((firma) => {
-    if (firma.firmada) return false
-    const firmante = firmantes.find((uno) => uno.cargo === firma.cargo)
-    return (
-      props.actor !== null && firmante !== undefined && puedeFirmarEnLaApp(props.actor, firmante)
-    )
-  })
+  const miFirmaPendiente = permiso.firmas.some(
+    (firma) =>
+      !firma.firmada && puedeFirmarComo(props.actor, firma.cargo, props.grupoId, props.distritoId),
+  )
   const estado = estadoDelPermiso(permiso, miFirmaPendiente)
+  // Una sola línea de error para las cinco escrituras de la pantalla: la
+  // cadena estaba escrita dos veces y se evaluaba dos veces.
+  const problema =
+    emitir.error ?? anular.error ?? reEmitir.error ?? subir.error ?? quitarAdjunto.error
 
   return (
     <>
@@ -579,14 +569,7 @@ function Detalle(props: {
         </p>
       )}
       {aviso && permiso.estado === 'borrador' && <Aviso>{aviso.mensaje}</Aviso>}
-      {(emitir.error ?? anular.error ?? reEmitir.error ?? subir.error ?? quitarAdjunto.error) && (
-        <Falla>
-          {
-            (emitir.error ?? anular.error ?? reEmitir.error ?? subir.error ?? quitarAdjunto.error)
-              ?.message
-          }
-        </Falla>
-      )}
+      {problema && <Falla>{problema.message}</Falla>}
 
       {/* Lo menos frecuente, al final y chiquito: el mismo criterio que
           "declarar extraordinaria" en afiliacion. Firmar no se deshace desde
@@ -613,12 +596,9 @@ function Detalle(props: {
  *  pagine, se agrega `permiso(id)` y se arregla en un solo lugar. */
 export function Salida(props: { grupoId: string; permisoId: string }) {
   const consulta = usePermisos(props.grupoId)
-  const arbol = useDistritos()
+  const { distrito } = useGrupo(props.grupoId)
   const actor = useActor()
 
-  const distrito = arbol.data?.distritos.find((candidato) =>
-    candidato.grupos.some((grupo) => grupo.id === props.grupoId),
-  )
   const permiso = consulta.data?.permisos.find((uno) => uno.id === props.permisoId)
 
   if (consulta.isPending) return <Cargando>Consultando la salida…</Cargando>

@@ -1,9 +1,8 @@
-import { type PermisosQuery, useActor, useDistritos, usePermisos } from '@gps/api'
+import { type PermisosQuery, useActor, useGrupo, usePermisos } from '@gps/api'
 import type { Actor } from '@gps/core'
 import {
-  firmantesRequeridos,
   puedeAdministrarPermisosDelGrupo,
-  puedeFirmarEnLaApp,
+  puedeFirmarComo,
   resumenDeParticipantes,
 } from '@gps/salidas/dominio'
 import { Link } from 'wouter'
@@ -25,14 +24,10 @@ function Fila(props: {
 
   // La misma política pura que aplica el servidor, igual que en el detalle:
   // "pendiente de tu firma" tiene que querer decir lo mismo en los dos lados.
-  const firmantes = props.distritoId ? firmantesRequeridos(props.grupoId, props.distritoId) : []
-  const miFirmaPendiente = permiso.firmas.some((firma) => {
-    if (firma.firmada) return false
-    const firmante = firmantes.find((uno) => uno.cargo === firma.cargo)
-    return (
-      props.actor !== null && firmante !== undefined && puedeFirmarEnLaApp(props.actor, firmante)
-    )
-  })
+  const miFirmaPendiente = permiso.firmas.some(
+    (firma) =>
+      !firma.firmada && puedeFirmarComo(props.actor, firma.cargo, props.grupoId, props.distritoId),
+  )
   const estado = estadoDelPermiso(permiso, miFirmaPendiente)
 
   return (
@@ -65,12 +60,9 @@ function Fila(props: {
 
 export function Salidas(props: { grupoId: string }) {
   const consulta = usePermisos(props.grupoId)
-  const arbol = useDistritos()
+  const { distrito } = useGrupo(props.grupoId)
   const actor = useActor()
 
-  const distrito = arbol.data?.distritos.find((candidato) =>
-    candidato.grupos.some((grupo) => grupo.id === props.grupoId),
-  )
   const administra = actor !== null && puedeAdministrarPermisosDelGrupo(actor, props.grupoId)
   const permisos = consulta.data?.permisos ?? []
 

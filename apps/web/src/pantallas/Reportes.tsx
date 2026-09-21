@@ -1,13 +1,21 @@
 import { useReporteDeCobranza, useTesoreria } from '@gps/api'
+import { aFechaDeCalendario } from '@gps/core/fechas'
 import { periodosDelReporte, variacion } from '@gps/tesoreria/dominio'
 import { useState } from 'react'
-import { CAMPO, Campo, Cargando, Falla, Nota, Titulo, Vacio, Volver } from '../ui'
+import {
+  CAMPO,
+  Campo,
+  Cargando,
+  Falla,
+  Nota,
+  PIE_DE_TABLA,
+  pesos,
+  TABLA,
+  Titulo,
+  Vacio,
+  Volver,
+} from '../ui'
 
-const pesos = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS',
-  maximumFractionDigits: 0,
-})
 const entero = new Intl.NumberFormat('es-AR')
 const porciento = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 })
 
@@ -58,7 +66,7 @@ export function Reportes() {
   // Deuda, así que elegir período no dispara un pedido nuevo.
   const tesoreria = useTesoreria()
   const mirables = periodosDelReporte(
-    new Date().toLocaleDateString('en-CA'),
+    aFechaDeCalendario(new Date()),
     (tesoreria.data?.cuotasDeAfiliacion ?? []).map((cuota) => cuota.periodo),
   )
   const [elegido, setElegido] = useState<number | null>(null)
@@ -99,7 +107,7 @@ export function Reportes() {
 
       {reporte && (
         <>
-          <section className="mt-5 md:rounded-xl md:border md:border-line-strong">
+          <section className={TABLA}>
             <h3 className="text-lg font-bold md:border-b md:border-line md:p-4">
               Cobranza por distrito
             </h3>
@@ -178,7 +186,7 @@ export function Reportes() {
               </div>
             )}
 
-            <div className="mt-4 flex flex-wrap justify-between gap-3 rounded-lg bg-surface-3 px-4 py-3 text-sm md:mt-0 md:rounded-none md:rounded-b-xl">
+            <div className={PIE_DE_TABLA}>
               <span className="tabular-nums text-ink-muted">
                 {reporte.totales.distritos} distritos · {reporte.totales.grupos} grupos ·{' '}
                 {reporte.totales.declararon} declararon

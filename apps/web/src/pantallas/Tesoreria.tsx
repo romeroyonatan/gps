@@ -9,18 +9,16 @@ import {
   Chip,
   Falla,
   Filtros,
+  Pendiente,
+  PIE_DE_TABLA,
+  pesos,
+  TABLA,
   Titulo,
   Vacio,
   Volver,
 } from '../ui'
 
 type Filtro = 'todos' | 'deuda' | 'favor' | 'cero'
-
-const pesos = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS',
-  maximumFractionDigits: 0,
-})
 
 const FILTROS = [
   { id: 'todos', etiqueta: 'Todos' },
@@ -93,10 +91,8 @@ export function Tesoreria() {
         </section>
       )}
 
-      {/* Lo que exige acción va arriba de todo, y sólo aparece si hay algo que
-          hacer: un bloque destacado que dice "0" no destaca nada. */}
       {pendientes && pendientes.cantidad > 0 && (
-        <section className="mt-5 rounded-lg bg-warn-soft p-4">
+        <Pendiente>
           <p className="font-semibold text-warn">
             Hay {pendientes.cantidad}{' '}
             {pendientes.cantidad === 1 ? 'deuda pendiente' : 'deudas pendientes'}.
@@ -114,14 +110,10 @@ export function Tesoreria() {
           >
             {generar.isPending ? 'Generando…' : `Generar ${pendientes.cantidad} deudas pendientes`}
           </button>
-        </section>
+        </Pendiente>
       )}
 
-      {/* En el teléfono esto es una lista suelta; de `md:` para arriba se
-          encuadra —barra de filtros, encabezados, pie— y pasa a ser la tabla
-          del mockup de escritorio. Es el mismo markup con otra grilla, y no
-          dos pantallas paralelas que después se separan. */}
-      <section className="mt-5 md:rounded-xl md:border md:border-line-strong">
+      <section className={TABLA}>
         {/* Buscar antes que filtrar: se busca por nombre, y los recortes por
             estado quedan en las píldoras al lado. */}
         <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:border-b md:border-line md:p-4">
@@ -203,7 +195,7 @@ export function Tesoreria() {
         {/* El pie del mockup: el filtro cambia la pregunta, así que el total
             tiene que cambiar con ella. */}
         {cuentas.length > 0 && (
-          <div className="mt-4 flex flex-wrap justify-between gap-3 rounded-lg bg-surface-3 px-4 py-3 text-sm md:mt-0 md:rounded-none md:rounded-b-xl">
+          <div className={PIE_DE_TABLA}>
             <span className="text-ink-muted">
               {cuentas.length} {cuentas.length === 1 ? 'grupo' : 'grupos'}
             </span>

@@ -310,6 +310,34 @@ describe('listarPersonas', () => {
   test('un grupo sin nadie devuelve la lista vacia', async () => {
     expect(await montar().listarPersonas(alcanceSinLimites(), 'grupo_1')).toEqual([])
   })
+
+  test('cada equipo viaja con su tipo', async () => {
+    // Sin el tipo, la pantalla del plantel no puede distinguir la Secretaría
+    // del grupo de un equipo diocesano de la misma persona: dibujaba las dos
+    // como Secretaría, y quitar una revocaba la otra.
+    const servicio = montar()
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
+    await servicio.integrarEquipo(actor('jefeDeGrupo'), {
+      personaId: persona.id,
+      tipo: 'secretaria',
+      ambitoTipo: 'grupo',
+      ambitoId: 'grupo_1',
+      desde: '1970-01-01',
+    })
+    await servicio.integrarEquipo(actorDiocesano('jefeScoutDiocesano'), {
+      personaId: persona.id,
+      tipo: 'tesoreriaDiocesana',
+      ambitoTipo: 'diocesis',
+      ambitoId: null,
+      desde: '1970-01-01',
+    })
+
+    const [traida] = await servicio.listarPersonas(alcanceSinLimites(), 'grupo_1')
+    expect(traida?.equipos.map((equipo) => equipo.tipo).sort()).toEqual([
+      'secretaria',
+      'tesoreriaDiocesana',
+    ])
+  })
 })
 
 describe('crearPersona', () => {

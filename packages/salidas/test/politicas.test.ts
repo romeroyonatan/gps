@@ -3,6 +3,7 @@ import type { Actor, Alcance } from '@gps/core'
 import { type FirmanteRequerido, firmantesRequeridos } from '../src/dominio/firmas'
 import {
   puedeAdministrarPermisosDelGrupo,
+  puedeFirmarComo,
   puedeFirmarEnLaApp,
   puedeVerPermisoDelGrupo,
 } from '../src/dominio/politicas'
@@ -75,5 +76,25 @@ describe('puedeFirmarEnLaApp', () => {
 
   test('la elevación no firma por nadie: falsificaría una firma', () => {
     expect(puedeFirmarEnLaApp(elevado, jefe)).toBe(false)
+  })
+})
+
+describe('puedeFirmarComo', () => {
+  test('responde por cargo sin que la pantalla arme la lista de firmantes', () => {
+    expect(puedeFirmarComo(actorCon('jefeDeGrupo', 'grupo', 'g1'), 'jefeDeGrupo', 'g1', 'd1')).toBe(
+      true,
+    )
+    expect(puedeFirmarComo(actorCon('jefeDeGrupo', 'grupo', 'g1'), 'director', 'g1', 'd1')).toBe(
+      false,
+    )
+  })
+
+  test('sin actor o sin distrito todavia no firma nadie', () => {
+    // No es un permiso denegado: es que el arbol no volvio y todavia no se
+    // sabe quien es el comisionado.
+    expect(puedeFirmarComo(null, 'jefeDeGrupo', 'g1', 'd1')).toBe(false)
+    expect(
+      puedeFirmarComo(actorCon('jefeDeGrupo', 'grupo', 'g1'), 'jefeDeGrupo', 'g1', undefined),
+    ).toBe(false)
   })
 })
