@@ -12,7 +12,18 @@ import {
 } from '@gps/personas/dominio'
 import { useState } from 'react'
 import { Link } from 'wouter'
-import { COLOR_DE_RAMA } from '../ramas'
+import {
+  Accion,
+  Bajar,
+  CAMPO,
+  Cargando,
+  Chip,
+  ChipDeRama,
+  Falla,
+  Filtros,
+  Titulo,
+  Vacio,
+} from '../ui'
 
 type Persona = NonNullable<ReturnType<typeof usePersonasDelGrupo>['data']>['personas'][number]
 
@@ -69,42 +80,15 @@ function nombreDeRama(rama: Rama | null): string {
   return rama ? (ramaDelCatalogo(rama)?.nombre ?? rama) : ''
 }
 
-/** El estado se lee, no se adivina: la píldora siempre lleva su texto y el
- *  color es refuerzo. */
+/** La píldora de afiliación. El período va escrito: pertenecer no es estar
+ *  afiliado, y "afiliado" a secas no dice de cuándo. El sustantivo y no el
+ *  adjetivo porque el padrón no guarda el género: "Afiliada" en la fila de
+ *  Ignacio es un dato inventado. */
 function Afiliacion(props: { afiliada: boolean; periodo: number }) {
   return (
-    <span
-      className={`inline-flex min-h-[26px] shrink-0 items-center rounded-full px-2.5 py-0.5 text-label font-semibold whitespace-nowrap ${props.afiliada ? 'bg-ok-soft text-ok' : 'bg-warn-soft text-warn'}`}
-    >
-      {/* El período va escrito: pertenecer no es estar afiliado, y "afiliado" a
-          secas no dice de cuándo. El sustantivo y no el adjetivo porque el
-          padrón no guarda el género: "Afiliada" en la fila de Ignacio es un
-          dato inventado. */}
+    <Chip tono={props.afiliada ? 'ok' : 'warn'}>
       {props.afiliada ? `Afiliación ${props.periodo}` : 'Sin afiliar'}
-    </span>
-  )
-}
-
-function Chip(props: { rama: Rama }) {
-  return (
-    <span className="inline-flex min-h-[24px] items-center gap-1.5 rounded-full bg-surface-3 px-2.5 py-0.5 text-label font-medium text-ink-muted whitespace-nowrap">
-      <span className={`size-2 rounded-full ${COLOR_DE_RAMA[props.rama]}`} aria-hidden="true" />
-      {nombreDeRama(props.rama)}
-    </span>
-  )
-}
-
-/** Los dos archivos los arma el servidor y se bajan con un link, igual que el
- *  PDF del permiso de salida: un binario no viaja por GraphQL, y asi el
- *  navegador -y el telefono- lo abre con la aplicacion que corresponde. */
-function Bajar(props: { href: string; children: React.ReactNode }) {
-  return (
-    <a
-      href={props.href}
-      className="inline-flex min-h-11 items-center justify-center rounded-lg border border-line-strong px-3.5 text-sm font-semibold hover:bg-surface-3"
-    >
-      {props.children}
-    </a>
+    </Chip>
   )
 }
 
@@ -130,25 +114,15 @@ export function Nomina(props: { grupoId: string }) {
   )
   const grupo = distrito?.grupos.find((candidato) => candidato.id === props.grupoId)
 
-  if (arbol.isPending || lista.isPending) {
-    return <p className="text-sm text-ink-muted">Consultando la nómina…</p>
-  }
+  if (arbol.isPending || lista.isPending) return <Cargando>Consultando la nómina…</Cargando>
 
   const error = arbol.error ?? lista.error
   if (error) {
-    return (
-      <p className="rounded-lg bg-danger-soft p-4 text-sm break-words text-danger">
-        No se pudo consultar la nómina: {error.message}
-      </p>
-    )
+    return <Falla>No se pudo consultar la nómina: {error.message}</Falla>
   }
 
   if (!grupo) {
-    return (
-      <p className="rounded-lg border border-line-strong p-4 text-sm text-ink-muted">
-        No hay ningún grupo abierto con esa dirección.
-      </p>
-    )
+    return <Vacio>No hay ningún grupo abierto con esa dirección.</Vacio>
   }
 
   // La rama es de la unidad, no de la persona: los adherentes no tienen.
@@ -188,16 +162,11 @@ export function Nomina(props: { grupoId: string }) {
 
   return (
     <>
-      <Link href={`/grupos/${props.grupoId}`} className="text-label text-ink-muted hover:text-ink">
-        ← Grupo {grupo.numero}
-      </Link>
-
       {/* Lo mismo que encabeza el PDF: de qué grupo es y a qué día. Una nómina
           sin fecha no dice nada, ni en pantalla ni en papel. */}
-      <h2 className="mt-1 text-2xl font-bold">Nómina del grupo {grupo.numero}</h2>
-      <p className="mt-1 text-sm text-ink-muted">
-        {grupo.nombre} · Distrito {distrito?.numero} · al {fecha}
-      </p>
+      <Titulo acompaña={`${grupo.nombre} · Distrito ${distrito?.numero} · al ${fecha}`}>
+        Nómina del grupo {grupo.numero}
+      </Titulo>
 
       <div className="mt-5 flex flex-wrap gap-2">
         {/* Los dos formatos como dos botones y no un menu: son dos usos
@@ -205,12 +174,7 @@ export function Nomina(props: { grupoId: string }) {
             en una hoja de calculo- y ninguno es el caso raro del otro. */}
         <Bajar href={`/grupos/${props.grupoId}/nomina.pdf?descargar`}>Exportar PDF</Bajar>
         <Bajar href={`/grupos/${props.grupoId}/nomina.xlsx?descargar`}>Exportar XLSX</Bajar>
-        <Link
-          href={`/grupos/${props.grupoId}/alta`}
-          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-accent px-3.5 text-sm font-semibold text-accent-ink hover:bg-accent-strong"
-        >
-          Agregar una persona
-        </Link>
+        <Accion href={`/grupos/${props.grupoId}/alta`}>Agregar una persona</Accion>
       </div>
 
       <div className="mt-4 flex flex-col gap-3">
@@ -219,24 +183,9 @@ export function Nomina(props: { grupoId: string }) {
           value={busqueda}
           onChange={(evento) => setBusqueda(evento.target.value)}
           placeholder="Buscar por apellido o documento"
-          className="h-12 w-full rounded-lg border border-line-strong px-3.5 text-base sm:max-w-80"
+          className={`${CAMPO} h-12 sm:max-w-80`}
         />
-        <div className="flex flex-wrap gap-2">
-          {filtros.map((uno) => (
-            <button
-              key={uno.id}
-              type="button"
-              onClick={() => setFiltro(uno.id)}
-              className={`inline-flex min-h-9 items-center rounded-full border px-3 text-sm font-semibold ${
-                filtro === uno.id
-                  ? 'border-accent bg-accent text-accent-ink'
-                  : 'border-line-strong hover:bg-surface-3'
-              }`}
-            >
-              {uno.etiqueta}
-            </button>
-          ))}
-        </div>
+        <Filtros opciones={filtros} valor={filtro} onElegir={setFiltro} />
       </div>
 
       {/* La búsqueda y los filtros son para mirar: los archivos salen siempre
@@ -249,9 +198,9 @@ export function Nomina(props: { grupoId: string }) {
       </p>
 
       {visibles.length === 0 ? (
-        <p className="mt-5 rounded-lg border border-dashed border-line-strong p-4 text-sm text-ink-muted">
+        <Vacio>
           No hay nadie con ese criterio. Probá con otro apellido o sacá el filtro de rama.
-        </p>
+        </Vacio>
       ) : (
         <div className="mt-2 space-y-6">
           {secciones.map((seccion) => (
@@ -275,7 +224,7 @@ export function Nomina(props: { grupoId: string }) {
                       <p className="text-sm font-semibold">{fila.nombre}</p>
                       <p className="mt-0.5 text-xs tabular-nums text-ink-muted">{fila.documento}</p>
                       <p className="mt-1.5 flex flex-wrap items-center gap-2">
-                        {fila.rama && <Chip rama={fila.rama} />}
+                        {fila.rama && <ChipDeRama rama={fila.rama} />}
                         {fila.cargo && <span className="text-xs text-ink-faint">{fila.cargo}</span>}
                       </p>
                     </div>

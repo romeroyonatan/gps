@@ -9,6 +9,7 @@ import {
   useVersion,
 } from '@gps/api'
 import type { Actor } from '@gps/core'
+import { nombreCompleto } from '@gps/personas/dominio'
 import { type ReactNode, useEffect, useRef } from 'react'
 import { Link, Route, Switch, useLocation, useRoute } from 'wouter'
 import { Afiliacion } from './pantallas/Afiliacion'
@@ -28,7 +29,11 @@ import { Grupo } from './pantallas/Grupo'
 import { ElegirRol, Ingreso } from './pantallas/Ingreso'
 import { ModoElevado } from './pantallas/ModoElevado'
 import { Nomina } from './pantallas/Nomina'
+import { NuevaCuota } from './pantallas/NuevaCuota'
+import { NuevaSalida } from './pantallas/NuevaSalida'
 import { Plantel } from './pantallas/Plantel'
+import { RegistrarPago } from './pantallas/RegistrarPago'
+import { Salida } from './pantallas/Salida'
 import { Salidas } from './pantallas/Salidas'
 import { Tesoreria } from './pantallas/Tesoreria'
 
@@ -175,14 +180,24 @@ function Rutas() {
   return (
     <Switch>
       <Route path="/" component={Estructura} />
+      <Route path="/tesoreria/grupos/:id/pago">
+        {(params) => <RegistrarPago grupoId={params.id} />}
+      </Route>
       <Route path="/tesoreria/grupos/:id">
         {(params) => <CuentaDeGrupo grupoId={params.id} />}
       </Route>
+      <Route path="/tesoreria/configuracion/nueva" component={NuevaCuota} />
       <Route path="/tesoreria/configuracion" component={ConfiguracionDeCuotas} />
       <Route path="/tesoreria" component={Tesoreria} />
       <Route path="/grupos/:id/afiliacion">{(params) => <Afiliacion grupoId={params.id} />}</Route>
       <Route path="/grupos/:id/nomina">{(params) => <Nomina grupoId={params.id} />}</Route>
       <Route path="/grupos/:id/alta">{(params) => <AltaDePersona grupoId={params.id} />}</Route>
+      <Route path="/grupos/:id/salidas/nueva">
+        {(params) => <NuevaSalida grupoId={params.id} />}
+      </Route>
+      <Route path="/grupos/:id/salidas/:permisoId">
+        {(params) => <Salida grupoId={params.id} permisoId={params.permisoId} />}
+      </Route>
       <Route path="/grupos/:id/salidas">{(params) => <Salidas grupoId={params.id} />}</Route>
       <Route path="/grupos/:id/plantel">{(params) => <Plantel grupoId={params.id} />}</Route>
       <Route path="/grupos/:id">{(params) => <Grupo id={params.id} />}</Route>
@@ -199,6 +214,9 @@ function Rutas() {
  *  `relative` es para que la hoja de roles cuelgue de la barra. */
 function Cascara(props: {
   personaId?: string
+  /** Cómo se llama quien tiene la sesión. Sólo lo usa el pie de la barra: en
+   *  la cabecera del teléfono no hay ancho para el nombre y el ámbito. */
+  nombre?: string
   cabecera?: ReactNode
   /** Lo mismo que `cabecera`, pero abriendo hacia arriba: cuelga del pie de la
    *  barra de tareas, donde no hay lugar para una hoja que baje. */
@@ -208,8 +226,6 @@ function Cascara(props: {
   grupoId?: string
   children: ReactNode
 }) {
-  const version = useVersion()
-
   return (
     <div className="min-h-dvh bg-surface font-sans text-base text-ink md:flex">
       {/* La barra de tareas es negra en las dos formas: `dark` le da vuelta los
@@ -221,9 +237,18 @@ function Cascara(props: {
           <div className="mt-6 flex-1">
             <Tareas grupoId={props.grupoId} forma="columna" />
           </div>
-          <div className="relative flex flex-col items-start gap-3 px-3">
+          {/* De quién es la sesión abierta y sobre qué manda: en un aparato
+              compartido las dos cosas se responden acá, no en un avatar. */}
+          <div className="relative flex flex-col items-start gap-1 px-3">
+            {props.nombre && (
+              <span className="max-w-full text-sm font-semibold text-pretty">{props.nombre}</span>
+            )}
             {props.pie}
-            {props.personaId && <Salir personaId={props.personaId} />}
+            {props.personaId && (
+              <span className="mt-2">
+                <Salir personaId={props.personaId} />
+              </span>
+            )}
           </div>
         </aside>
       )}
@@ -247,13 +272,6 @@ function Cascara(props: {
           className={`mx-auto w-full max-w-[1180px] px-5 py-7 ${props.grupoId ? 'pb-24 md:pb-7' : ''}`}
         >
           {props.children}
-
-          {version.data && (
-            <p className="mt-10 text-xs tabular-nums text-ink-faint">
-              v{version.data.version.numero} · {version.data.version.entorno} ·{' '}
-              {version.data.version.modulos.join(', ')}
-            </p>
-          )}
         </main>
       </div>
 
@@ -266,7 +284,15 @@ function Cascara(props: {
  *  app. Es un componente aparte y no un `if` en App porque `useRolActivo`
  *  guarda la elección por persona, y un hook no puede esperar a que se sepa
  *  quién es: hasta que hay actor, esto no se monta. */
-function ConSesion(props: { actor: Actor; nombre: string | null; entorno: string }) {
+function ConSesion(props: {
+  actor: Actor
+  /** El nombre de pila, para saludar al elegir rol. */
+  nombre: string | null
+  /** Apellido y nombre, para el pie de la barra: de quién es esta sesión. Es
+   *  la misma forma que usa el padrón en todas las listas. */
+  quienEs: string | null
+  entorno: string
+}) {
   const personaId = props.actor.personaId
   const rol = useRolActivo(props.actor)
   const nombreDelAmbito = useNombreDelAmbito()
@@ -317,7 +343,16 @@ function ConSesion(props: { actor: Actor; nombre: string | null; entorno: string
     <Cascara
       personaId={personaId}
       cabecera={<CambioDeRol roles={rol.roles} activo={rol.activo} elegir={rol.elegir} />}
-      pie={<CambioDeRol roles={rol.roles} activo={rol.activo} elegir={rol.elegir} hacia="arriba" />}
+      pie={
+        <CambioDeRol
+          roles={rol.roles}
+          activo={rol.activo}
+          elegir={rol.elegir}
+          hacia="arriba"
+          envuelve
+        />
+      }
+      nombre={props.quienEs ?? undefined}
       grupoId={grupoId ?? undefined}
     >
       <ModoElevado entorno={props.entorno} />
@@ -367,5 +402,14 @@ export function App(props: { particion: ParticionDelCache }) {
   // ni contenedor, así que sale antes en vez de pelearse con el max-width.
   if (!quien || !actor) return <Ingreso entorno={entorno} />
 
-  return <ConSesion actor={actor} nombre={quien.nombres ?? null} entorno={entorno} />
+  // Apellido y nombre sólo cuando están los dos: "González, " a medias es
+  // peor que el nombre de pila solo.
+  const quienEs =
+    quien.nombres && quien.apellidos
+      ? nombreCompleto({ nombres: quien.nombres, apellidos: quien.apellidos })
+      : (quien.nombres ?? null)
+
+  return (
+    <ConSesion actor={actor} nombre={quien.nombres ?? null} quienEs={quienEs} entorno={entorno} />
+  )
 }

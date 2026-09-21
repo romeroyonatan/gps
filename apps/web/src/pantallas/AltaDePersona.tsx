@@ -2,7 +2,6 @@ import { ErrorDeApi, useCrearPersona, useDistritos } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import {
   etiquetaDeEdades,
-  type Rama,
   ramaDelCatalogo,
   ramaParaEdad,
   type Unidad,
@@ -22,8 +21,10 @@ import {
   validarIngreso,
   validarPersona,
 } from '@gps/personas/dominio'
-import { type FormEvent, type ReactNode, useState } from 'react'
-import { Link, useLocation } from 'wouter'
+import { type FormEvent, useState } from 'react'
+import { useLocation } from 'wouter'
+import { COLOR_DE_RAMA } from '../ramas'
+import { BOTON_PRINCIPAL, CAMPO, Campo, Chip, Falla, Titulo, Volver } from '../ui'
 
 type UnidadAbierta = Pick<Unidad, 'id' | 'rama' | 'nombre' | 'sexo'>
 
@@ -35,22 +36,6 @@ const VACIO: DatosDePersona = {
   fechaDeNacimiento: '',
 }
 
-/** El color de rama escrito entero, no armado con plantilla: Tailwind lee las
- *  clases del fuente y una interpolada nunca se genera. */
-const COLOR_DE_RAMA: Record<Rama, string> = {
-  castores: 'bg-rama-castores',
-  lobatos: 'bg-rama-lobatos',
-  scouts: 'bg-rama-scouts',
-  raiders: 'bg-rama-raiders',
-  rovers: 'bg-rama-rovers',
-  adultos: 'bg-rama-adultos',
-}
-
-const CAMPO =
-  'w-full rounded-lg border border-line-strong bg-surface-2 px-3.5 text-base text-ink ' +
-  'placeholder:text-ink-faint focus:border-ink focus:outline-none ' +
-  'disabled:bg-surface-3 disabled:text-ink-faint'
-
 /** Los meses con nombre, no con número: evita el error de 03/04 contra 04/03.
  *  Del `Intl` del navegador y no de una lista escrita a mano —es exactamente
  *  para esto—; el día 1 de cada mes del 2000 es sólo el vehículo. */
@@ -60,17 +45,6 @@ const MESES = Array.from({ length: 12 }, (_, indice) => ({
 }))
 
 const DIAS = Array.from({ length: 31 }, (_, indice) => String(indice + 1))
-
-function Campo(props: { etiqueta: string; problema?: string; children: ReactNode }) {
-  return (
-    // biome-ignore lint/a11y/noLabelWithoutControl: children es generico, biome no ve el control adentro
-    <label className="block">
-      <span className="text-sm font-semibold">{props.etiqueta}</span>
-      <div className="mt-1.5">{props.children}</div>
-      {props.problema && <p className="mt-1.5 text-sm text-danger">{props.problema}</p>}
-    </label>
-  )
-}
 
 /** La fecha de nacimiento, con tres selects nativos y no con un calendario.
  *
@@ -301,10 +275,8 @@ export function AltaDePersona(props: { grupoId: string }) {
 
   return (
     <>
-      <Link href={`/grupos/${props.grupoId}`} className="text-label text-ink-muted hover:text-ink">
-        ← Grupo
-      </Link>
-      <h2 className="mt-1 text-2xl font-bold">Nueva persona</h2>
+      <Volver href={`/grupos/${props.grupoId}`}>Grupo</Volver>
+      <Titulo>Nueva persona</Titulo>
 
       {/* Dos columnas en escritorio, una en el teléfono: mismo orden y mismos
           controles. El resumen de la derecha ocupa el lugar que en el teléfono
@@ -508,9 +480,7 @@ export function AltaDePersona(props: { grupoId: string }) {
               )}
               {/* Nace sin afiliar y el resumen lo dice: es lo que más se
                   malentiende de esta pantalla. */}
-              <span className="inline-flex min-h-[26px] items-center rounded-full bg-warn-soft px-2.5 text-label font-semibold text-warn">
-                Sin afiliar
-              </span>
+              <Chip tono="warn">Sin afiliar</Chip>
             </div>
             <p className="mt-2.5 text-sm tabular-nums text-ink-muted">
               {edad !== null && edad >= 0 && `${edad} años · `}
@@ -526,16 +496,12 @@ export function AltaDePersona(props: { grupoId: string }) {
           </p>
 
           {alta.isError && (
-            <p className="rounded-lg bg-danger-soft p-3 text-sm break-words text-danger">
+            <Falla>
               {alta.error instanceof ErrorDeApi ? alta.error.errores.join(' ') : alta.error.message}
-            </p>
+            </Falla>
           )}
 
-          <button
-            type="submit"
-            disabled={alta.isPending}
-            className="flex min-h-13 w-full items-center justify-center rounded-lg bg-accent px-4 text-base font-semibold text-accent-ink hover:bg-accent-strong disabled:opacity-40"
-          >
+          <button type="submit" disabled={alta.isPending} className={`${BOTON_PRINCIPAL} min-h-13`}>
             {alta.isPending ? 'Guardando…' : 'Guardar persona'}
           </button>
         </aside>

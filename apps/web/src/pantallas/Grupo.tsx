@@ -8,12 +8,12 @@ import {
   useTesoreria,
 } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
-import { type Rama, ramaDelCatalogo } from '@gps/estructura/dominio'
+import type { Rama } from '@gps/estructura/dominio'
 import type { TipoDeCargo } from '@gps/personas/dominio'
 import { firmantesRequeridos, puedeFirmarEnLaApp, repartirSalidas } from '@gps/salidas/dominio'
-import type { ReactNode } from 'react'
 import { Link } from 'wouter'
 import { COLOR_DE_RAMA } from '../ramas'
+import { BOTON_PRINCIPAL, Cargando, ChipDeRama, Falla, Seccion, Titulo, Vacio } from '../ui'
 
 const pesos = new Intl.NumberFormat('es-AR', {
   style: 'currency',
@@ -38,38 +38,14 @@ function PorRama(props: { total: number; ramas: readonly { rama: Rama; cuantos: 
       </div>
       <ul className="mt-3 flex flex-wrap gap-2">
         {props.ramas.map((una) => (
-          <li
-            key={una.rama}
-            className="inline-flex h-8 items-center gap-2 rounded-full bg-surface-3 px-3 text-sm font-medium"
-          >
-            <span className={`size-2 rounded-full ${COLOR_DE_RAMA[una.rama]}`} aria-hidden="true" />
-            {ramaDelCatalogo(una.rama)?.nombre ?? una.rama}
-            <strong className="tabular-nums">{una.cuantos}</strong>
+          <li key={una.rama}>
+            <ChipDeRama rama={una.rama}>
+              <strong className="tabular-nums">{una.cuantos}</strong>
+            </ChipDeRama>
           </li>
         ))}
       </ul>
     </>
-  )
-}
-
-/** Toda sección tiene el mismo encabezado: el nombre a la izquierda y su única
- *  acción a la derecha, siempre con la misma forma. Ninguna acción vive suelta
- *  adentro del texto. */
-function Seccion(props: {
-  titulo: string
-  accion: { texto: string; href: string }
-  children?: ReactNode
-}) {
-  return (
-    <section className="mt-5 border-t border-line pt-4 first-of-type:border-t-0 first-of-type:pt-0">
-      <div className="flex items-baseline justify-between gap-3">
-        <h3 className="font-semibold">{props.titulo}</h3>
-        <Link href={props.accion.href} className="shrink-0 text-sm text-ink-muted hover:text-ink">
-          {props.accion.texto} →
-        </Link>
-      </div>
-      {props.children}
-    </section>
   )
 }
 
@@ -101,25 +77,15 @@ export function Grupo(props: { id: string }) {
   )
   const grupo = distrito?.grupos.find((candidato) => candidato.id === props.id)
 
-  if (arbol.isPending || lista.isPending) {
-    return <p className="text-sm text-ink-muted">Consultando el grupo…</p>
-  }
+  if (arbol.isPending || lista.isPending) return <Cargando>Consultando el grupo…</Cargando>
 
   const error = arbol.error ?? lista.error
   if (error) {
-    return (
-      <p className="rounded-lg bg-danger-soft p-4 text-sm break-words text-danger">
-        No se pudo consultar el grupo: {error.message}
-      </p>
-    )
+    return <Falla>No se pudo consultar el grupo: {error.message}</Falla>
   }
 
   if (!grupo) {
-    return (
-      <p className="rounded-lg border border-line-strong p-4 text-sm text-ink-muted">
-        No hay ningún grupo abierto con esa dirección.
-      </p>
-    )
+    return <Vacio>No hay ningún grupo abierto con esa dirección.</Vacio>
   }
 
   const sinAfiliar = personas.filter((persona) => !afiliados.has(persona.id)).length
@@ -180,12 +146,9 @@ export function Grupo(props: { id: string }) {
 
   return (
     <>
-      <Link href="/" className="text-label text-ink-muted hover:text-ink">
-        ← Distrito {distrito?.numero}
-      </Link>
-      <h2 className="mt-1 text-2xl font-bold">
+      <Titulo>
         Grupo {grupo.numero} — {grupo.nombre}
-      </h2>
+      </Titulo>
 
       {/* Lo que exige acción va arriba de todo, y sólo aparece si hay algo que
           hacer: un bloque destacado que dice "0" no destaca nada. */}
@@ -196,10 +159,7 @@ export function Grupo(props: { id: string }) {
               ? '1 salida espera tu firma'
               : `${esperanFirma} salidas esperan tu firma`}
           </p>
-          <Link
-            href={`/grupos/${props.id}/salidas`}
-            className="mt-3 flex h-12 w-full items-center justify-center rounded-lg bg-accent px-6 font-semibold text-accent-ink hover:bg-accent-strong sm:w-fit"
-          >
+          <Link href={`/grupos/${props.id}/salidas`} className={`${BOTON_PRINCIPAL} mt-3 sm:w-fit`}>
             Ver salidas
           </Link>
         </div>
@@ -207,7 +167,7 @@ export function Grupo(props: { id: string }) {
 
       <Seccion
         titulo="Integrantes"
-        accion={{ texto: 'Ver nómina', href: `/grupos/${props.id}/nomina` }}
+        enlace={{ texto: 'Ver nómina', href: `/grupos/${props.id}/nomina` }}
       >
         <p className="mt-1.5 flex items-baseline gap-2.5">
           <span className="text-3xl font-bold tabular-nums">{personas.length}</span>
@@ -221,7 +181,7 @@ export function Grupo(props: { id: string }) {
       {cuenta && (
         <Seccion
           titulo="Cuenta corriente"
-          accion={{ texto: 'Ver movimientos', href: `/tesoreria/grupos/${props.id}` }}
+          enlace={{ texto: 'Ver movimientos', href: `/tesoreria/grupos/${props.id}` }}
         >
           {/* El saldo positivo es deuda: así lo guarda tesorería. El signo se
               escribe, no se deduce del color. */}
@@ -239,7 +199,7 @@ export function Grupo(props: { id: string }) {
 
       <Seccion
         titulo="Salidas"
-        accion={{ texto: 'Ver todas', href: `/grupos/${props.id}/salidas` }}
+        enlace={{ texto: 'Ver todas', href: `/grupos/${props.id}/salidas` }}
       >
         {!permisos.data ? (
           <p className="mt-1.5 text-sm text-ink-muted">Consultando las salidas…</p>
