@@ -131,6 +131,45 @@ al índice.
 **Mobile-first.** Todo se diseña primero a 375px. `sm:` y `md:` sólo agregan en
 pantallas grandes, nunca arreglan lo que se rompió en chicas.
 
+**Piezas de interfaz: mirar `apps/web/src/ui.tsx` antes de escribir markup.** Es la guía
+escrita una sola vez —no una librería de propósito general— y ya tiene esto:
+
+| Pieza | Qué es |
+| --- | --- |
+| `CAMPO` | Clases del input: borde, alto, foco, deshabilitado. |
+| `BOTON_PRINCIPAL` | La acción de la pantalla: negra, ancho completo, 48px. |
+| `BOTON_SECUNDARIO` | La otra acción: con borde, 44px. También la usa `Bajar`. |
+| `BOTON_AL_MARGEN` | Lo infrecuente y lo que no se deshace: chiquito y al final. |
+| `FILA` | Fila de lista de 56px. Las de 72px, con dos líneas de dato, las escribe cada pantalla. |
+| `Icono` | El único dibujo de la guía: trazos de 1.7 sobre `viewBox` de 24, hereda el color. No hay librería de iconos: un icono nuevo es una constante con sus `d`. |
+| `CHEVRON` | Los trazos del chevron. Rotado 90° es el que apunta abajo. |
+| `Volver` | El camino de vuelta, siempre arriba del título. |
+| `Titulo` | El título de la pantalla y su único enlace de salida. |
+| `Seccion` | Una sección con su nombre, su contador y su única acción. |
+| `Accion` | El enlace negro que abre el formulario de una lista. |
+| `Bajar` | Un archivo que arma el servidor: PDF, XLSX, escaneo. Es un `<a>`, no un botón. |
+| `Filtros` | Recortes de una misma lista, elegidos de a uno. |
+| `Campo` | Un control con su etiqueta arriba y su problema debajo. |
+| `Chip` | La píldora de estado, con su texto siempre escrito y el color como refuerzo. |
+| `ChipDeRama` | La etiqueta de rama: el punto de color de 8px adentro de un `Chip`. |
+| `Falla` / `Aviso` / `Nota` | Salió mal / conviene saberlo / se mira pero no se toca. |
+| `Cargando` / `Vacio` | La consulta no volvió / volvió sin nada. |
+
+El color de rama vive aparte, en `apps/web/src/ramas.ts` (`COLOR_DE_RAMA`), escrito entero
+y no interpolado, porque Tailwind lee las clases del fuente.
+
+Todo esto es de web. Mobile no tiene equivalente todavía: `apps/mobile/componentes/` son
+dos pantallas grandes y nada compartido. Lo que se comparte entre las dos apps son los
+`/dominio` de los módulos, no la interfaz —React DOM y React Native no dibujan con las
+mismas etiquetas—, así que la paridad se copia a mano y hay que decirlo cuando se rompe.
+
+**Agregar una pieza nueva es bienvenido**, con una condición: que la misma forma ya esté
+escrita en dos pantallas. Lo que aparece una sola vez se queda en su pantalla —una
+abstracción con un solo consumidor es deuda, no reuso—. Cuando la segunda aparece, moverla
+acá es el cambio más corto, no el más largo: lo que se duplica se arregla dos veces. Y si
+al escribir una pantalla ves que una pieza existente casi sirve, preferí estirarla con una
+clase al lado (`` `${BOTON_SECUNDARIO} min-h-12` ``) antes que copiar sus clases.
+
 **Autorización.** Tres capas, y las tres están implementadas:
 
 1. **Acceso al módulo.** Cada `Module` declara `accesoAlModulo` —es un campo
