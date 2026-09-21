@@ -193,6 +193,18 @@ export function armarReporteDeCobranza(periodo: number, datos: DatosDelReporte):
   }
 }
 
+/** Los períodos que se pueden mirar en el reporte: el corriente y todos los
+ *  que tienen cuota definida, del más nuevo al más viejo.
+ *
+ *  No es un rango fijo desde el almanaque: la asociación lleva treinta años y
+ *  ofrecer los treinta -o inventar cuántos atrás mostrar- es igual de malo.
+ *  Un período sin cuota no tiene cargos, así que su reporte sería todo ceros;
+ *  el corriente se suma aunque todavía no tenga cuota porque es el que se está
+ *  mirando cuando alguien entra. */
+export function periodosDelReporte(hoy: string, conCuota: readonly number[]): readonly number[] {
+  return [...new Set([periodoDe(hoy), ...conCuota])].sort((uno, otro) => otro - uno)
+}
+
 /** La variación entre dos períodos, escrita con signo. `porcentaje` es null
  *  cuando antes era cero: no se puede porcentuar desde cero, y escribir
  *  "+∞ %" o "+100 %" sería inventar. La pantalla decide cuál de los dos

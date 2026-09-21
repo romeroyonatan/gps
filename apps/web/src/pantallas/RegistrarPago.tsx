@@ -54,7 +54,7 @@ export function RegistrarPago(props: { grupoId: string }) {
       <Volver href={volver}>Cuenta del grupo</Volver>
       {/* En GPS no se paga: se asienta que se pagó. */}
       <Titulo acompaña="El grupo paga por fuera de GPS. Acá se asienta lo recibido y se imputa a la deuda.">
-        Registrar pago externo
+        Registrar pago
       </Titulo>
 
       <form onSubmit={enviar} className="mt-6 max-w-[560px] space-y-5">

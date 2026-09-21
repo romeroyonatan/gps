@@ -1,8 +1,7 @@
-import { periodoDe } from '@gps/afiliacion/dominio'
-import { useReporteDeCobranza } from '@gps/api'
-import { variacion } from '@gps/tesoreria/dominio'
+import { useReporteDeCobranza, useTesoreria } from '@gps/api'
+import { periodosDelReporte, variacion } from '@gps/tesoreria/dominio'
 import { useState } from 'react'
-import { Cargando, Falla, Filtros, Nota, Titulo, Vacio, Volver } from '../ui'
+import { CAMPO, Campo, Cargando, Falla, Nota, Titulo, Vacio, Volver } from '../ui'
 
 const pesos = new Intl.NumberFormat('es-AR', {
   style: 'currency',
@@ -11,14 +10,6 @@ const pesos = new Intl.NumberFormat('es-AR', {
 })
 const entero = new Intl.NumberFormat('es-AR')
 const porciento = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 })
-
-/** Los períodos que se pueden mirar: el corriente y los dos anteriores. Sale
- *  del almanaque y no de una consulta —`periodoDe` es la misma regla con la
- *  que Afiliación parte la historia—, así que no hay una lista que mantener. */
-function periodosMirables(hoy: Date): readonly number[] {
-  const actual = periodoDe(hoy.toLocaleDateString('en-CA'))
-  return [actual, actual - 1, actual - 2]
-}
 
 /** El signo se escribe siempre, también el más: "117" no dice si subió. */
 const conSigno = (numero: number, texto: string) =>
@@ -63,8 +54,15 @@ function FilaDeEvolucion(props: {
 }
 
 export function Reportes() {
-  const mirables = periodosMirables(new Date())
-  const [periodo, setPeriodo] = useState(mirables[0] as number)
+  // Las cuotas ya están en cache: es la misma consulta que usa la pantalla de
+  // Deuda, así que elegir período no dispara un pedido nuevo.
+  const tesoreria = useTesoreria()
+  const mirables = periodosDelReporte(
+    new Date().toLocaleDateString('en-CA'),
+    (tesoreria.data?.cuotasDeAfiliacion ?? []).map((cuota) => cuota.periodo),
+  )
+  const [elegido, setElegido] = useState<number | null>(null)
+  const periodo = elegido ?? (mirables[0] as number)
   const consulta = useReporteDeCobranza(periodo)
   const reporte = consulta.data?.reporteDeCobranza
 
@@ -75,15 +73,22 @@ export function Reportes() {
         Reportes
       </Titulo>
 
-      <div className="mt-5">
-        <Filtros
-          opciones={mirables.map((uno) => ({
-            id: String(uno),
-            etiqueta: `${uno}-03 → ${uno + 1}-02`,
-          }))}
-          valor={String(periodo)}
-          onElegir={(elegido) => setPeriodo(Number(elegido))}
-        />
+      {/* Un select y no píldoras: la asociación lleva treinta años y treinta
+          píldoras se comen la pantalla. */}
+      <div className="mt-5 max-w-[320px]">
+        <Campo etiqueta="Período">
+          <select
+            value={periodo}
+            onChange={(evento) => setElegido(Number(evento.target.value))}
+            className={`${CAMPO} h-12 tabular-nums`}
+          >
+            {mirables.map((uno) => (
+              <option key={uno} value={uno}>
+                {uno}
+              </option>
+            ))}
+          </select>
+        </Campo>
       </div>
 
       {consulta.isPending && <Cargando>Armando el reporte…</Cargando>}
@@ -185,17 +190,14 @@ export function Reportes() {
           </section>
 
           <section className="mt-6 md:rounded-xl md:border md:border-line-strong md:p-4">
+            {/* Sin gráficos, que es la decisión de la guía. No hace falta
+                escribirlo en la pantalla: se ve que no hay ninguno. */}
             <h3 className="text-lg font-bold">Evolución entre períodos</h3>
-            {/* La decisión del mockup, y es la de la guía: sin gráficos. */}
-            <p className="mt-1 max-w-[66ch] text-sm text-ink-muted">
-              Sin gráficos: la comparación entre dos períodos es una tabla con la variación escrita
-              con signo. Un gráfico acá no agrega nada que la cifra no diga.
-            </p>
 
             <div className="mt-4 hidden md:grid md:grid-cols-[1fr_8rem_8rem_7rem] md:gap-4 md:border-b md:border-line md:pb-2.5 md:text-label md:text-ink-muted">
               <span>Concepto</span>
-              <span className="text-right tabular-nums">{reporte.anterior.periodo}-03</span>
-              <span className="text-right tabular-nums">{reporte.periodo}-03</span>
+              <span className="text-right tabular-nums">{reporte.anterior.periodo}</span>
+              <span className="text-right tabular-nums">{reporte.periodo}</span>
               <span className="text-right">Variación</span>
             </div>
 

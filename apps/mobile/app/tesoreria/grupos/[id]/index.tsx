@@ -50,7 +50,7 @@ export default function Pantalla_() {
         <View className="mt-5 flex-row">
           <Link href={`/tesoreria/grupos/${id}/pago`} asChild>
             <Pressable className="min-h-11 items-center justify-center rounded-lg bg-accent px-3.5 active:bg-accent-strong">
-              <Text className="text-sm font-semibold text-accent-ink">Registrar pago externo</Text>
+              <Text className="text-sm font-semibold text-accent-ink">Registrar pago</Text>
             </Pressable>
           </Link>
         </View>

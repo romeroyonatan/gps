@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test'
-import { armarReporteDeCobranza, type DatosDelReporte, variacion } from '../src/dominio'
+import {
+  armarReporteDeCobranza,
+  type DatosDelReporte,
+  periodosDelReporte,
+  variacion,
+} from '../src/dominio'
 
 /** Dos distritos, tres grupos. El período 2026 va del 2026-03-01 al
  *  2027-02-28: por eso un pago del 2027-01 todavía cuenta como del 2026. */
@@ -142,5 +147,20 @@ describe('variación entre períodos', () => {
   // Desde cero no hay porcentaje: "+100 %" sería inventar una base.
   test('sin base no hay porcentaje', () => {
     expect(variacion(0, 5000)).toEqual({ absoluta: 5000, porcentaje: null })
+  })
+})
+
+describe('períodos que ofrece el reporte', () => {
+  test('el corriente primero y después los que tienen cuota, sin repetir', () => {
+    expect(periodosDelReporte('2026-09-20', [2024, 2026, 2025])).toEqual([2026, 2025, 2024])
+  })
+
+  // Enero es la cola del período anterior: el corriente ahí es 2026, no 2027.
+  test('el corriente sale de la misma regla que parte la historia', () => {
+    expect(periodosDelReporte('2027-01-15', [])).toEqual([2026])
+  })
+
+  test('el corriente se ofrece aunque todavía no tenga cuota', () => {
+    expect(periodosDelReporte('2026-09-20', [2025])).toEqual([2026, 2025])
   })
 })

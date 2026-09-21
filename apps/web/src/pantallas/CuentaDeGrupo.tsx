@@ -55,7 +55,7 @@ export function CuentaDeGrupo(props: { grupoId: string }) {
           asentar un pago es una tarea que termina, y tiene su pantalla. */}
       {escribe && (
         <div className="mt-5">
-          <Accion href={`/tesoreria/grupos/${props.grupoId}/pago`}>Registrar pago externo</Accion>
+          <Accion href={`/tesoreria/grupos/${props.grupoId}/pago`}>Registrar pago</Accion>
         </div>
       )}
 

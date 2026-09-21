@@ -28,4 +28,4 @@ export type {
   ReporteDeCobranza,
   TotalesDelPeriodo,
 } from './reportes'
-export { armarReporteDeCobranza, variacion } from './reportes'
+export { armarReporteDeCobranza, periodosDelReporte, variacion } from './reportes'

@@ -1,29 +1,11 @@
-import { periodoDe } from '@gps/afiliacion/dominio'
-import { useReporteDeCobranza } from '@gps/api'
-import { variacion } from '@gps/tesoreria/dominio'
+import { useReporteDeCobranza, useTesoreria } from '@gps/api'
+import { periodosDelReporte, variacion } from '@gps/tesoreria/dominio'
 import { useState } from 'react'
-import { Text, View } from 'react-native'
-import {
-  Cargando,
-  Falla,
-  Filtros,
-  Pantalla,
-  pesos,
-  Titulo,
-  Vacio,
-  Volver,
-} from '../../componentes/ui'
+import { Pressable, ScrollView, Text, View } from 'react-native'
+import { Cargando, Falla, Pantalla, pesos, Titulo, Vacio, Volver } from '../../componentes/ui'
 
 const entero = new Intl.NumberFormat('es-AR')
 const porciento = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 })
-
-/** Los períodos que se pueden mirar: el corriente y los dos anteriores. Sale
- *  del almanaque y no de una consulta —`periodoDe` es la misma regla con la
- *  que Afiliación parte la historia—, así que no hay una lista que mantener. */
-function periodosMirables(hoy: Date): readonly number[] {
-  const actual = periodoDe(hoy.toLocaleDateString('en-CA'))
-  return [actual, actual - 1, actual - 2]
-}
 
 /** El signo se escribe siempre, también el más: "117" no dice si subió. */
 const conSigno = (numero: number, texto: string) =>
@@ -63,8 +45,15 @@ function FilaDeEvolucion(props: {
 }
 
 export default function Pantalla_() {
-  const mirables = periodosMirables(new Date())
-  const [periodo, setPeriodo] = useState(mirables[0] as number)
+  // Las cuotas ya están en cache: es la misma consulta que usa la pantalla de
+  // Deuda, así que elegir período no dispara un pedido nuevo.
+  const tesoreria = useTesoreria()
+  const mirables = periodosDelReporte(
+    new Date().toLocaleDateString('en-CA'),
+    (tesoreria.data?.cuotasDeAfiliacion ?? []).map((cuota) => cuota.periodo),
+  )
+  const [elegido, setElegido] = useState<number | null>(null)
+  const periodo = elegido ?? (mirables[0] as number)
   const consulta = useReporteDeCobranza(periodo)
   const reporte = consulta.data?.reporteDeCobranza
 
@@ -75,16 +64,34 @@ export default function Pantalla_() {
         Reportes
       </Titulo>
 
-      <View className="mt-5">
-        <Filtros
-          opciones={mirables.map((uno) => ({
-            id: String(uno),
-            etiqueta: `${uno}-03 → ${uno + 1}-02`,
-          }))}
-          valor={String(periodo)}
-          onElegir={(elegido) => setPeriodo(Number(elegido))}
-        />
-      </View>
+      {/* Una fila que se desplaza y no píldoras que envuelven: la asociación
+          lleva treinta años, y así ocupa siempre un renglón. En web esto es un
+          select; React Native no tiene uno sin sumar una dependencia. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        className="mt-5 -mx-5"
+        contentContainerClassName="px-5 gap-2"
+      >
+        {mirables.map((uno) => {
+          const activo = uno === periodo
+          return (
+            <Pressable
+              key={uno}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: activo }}
+              onPress={() => setElegido(uno)}
+              className={`min-h-11 justify-center rounded-full border px-3.5 ${
+                activo ? 'border-accent bg-accent' : 'border-line-strong bg-surface-2'
+              }`}
+            >
+              <Text className={`text-sm font-semibold ${activo ? 'text-accent-ink' : 'text-ink'}`}>
+                {uno}
+              </Text>
+            </Pressable>
+          )
+        })}
+      </ScrollView>
 
       {consulta.isPending && <Cargando>Armando el reporte…</Cargando>}
       {consulta.error && <Falla>{consulta.error.message}</Falla>}
@@ -157,12 +164,9 @@ export default function Pantalla_() {
             </Text>
           </View>
 
+          {/* Sin gráficos, que es la decisión de la guía. No hace falta
+              escribirlo en la pantalla: se ve que no hay ninguno. */}
           <Text className="mt-6 text-lg font-bold text-ink">Contra el período anterior</Text>
-          {/* La decisión del mockup, y es la de la guía: sin gráficos. */}
-          <Text className="mt-1 text-sm text-ink-muted">
-            Sin gráficos: la comparación entre dos períodos es una lista con la variación escrita
-            con signo.
-          </Text>
           <View className="mt-2">
             <FilaDeEvolucion
               concepto="Personas cobradas"
