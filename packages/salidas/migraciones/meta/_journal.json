@@ -8,6 +8,34 @@
       "when": 1789769012104,
       "tag": "0000_inicial",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789955706905,
+      "tag": "0001_direccion",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789956123586,
+      "tag": "0002_responsable",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789957262337,
+      "tag": "0003_telefono-y-huella",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1789988042609,
+      "tag": "0004_expediente",
+      "breakpoints": true
     }
   ]
 }

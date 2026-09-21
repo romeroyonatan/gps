@@ -17,7 +17,10 @@ export { type PermisoDelPanel, repartirSalidas } from './panel'
 export { cuantos, resumenDeParticipantes } from './participantes'
 export {
   candidatos,
+  contenidoDelPermiso,
+  esResponsablePosible,
   marcaSegunCategoria,
+  numeroDeExpediente,
   type Problema,
   puedeTransicionar,
   sePuedeEditar,

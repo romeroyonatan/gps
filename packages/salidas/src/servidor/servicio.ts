@@ -43,6 +43,8 @@ export interface ServicioDeSalidas {
   unidadesElegidas(permisoId: string): readonly string[]
   agregarParticipante(alcance: Alcance, permisoId: string, personaId: string): Promise<void>
   quitarParticipante(alcance: Alcance, permisoId: string, personaId: string): Promise<void>
+  /** Quien queda a cargo: uno de los dirigentes que van. */
+  elegirResponsable(alcance: Alcance, permisoId: string, personaId: string): Promise<void>
 
   emitir(
     alcance: Alcance,
@@ -150,6 +152,7 @@ export function crearServicioDeSalidas(
     unidadesElegidas: borradores.unidadesElegidas,
     agregarParticipante: administrando(borradores.agregarParticipante),
     quitarParticipante: administrando(borradores.quitarParticipante),
+    elegirResponsable: administrando(borradores.elegirResponsable),
 
     emitir: administrando(emision.emitir),
     anular: administrando(emision.anular),
@@ -188,7 +191,7 @@ export function crearServicioDeSalidas(
     listarAdjuntos: leyendo(consultas.listarAdjuntos),
 
     pdfDelPermiso: leyendo((permisoId) =>
-      armarPdfDelPermiso(estructura, archivos, borradores, firmas, consultas, permisoId),
+      armarPdfDelPermiso(core, estructura, archivos, borradores, firmas, consultas, permisoId),
     ),
 
     async puedeVerArchivosDe(permisoId, alcance) {

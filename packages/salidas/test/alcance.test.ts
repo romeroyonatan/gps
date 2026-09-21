@@ -57,6 +57,10 @@ describe('un permiso es del grupo que sale', () => {
     expect(
       servicio.crearPermiso(ajeno, GRUPO_ID, {
         lugar: 'Estancia La Paz',
+        direccion: 'Ruta 9 km 500',
+        localidad: 'Los Patos',
+        provincia: 'Santa Fe',
+        telefono: '11 5488-2210',
         desde: '1970-03-01',
         hasta: '1970-03-03',
         comoSeViaja: null,

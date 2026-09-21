@@ -1,6 +1,8 @@
 import type { Archivos } from '@gps/archivos/dominio'
+import type { Core } from '@gps/core'
 import type { Estructura } from '@gps/estructura/dominio'
 import { nombreDeLaUnidad } from '@gps/estructura/dominio'
+import { contenidoDelPermiso } from '../dominio/permisos'
 import type { crearOperacionesDeBorrador } from './borradores'
 import { PermisoNoEditable } from './borradores'
 import type { crearConsultasDeSalidas } from './consultas'
@@ -13,6 +15,7 @@ import { armarPdf } from './pdf'
  *  Vive aparte de pdf.ts para que ese siga siendo puro -datos adentro, bytes
  *  afuera- y se pueda probar sin montar nada. */
 export async function armarPdfDelPermiso(
+  core: Core,
   estructura: Estructura,
   archivos: Archivos,
   borradores: ReturnType<typeof crearOperacionesDeBorrador>,
@@ -47,14 +50,25 @@ export async function armarPdfDelPermiso(
     }),
   )
 
+  const emitidos = await consultas.listarParticipantesEmitidos(permisoId)
+  const unidades = borradores.unidadesElegidas(permisoId)
+
+  // La huella se recalcula sobre lo que hay hoy y no se lee de la fila: si
+  // alguien toco la base, el papel sale diciendo otra huella -y avisando-, que
+  // es justamente para lo que sirve.
+  const huella = core.hash(contenidoDelPermiso({ permiso, unidades, participantes: emitidos }))
+
   return await armarPdf({
     permiso,
     grupo,
-    unidades: borradores.unidadesElegidas(permisoId).map((id) => {
+    huella,
+    alterado: permiso.hashDelContenido !== null && permiso.hashDelContenido !== huella,
+    unidades: unidades.map((id) => {
       const unidad = unidadesPorId.get(id)
       return unidad ? nombreDeLaUnidad(unidad) : id
     }),
-    participantes: await consultas.listarParticipantesEmitidos(permisoId),
+    participantes: emitidos,
+    responsable: emitidos.find((uno) => uno.personaId === permiso.responsableId) ?? null,
     firmas: estados.map((estado) => ({
       cargo: estado.nombreDelCargo,
       nombre: estado.quien ? `${estado.quien.apellidos}, ${estado.quien.nombres}` : 'Sin ocupante',

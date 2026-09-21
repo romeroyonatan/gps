@@ -11,11 +11,19 @@ const permiso: Permiso = {
   grupoId: 'grupo_1',
   estado: 'emitido',
   lugar: 'Estancia La Paz',
+  direccion: 'Ruta 9 km 500',
+  localidad: 'Los Patos',
+  provincia: 'Santa Fe',
+  telefono: '11 5488-2210',
   desde: '2026-10-12',
   hasta: '2026-10-14',
   comoSeViaja: 'Micro contratado',
+  responsableId: 'persona_Ana',
+  anioDeExpediente: 2026,
+  numeroDeExpediente: 147,
   pdfId: null,
   hashDelPdf: null,
+  hashDelContenido: null,
   reemplazaA: null,
   creadoEn: HORA,
   actualizadoEn: HORA,
@@ -65,6 +73,9 @@ const base = {
   grupo: { numero: 42, nombre: 'Ceferino Namuncurá' },
   unidades: ['Tropa scout San Jorge'],
   participantes: [participante('Ana', 'dirigente'), participante('Bruno', 'beneficiario')],
+  responsable: participante('Ana', 'dirigente'),
+  huella: 'a'.repeat(64),
+  alterado: false,
   escaneos: [],
 }
 
@@ -137,8 +148,9 @@ describe('armarPdf', () => {
         { cargo: 'Director', contenido: await dosPaginas.save(), tipo: 'application/pdf' },
       ],
     })
-    // La del permiso mas las dos del escaneo.
-    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(3)
+    // Las dos del permiso -la principal y el anexo con la nómina- mas las dos
+    // del escaneo.
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(4)
   })
 
   test('un escaneo que no se puede leer no tumba el permiso entero', async () => {
@@ -149,7 +161,7 @@ describe('armarPdf', () => {
       firmas: lineas([firmaEnPapel, null, null]),
       escaneos: [{ cargo: 'Director', contenido: new Uint8Array([1, 2, 3]), tipo: 'image/jpeg' }],
     })
-    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(2)
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(3)
   })
 
   test('un permiso con mucha gente sigue teniendo las firmas', async () => {
