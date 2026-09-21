@@ -40,6 +40,7 @@ export {
   useAgregarParticipante,
   useAnularPermiso,
   useCrearPermiso,
+  useElegirResponsable,
   useElegirUnidades,
   useEmitirPermiso,
   useFirmarEnApp,

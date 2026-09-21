@@ -1,0 +1,1 @@
+ALTER TABLE `permisos` ADD `responsable_id` text;

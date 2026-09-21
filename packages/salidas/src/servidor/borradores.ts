@@ -5,6 +5,7 @@ import { and, eq, inArray } from 'drizzle-orm'
 import type { Permiso } from '../dominio/modelos'
 import {
   candidatos,
+  esResponsablePosible,
   marcaSegunCategoria,
   type Problema,
   sePuedeEditar,
@@ -35,6 +36,10 @@ export class PermisoNoEditable extends Error {
 
 export interface DatosDelPermiso {
   readonly lugar: string
+  readonly direccion: string
+  readonly localidad: string
+  readonly provincia: string
+  readonly telefono: string
   readonly desde: string
   readonly hasta: string
   readonly comoSeViaja?: string | null
@@ -83,6 +88,29 @@ export function crearOperacionesDeBorrador(core: Core, personas: Personas, estru
     )
   }
 
+  /** Los anotados hoy, con lo unico que decide quien puede quedar a cargo. */
+  function anotados(permisoId: string) {
+    return core.bd
+      .select({ personaId: participantes.personaId, marca: participantes.marca })
+      .from(participantes)
+      .where(eq(participantes.permisoId, permisoId))
+      .all()
+  }
+
+  /** Suelta al responsable si dejo de ir. Se llama desde los dos lados que
+   *  sacan gente -quitar a alguien y desmarcar su unidad-: si no, el permiso
+   *  quedaria a cargo de quien la pantalla ya no muestra. */
+  function soltarResponsableAusente(permisoId: string): void {
+    const permiso = permisoDe(permisoId)
+    if (permiso.responsableId === null) return
+    if (esResponsablePosible(anotados(permisoId), permiso.responsableId)) return
+    core.bd
+      .update(permisos)
+      .set({ responsableId: null, actualizadoEn: core.reloj.ahora() })
+      .where(eq(permisos.id, permisoId))
+      .run()
+  }
+
   return {
     permisoDe,
     exigirBorrador,
@@ -104,11 +132,19 @@ export function crearOperacionesDeBorrador(core: Core, personas: Personas, estru
         grupoId,
         estado: 'borrador',
         lugar: datos.lugar.trim(),
+        direccion: datos.direccion.trim(),
+        localidad: datos.localidad.trim(),
+        provincia: datos.provincia.trim(),
+        telefono: datos.telefono.trim(),
         desde: datos.desde,
         hasta: datos.hasta,
         comoSeViaja: datos.comoSeViaja?.trim() || null,
+        responsableId: null,
+        anioDeExpediente: null,
+        numeroDeExpediente: null,
         pdfId: null,
         hashDelPdf: null,
+        hashDelContenido: null,
         reemplazaA: null,
         creadoEn: ahora,
         actualizadoEn: ahora,
@@ -127,6 +163,10 @@ export function crearOperacionesDeBorrador(core: Core, personas: Personas, estru
         .update(permisos)
         .set({
           lugar: datos.lugar.trim(),
+          direccion: datos.direccion.trim(),
+          localidad: datos.localidad.trim(),
+          provincia: datos.provincia.trim(),
+          telefono: datos.telefono.trim(),
           desde: datos.desde,
           hasta: datos.hasta,
           comoSeViaja: datos.comoSeViaja?.trim() || null,
@@ -188,6 +228,7 @@ export function crearOperacionesDeBorrador(core: Core, personas: Personas, estru
             .run()
         }
       })
+      soltarResponsableAusente(permisoId)
     },
 
     /** Suma a alguien. La marca no se elige: sale de su categoria. */
@@ -221,6 +262,27 @@ export function crearOperacionesDeBorrador(core: Core, personas: Personas, estru
       core.bd
         .delete(participantes)
         .where(and(eq(participantes.permisoId, permisoId), eq(participantes.personaId, personaId)))
+        .run()
+      soltarResponsableAusente(permisoId)
+    },
+
+    /** Quien queda a cargo. Tiene que ser uno de los dirigentes que van: el
+     *  papel lo imprime como el contacto de la salida, y alguien que no viaja
+     *  no le sirve a nadie. */
+    async elegirResponsable(permisoId: string, personaId: string): Promise<void> {
+      exigirBorrador(permisoId)
+      if (!esResponsablePosible(anotados(permisoId), personaId)) {
+        throw new PermisoInvalido([
+          {
+            campo: 'responsable',
+            mensaje: 'El responsable tiene que ser uno de los dirigentes que van.',
+          },
+        ])
+      }
+      core.bd
+        .update(permisos)
+        .set({ responsableId: personaId, actualizadoEn: core.reloj.ahora() })
+        .where(eq(permisos.id, permisoId))
         .run()
     },
   }

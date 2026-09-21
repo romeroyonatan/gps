@@ -436,7 +436,16 @@ export default function Pantalla() {
   const consulta = usePermisos(id)
   const crear = useCrearPermiso()
   const hoy = aFechaDeCalendario(new Date())
-  const [datos, setDatos] = useState({ lugar: '', desde: hoy, hasta: hoy, comoSeViaja: '' })
+  const [datos, setDatos] = useState({
+    lugar: '',
+    direccion: '',
+    localidad: '',
+    provincia: '',
+    telefono: '',
+    desde: hoy,
+    hasta: hoy,
+    comoSeViaja: '',
+  })
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
@@ -472,6 +481,33 @@ export default function Pantalla() {
             onChangeText={(lugar) => setDatos({ ...datos, lugar })}
             placeholder="¿A dónde van?"
           />
+          <TextInput
+            className={CLASE_DE_INPUT}
+            value={datos.direccion}
+            onChangeText={(direccion) => setDatos({ ...datos, direccion })}
+            placeholder="Dirección"
+          />
+          <TextInput
+            className={CLASE_DE_INPUT}
+            value={datos.telefono}
+            onChangeText={(telefono) => setDatos({ ...datos, telefono })}
+            placeholder="Teléfono de contacto"
+            keyboardType="phone-pad"
+          />
+          <View className="flex-row gap-2">
+            <TextInput
+              className={`${CLASE_DE_INPUT} flex-1`}
+              value={datos.localidad}
+              onChangeText={(localidad) => setDatos({ ...datos, localidad })}
+              placeholder="Localidad"
+            />
+            <TextInput
+              className={`${CLASE_DE_INPUT} flex-1`}
+              value={datos.provincia}
+              onChangeText={(provincia) => setDatos({ ...datos, provincia })}
+              placeholder="Provincia"
+            />
+          </View>
           <View className="flex-row gap-2">
             <TextInput
               className={`${CLASE_DE_INPUT} flex-1`}
@@ -502,7 +538,17 @@ export default function Pantalla() {
               crear.mutate(
                 { grupoId: id, ...datos, comoSeViaja: datos.comoSeViaja || null },
                 {
-                  onSuccess: () => setDatos({ lugar: '', desde: hoy, hasta: hoy, comoSeViaja: '' }),
+                  onSuccess: () =>
+                    setDatos({
+                      lugar: '',
+                      direccion: '',
+                      localidad: '',
+                      provincia: '',
+                      telefono: '',
+                      desde: hoy,
+                      hasta: hoy,
+                      comoSeViaja: '',
+                    }),
                 },
               )
             }

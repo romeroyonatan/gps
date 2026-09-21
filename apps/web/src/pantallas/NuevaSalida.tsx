@@ -13,7 +13,16 @@ import { Aviso, BOTON_PRINCIPAL, CAMPO, Campo, Falla, Nota, Titulo, Volver } fro
  *  emitir: enterarse tarde de que faltan días no le sirve a nadie. */
 export function NuevaSalida(props: { grupoId: string }) {
   const hoy = aFechaDeCalendario(new Date())
-  const [datos, setDatos] = useState({ lugar: '', desde: hoy, hasta: hoy, comoSeViaja: '' })
+  const [datos, setDatos] = useState({
+    lugar: '',
+    direccion: '',
+    localidad: '',
+    provincia: '',
+    telefono: '',
+    desde: hoy,
+    hasta: hoy,
+    comoSeViaja: '',
+  })
   const crear = useCrearPermiso()
   const actor = useActor()
   const [, navegar] = useLocation()
@@ -60,6 +69,42 @@ export function NuevaSalida(props: { grupoId: string }) {
             value={datos.lugar}
             onChange={(evento) => setDatos({ ...datos, lugar: evento.target.value })}
             className={`${CAMPO} h-13`}
+          />
+        </Campo>
+
+        <Campo etiqueta="Dirección">
+          <input
+            value={datos.direccion}
+            onChange={(evento) => setDatos({ ...datos, direccion: evento.target.value })}
+            placeholder="Ruta 9 km 500"
+            className={`${CAMPO} h-13`}
+          />
+        </Campo>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Campo etiqueta="Localidad">
+            <input
+              value={datos.localidad}
+              onChange={(evento) => setDatos({ ...datos, localidad: evento.target.value })}
+              className={`${CAMPO} h-13`}
+            />
+          </Campo>
+          <Campo etiqueta="Provincia">
+            <input
+              value={datos.provincia}
+              onChange={(evento) => setDatos({ ...datos, provincia: evento.target.value })}
+              className={`${CAMPO} h-13`}
+            />
+          </Campo>
+        </div>
+
+        <Campo etiqueta="Teléfono de contacto durante la salida">
+          <input
+            type="tel"
+            value={datos.telefono}
+            onChange={(evento) => setDatos({ ...datos, telefono: evento.target.value })}
+            placeholder="11 5488-2210"
+            className={`${CAMPO} h-13 tabular-nums`}
           />
         </Campo>
 

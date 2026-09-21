@@ -60,7 +60,17 @@ Ejemplo del final de la cadena: `salidas` —el permiso de salida— depende de 
 firmantes, qué candidatos hay según las unidades elegidas, qué mensaje se sella) y las
 pantallas usan esas mismas funciones; su `/servidor` se parte por caso de uso
 (`borradores.ts`, `emision.ts`, `firmas.ts`, `pdf.ts`, `consultas.ts`) y `servicio.ts` es
-sólo contrato y composición. El PDF se queda en `/servidor` aunque `pdf-lib` sea isomorfo:
+sólo contrato y composición. El permiso lleva dos huellas y no una: `hashDelPdf` es el sha256 del archivo emitido
+—lo que sellan las firmas— y `hashDelContenido` es el hash de `contenidoDelPermiso`, un
+texto canónico de lo que el papel dice. La segunda existe porque la primera no se puede
+imprimir (un archivo no contiene su propio hash) y porque rediagramar el PDF no tiene que
+invalidar lo emitido: se imprime en el pie de cada hoja y se recalcula al bajarlo, y si no
+coincide el PDF sale avisándolo. El número de expediente (`SAL-2026-0147`) es una serie corrida
+por año y de la diócesis entera: se reserva al emitir —antes de dibujar, porque va
+impreso— leyendo el mayor del año y escribiendo el siguiente en una misma transacción, y
+el `UNIQUE (anio, numero)` de la tabla es lo que impide que dos emisiones simultáneas se
+queden con el mismo. Si el PDF falla después, el número queda sin usar: una serie con
+huecos es normal, dos papeles con el mismo número no. El PDF se queda en `/servidor` aunque `pdf-lib` sea isomorfo:
 `/dominio` lo importa el navegador, y un import de valor entraría al bundle de mobile.
 
 `archivos`, en cambio, **no se parte**: solicitar, confirmar y descargar son orquestación de
@@ -302,7 +312,9 @@ no puede hacerlo porque la dependencia va al revés —no conoce a `personas`—
 otro módulo lo hace tampoco. `afiliacion` la esquiva filtrando por `gruposAbiertosEn` al
 declarar, pero `listarPersonas` de un grupo cerrado sigue devolviendo gente.
 
-También queda, de deuda de paridad: la pantalla `Grupo` de mobile no tiene el estado "no
+También queda, de deuda de paridad: mobile carga la salida con su dirección pero no
+tiene con qué elegir el dirigente a cargo —eso vive sólo en la pantalla `Salida` de web—,
+así que una salida creada desde el teléfono se termina de armar en la web. Y la pantalla `Grupo` de mobile no tiene el estado "no
 hay ningún grupo abierto con esa dirección" que sí tiene la de web
 (`apps/web/src/pantallas/Grupo.tsx`). Quedó a la vista al construir las pantallas de
 afiliación y no se resolvió ahí.

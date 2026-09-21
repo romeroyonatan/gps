@@ -13,19 +13,34 @@ const marcas = {
  *  otros modulos por la misma razon que en pertenencias: sus tablas son
  *  privadas. `reemplaza_a` si podria tenerla -es de este modulo- pero apunta a
  *  la misma tabla y SQLite no lo necesita para nada que el servicio no valide. */
-export const permisos = sqliteTable('permisos', {
-  id: text('id').primaryKey(),
-  grupoId: text('grupo_id').notNull(),
-  estado: text('estado').$type<Estado>().notNull(),
-  lugar: text('lugar').notNull(),
-  desde: text('desde').notNull(),
-  hasta: text('hasta').notNull(),
-  comoSeViaja: text('como_se_viaja'),
-  pdfId: text('pdf_id'),
-  hashDelPdf: text('hash_del_pdf'),
-  reemplazaA: text('reemplaza_a'),
-  ...marcas,
-})
+export const permisos = sqliteTable(
+  'permisos',
+  {
+    id: text('id').primaryKey(),
+    grupoId: text('grupo_id').notNull(),
+    estado: text('estado').$type<Estado>().notNull(),
+    lugar: text('lugar').notNull(),
+    direccion: text('direccion').notNull(),
+    localidad: text('localidad').notNull(),
+    provincia: text('provincia').notNull(),
+    desde: text('desde').notNull(),
+    hasta: text('hasta').notNull(),
+    comoSeViaja: text('como_se_viaja'),
+    responsableId: text('responsable_id'),
+    telefono: text('telefono').notNull(),
+    anioDeExpediente: integer('anio_de_expediente'),
+    numeroDeExpediente: integer('numero_de_expediente'),
+    pdfId: text('pdf_id'),
+    hashDelPdf: text('hash_del_pdf'),
+    hashDelContenido: text('hash_del_contenido'),
+    reemplazaA: text('reemplaza_a'),
+    ...marcas,
+  },
+  // Dos permisos no pueden llevar el mismo numero de expediente. Esta en la
+  // base y no en una regla que haya que acordarse: es lo unico que convierte
+  // "el siguiente al mayor" en una serie sin repetidos.
+  (tabla) => [unique().on(tabla.anioDeExpediente, tabla.numeroDeExpediente)],
+)
 
 /** Que unidades del grupo van. La clave compuesta impide elegir dos veces la
  *  misma sin una regla aparte. */

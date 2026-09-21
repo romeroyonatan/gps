@@ -654,6 +654,10 @@ async function sembrarSalidas(
   /** Arma un permiso con las unidades y todo el que pueda ir. */
   async function armar(datos: {
     lugar: string
+    direccion: string
+    localidad: string
+    provincia: string
+    telefono: string
     dentroDe: number
     dura: number
     comoSeViaja?: string
@@ -661,6 +665,10 @@ async function sembrarSalidas(
   }) {
     const permiso = await ctx.salidas.crearPermiso(alcanceSinLimites(), grupo.id, {
       lugar: datos.lugar,
+      direccion: datos.direccion,
+      localidad: datos.localidad,
+      provincia: datos.provincia,
+      telefono: datos.telefono,
       desde: enDias(datos.dentroDe),
       hasta: enDias(datos.dentroDe + datos.dura),
       comoSeViaja: datos.comoSeViaja ?? null,
@@ -671,6 +679,14 @@ async function sembrarSalidas(
       if (unidadId !== null && !datos.unidades.includes(unidadId)) continue
       await ctx.salidas.agregarParticipante(alcanceSinLimites(), permiso.id, persona.id)
     }
+    // El primer dirigente que va queda a cargo: sin responsable no se emite.
+    const aCargo = gente.find(
+      (persona) =>
+        persona.pertenencia.categoria === 'activo' &&
+        (persona.pertenencia.unidadId === null ||
+          datos.unidades.includes(persona.pertenencia.unidadId)),
+    )
+    if (aCargo) await ctx.salidas.elegirResponsable(alcanceSinLimites(), permiso.id, aCargo.id)
     return permiso
   }
 
@@ -716,6 +732,10 @@ async function sembrarSalidas(
   // de anticipacion.
   await armar({
     lugar: 'Reserva Natural Otamendi',
+    direccion: 'Ruta 9 km 67',
+    localidad: 'Campana',
+    provincia: 'Buenos Aires',
+    telefono: '11 5488-2210',
     dentroDe: 8,
     dura: 1,
     unidades: manada ? [manada.id] : [],
@@ -724,6 +744,10 @@ async function sembrarSalidas(
   // Emitido con una sola firma: el caso de "falta que firmen".
   const emitido = await armar({
     lugar: 'Sierra de la Ventana',
+    direccion: 'Camino de las Sierras s/n',
+    localidad: 'Tornquist',
+    provincia: 'Buenos Aires',
+    telefono: '11 4402-9981',
     dentroDe: 45,
     dura: 2,
     comoSeViaja: 'Micro contratado desde la parroquia',
@@ -736,6 +760,10 @@ async function sembrarSalidas(
   // una imagen de verdad en el paquete, y el caso mixto ya lo cubren los tests.
   const firmado = await armar({
     lugar: 'Camping El Durazno',
+    direccion: 'Camino al Durazno km 4',
+    localidad: 'Mina Clavero',
+    provincia: 'Córdoba',
+    telefono: '351 615-2233',
     dentroDe: 90,
     dura: 3,
     comoSeViaja: 'Combis de las familias',

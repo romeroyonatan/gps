@@ -336,9 +336,13 @@ type Mutation {
   crearPermiso(
     comoSeViaja: String
     desde: String!
+    direccion: String!
     grupoId: ID!
     hasta: String!
+    localidad: String!
     lugar: String!
+    provincia: String!
+    telefono: String!
   ): Permiso!
 
   """
@@ -351,6 +355,7 @@ type Mutation {
   """
   declararAfiliacion(grupoId: ID!): Declaracion!
   definirCuotaDeAfiliacion(importe: Int!, periodo: Int!): CuotaDeAfiliacion!
+  elegirResponsable(permisoId: ID!, personaId: ID!): Permiso!
   elegirUnidades(permisoId: ID!, unidadIds: [ID!]!): Permiso!
   emitirPermiso(permisoId: ID!): Emision!
 
@@ -451,15 +456,22 @@ type Permiso {
   adjuntos: [Adjunto!]!
   comoSeViaja: String
   desde: String!
+  direccion: String!
 
   """
   Los que figuran en el papel, tal como estaban al emitirse.
   """
   emitidos: [ParticipanteEmitido!]!
   estado: EstadoDePermiso!
+
+  """
+  El número de la serie: SAL-2026-0147. Null mientras sea borrador.
+  """
+  expediente: String
   firmas: [EstadoDeFirma!]!
   hasta: String!
   id: ID!
+  localidad: String!
   lugar: String!
 
   """
@@ -467,7 +479,10 @@ type Permiso {
   """
   participantes: [Participante!]!
   pdfId: ID
+  provincia: String!
   reemplazaA: ID
+  responsableId: ID
+  telefono: String!
 
   """
   Qué unidades del grupo van.
