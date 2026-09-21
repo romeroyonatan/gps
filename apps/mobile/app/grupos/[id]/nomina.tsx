@@ -80,8 +80,9 @@ function Unidad(props: {
   )
 }
 
-/** El padrón del grupo: quién pertenece, por unidad, y los adherentes. Salió
- *  del inicio cuando el inicio se volvió un resumen: son dos preguntas
+/** La nómina del grupo: quién pertenece, por unidad, y los adherentes. Se
+ *  llama como en la web y como la llama el negocio. Salió del inicio cuando el
+ *  inicio se volvió un resumen: son dos preguntas
  *  distintas —"¿qué tengo que hacer hoy?" y "¿quiénes son?"— y ahora son dos
  *  pestañas. */
 export default function Pantalla() {
@@ -102,7 +103,7 @@ export default function Pantalla() {
 
   return (
     <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-6">
-      <Titulo>Padrón</Titulo>
+      <Titulo>Nómina</Titulo>
 
       {(arbol.isPending || lista.isPending) && <Cargando>Consultando el grupo…</Cargando>}
       {(arbol.error ?? lista.error) && (

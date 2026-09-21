@@ -64,6 +64,18 @@ Y si la pieza nueva ya existe en `apps/web/src/ui.tsx`, poné**le el mismo
 nombre**, aunque el markup sea otro: el nombre es lo que hace que las dos apps
 se lean igual.
 
+## Una lista no lleva un formulario adentro
+
+La acción va **arriba** de la lista, con `Accion`, y abre una pantalla propia; cargar algo
+es una tarea que termina, y al terminar se vuelve a la lista, que recién cargada es la
+confirmación de que salió bien. Un formulario colgado al pie compite por el lugar con lo
+que se vino a leer y no se puede compartir por dirección.
+
+Son pares: Nómina → Alta de persona, Salidas → Nueva salida, Cuenta del grupo → Registrar
+pago, Cuotas → Definir una cuota. Cuando lo que se carga sigue editándose después —el
+borrador de una salida—, esa edición vive en la pantalla del objeto
+(`salidas/[permisoId]`), no de vuelta en la lista.
+
 ## Lo que es distinto por ser un teléfono
 
 - **Nunca un color escrito a mano.** La app sigue al sistema
@@ -83,5 +95,5 @@ se lean igual.
 - **Objetivo táctil de 48px** en todo lo que se toca, y `accessibilityRole` en
   cada `Pressable`: es un botón, un `tab`, un `radio`.
 - **Las listas son `ScrollView`, no `FlatList`.** Montan todo de una. Con un
-  padrón de grupo y el directorio de la diócesis alcanza; si alguna lista se
+  nómina de grupo y el directorio de la diócesis alcanza; si alguna lista se
   vuelve larga de verdad, ése es el techo y ahí se cambia.

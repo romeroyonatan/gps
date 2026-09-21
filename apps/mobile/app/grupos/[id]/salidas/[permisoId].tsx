@@ -4,7 +4,6 @@ import {
   useActor,
   useAgregarParticipante,
   useAnularPermiso,
-  useCrearPermiso,
   useElegirUnidades,
   useEmitirPermiso,
   useFirmarEnApp,
@@ -36,34 +35,53 @@ import * as DocumentPicker from 'expo-document-picker'
 import * as ImagePicker from 'expo-image-picker'
 import { useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
-import { Alert, Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
-import { PadDeFirma } from '../../../componentes/PadDeFirma'
+import { Alert, Linking, Pressable, ScrollView, Text, View } from 'react-native'
+import { PadDeFirma } from '../../../../componentes/PadDeFirma'
 import {
   AccionAlMargen,
   Aviso,
   Boton,
   BotonSecundario,
-  CAMPO,
   Cargando,
   Chip,
   Falla,
   Titulo,
-} from '../../../src/ui'
+  Vacio,
+  Volver,
+} from '../../../../src/ui'
 
 type Permiso = PermisosQuery['permisos'][number]
 
-/** El estado se lee, no se adivina: la píldora lleva su texto escrito y el
- *  color es refuerzo. El tono lo elige el estado; el resto lo pone `Chip`. */
-const TONO_DE_ESTADO = {
-  borrador: 'neutro',
-  emitido: 'warn',
-  firmado: 'ok',
-  anulado: 'neutro',
-} as const
+/** Si alguna de las firmas que faltan es la de quien mira. Lo deciden las
+ *  mismas funciones puras que corre el servidor, así "pendiente de tu firma"
+ *  quiere decir lo mismo en la lista, en el detalle y en el inicio del grupo. */
+export function miFirmaPendiente(
+  permiso: Permiso,
+  actor: Actor | null,
+  firmantes: readonly FirmanteRequerido[],
+): boolean {
+  return permiso.firmas.some((firma) => {
+    if (firma.firmada) return false
+    const firmante = firmantes.find((uno) => uno.cargo === firma.cargo)
+    return actor !== null && firmante !== undefined && puedeFirmarEnLaApp(actor, firmante)
+  })
+}
 
-function Etiqueta(props: { estado: string }) {
-  const tono = TONO_DE_ESTADO[props.estado as keyof typeof TONO_DE_ESTADO] ?? 'neutro'
-  return <Chip tono={tono}>{props.estado}</Chip>
+/** Cómo está el permiso, contado como lo cuenta quien mira: lo que importa no
+ *  es la palabra del estado sino cuántas firmas faltan y si alguna es la suya.
+ *  Es el gemelo del de `apps/web/src/pantallas/Salida.tsx`, y la lista lo
+ *  importa de acá por lo mismo que allá. */
+export function estadoDelPermiso(permiso: Permiso, esperaMiFirma: boolean) {
+  if (permiso.estado === 'borrador') return { tono: 'neutro', texto: 'Borrador' } as const
+  if (permiso.estado === 'anulado') return { tono: 'neutro', texto: 'Anulada' } as const
+
+  const faltan = permiso.firmas.filter((firma) => !firma.firmada).length
+  if (faltan === 0) return { tono: 'ok', texto: 'Firmada por los tres' } as const
+  if (esperaMiFirma) return { tono: 'warn', texto: 'Pendiente de tu firma' } as const
+  return {
+    tono: 'info',
+    texto: faltan === 1 ? 'Falta 1 firma' : `Faltan ${faltan} firmas`,
+  } as const
 }
 
 function Casilla(props: { marcada: boolean; onCambiar: () => void; children: React.ReactNode }) {
@@ -391,7 +409,7 @@ function Adjuntos(props: { permiso: Permiso; administra: boolean }) {
   )
 }
 
-function Tarjeta(props: {
+function Detalle(props: {
   permiso: Permiso
   grupoId: string
   actor: Actor
@@ -405,16 +423,20 @@ function Tarjeta(props: {
   const aviso = avisoDeAnticipacion(aFechaDeCalendario(new Date()), permiso.desde)
   const administra = puedeAdministrarPermisosDelGrupo(props.actor, props.grupoId)
 
+  const estado = estadoDelPermiso(permiso, miFirmaPendiente(permiso, props.actor, props.firmantes))
+
   return (
-    <View className="mt-4 rounded-lg border border-line p-4">
-      <View className="flex-row items-start justify-between gap-2">
-        <Text className="flex-1 text-lg font-bold text-ink">{permiso.lugar}</Text>
-        <Etiqueta estado={permiso.estado} />
+    <>
+      <Titulo
+        acompaña={`${permiso.desde} a ${permiso.hasta}${
+          permiso.comoSeViaja ? ` · ${permiso.comoSeViaja}` : ''
+        }`}
+      >
+        {permiso.lugar}
+      </Titulo>
+      <View className="mt-2 flex-row">
+        <Chip tono={estado.tono}>{estado.texto}</Chip>
       </View>
-      <Text className="mt-0.5 text-xs text-ink-muted">
-        {permiso.desde} a {permiso.hasta}
-        {permiso.comoSeViaja ? ` · ${permiso.comoSeViaja}` : ''}
-      </Text>
 
       {permiso.estado === 'borrador' && administra && (
         <Armado permiso={permiso} grupoId={props.grupoId} />
@@ -483,107 +505,41 @@ function Tarjeta(props: {
           </AccionAlMargen>
         </View>
       )}
-    </View>
+    </>
   )
 }
 
-/** El formulario de alta. El aviso se muestra mientras se escribe y no recién
- *  al emitir: enterarse tarde de que faltan días no le sirve a nadie. */
-function NuevoPermiso(props: { grupoId: string }) {
-  const crear = useCrearPermiso()
-  const hoy = aFechaDeCalendario(new Date())
-  const [datos, setDatos] = useState({ lugar: '', desde: hoy, hasta: hoy, comoSeViaja: '' })
-  const aviso = avisoDeAnticipacion(hoy, datos.desde)
-
-  return (
-    <View className="mt-8 gap-3 rounded-lg border border-line p-4">
-      <Text className="text-lg font-bold text-ink">Nueva salida</Text>
-      <TextInput
-        className={CAMPO}
-        value={datos.lugar}
-        onChangeText={(lugar) => setDatos({ ...datos, lugar })}
-        placeholder="¿A dónde van?"
-      />
-      <View className="flex-row gap-2">
-        <TextInput
-          className={`${CAMPO} flex-1`}
-          accessibilityLabel="Salen"
-          value={datos.desde}
-          onChangeText={(desde) => setDatos({ ...datos, desde })}
-          placeholder="aaaa-mm-dd"
-        />
-        <TextInput
-          className={`${CAMPO} flex-1`}
-          accessibilityLabel="Vuelven"
-          value={datos.hasta}
-          onChangeText={(hasta) => setDatos({ ...datos, hasta })}
-          placeholder="aaaa-mm-dd"
-        />
-      </View>
-      <TextInput
-        className={CAMPO}
-        value={datos.comoSeViaja}
-        onChangeText={(comoSeViaja) => setDatos({ ...datos, comoSeViaja })}
-        placeholder="Cómo viajan (opcional)"
-      />
-      {aviso && <Aviso>{aviso.mensaje}</Aviso>}
-      <Falla>{crear.error?.message}</Falla>
-      <Boton
-        disabled={crear.isPending}
-        onPress={() =>
-          crear.mutate(
-            { grupoId: props.grupoId, ...datos, comoSeViaja: datos.comoSeViaja || null },
-            { onSuccess: () => setDatos({ lugar: '', desde: hoy, hasta: hoy, comoSeViaja: '' }) },
-          )
-        }
-      >
-        Crear borrador
-      </Boton>
-    </View>
-  )
-}
-
+/** Una salida: armarla mientras es borrador, firmarla, adjuntarle lo que haya
+ *  y bajar el PDF. Todo lo que se toca de un permiso vive acá, y la lista no
+ *  tiene un solo control adentro.
+ *
+ *  Reusa la consulta de la lista en vez de estrenar `permiso(id)`: ya está en
+ *  cache porque venís de ahí. El día que la lista se pagine, se agrega
+ *  `permiso(id)` y se arregla en un solo lugar. */
 export default function Pantalla() {
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const { id, permisoId } = useLocalSearchParams<{ id: string; permisoId: string }>()
   const consulta = usePermisos(id)
   const { distrito } = useGrupo(id)
   const actor = useActor()
 
+  const permiso = consulta.data?.permisos.find((uno) => uno.id === permisoId)
   // Los tres cargos que firman este permiso, para saber cuál de ellos ocupa
   // quien mira. Sin el distrito todavía no se sabe, y el botón no se dibuja.
   const firmantes = distrito ? firmantesRequeridos(id, distrito.id) : []
 
   return (
-    <ScrollView
-      className="flex-1 bg-surface"
-      contentContainerClassName="px-4 pb-6"
-      keyboardShouldPersistTaps="handled"
-      automaticallyAdjustKeyboardInsets
-    >
-      <Titulo>Permisos de salida</Titulo>
+    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-10">
+      <Volver href={`/grupos/${id}/salidas`}>Salidas</Volver>
 
-      {consulta.isPending && <Cargando>Consultando…</Cargando>}
-      {consulta.error && (
-        <Falla>No se pudieron consultar los permisos: {consulta.error.message}</Falla>
+      {consulta.isPending && <Cargando>Consultando la salida…</Cargando>}
+      {consulta.error && <Falla>No se pudo consultar la salida: {consulta.error.message}</Falla>}
+      {!permiso && !consulta.isPending && !consulta.error && (
+        <Vacio>No hay ninguna salida en esta dirección.</Vacio>
       )}
 
-      {actor &&
-        (consulta.data?.permisos ?? []).map((permiso) => (
-          <Tarjeta
-            key={permiso.id}
-            permiso={permiso}
-            grupoId={id}
-            actor={actor}
-            firmantes={firmantes}
-          />
-        ))}
-      {consulta.data?.permisos.length === 0 && (
-        <View className="mt-6 rounded-lg border border-line p-4">
-          <Text className="text-sm text-ink-muted">El grupo todavía no cargó ninguna salida.</Text>
-        </View>
+      {permiso && actor && (
+        <Detalle permiso={permiso} grupoId={id} actor={actor} firmantes={firmantes} />
       )}
-
-      {actor && puedeAdministrarPermisosDelGrupo(actor, id) && <NuevoPermiso grupoId={id} />}
     </ScrollView>
   )
 }

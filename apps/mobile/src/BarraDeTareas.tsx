@@ -13,7 +13,7 @@ import { Icono } from './ui'
  *  da lo mismo de qué carpeta cuelgue cada pantalla. */
 const TAREAS = [
   { texto: 'Principal', a: (id: string) => `/grupos/${id}`, trazos: CASA },
-  { texto: 'Padrón', a: (id: string) => `/grupos/${id}/padron`, trazos: LISTA },
+  { texto: 'Nómina', a: (id: string) => `/grupos/${id}/nomina`, trazos: LISTA },
   { texto: 'Salidas', a: (id: string) => `/grupos/${id}/salidas`, trazos: CARPA },
   { texto: 'Plantel', a: (id: string) => `/grupos/${id}/plantel`, trazos: GENTE },
   { texto: 'Tesorería', a: (id: string) => `/tesoreria/grupos/${id}`, trazos: MONEDA },
