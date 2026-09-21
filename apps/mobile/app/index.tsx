@@ -116,7 +116,12 @@ export default function Pantalla() {
     filtro !== '' && filtrados.every((distrito) => distrito.encontrados.length === 0)
 
   return (
-    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-10">
+    <ScrollView
+      className="flex-1 bg-surface"
+      contentContainerClassName="px-4 pb-10"
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
+    >
       {/* En el teléfono el directorio es la portada, así que se lleva el
             enlace a Tesorería: no hay barra lateral donde ponerlo. */}
       <Titulo enlace={{ texto: 'Tesorería', href: '/tesoreria' }}>Estructura</Titulo>

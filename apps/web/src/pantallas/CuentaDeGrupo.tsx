@@ -1,12 +1,6 @@
 import { useActor, useAnularPago, useCuentaDeGrupo, useTesoreria } from '@gps/api'
-import { puedeRegistrarPagos, puedeVerTesoreriaDeLaDiocesis } from '@gps/tesoreria/dominio'
+import { enPesos, puedeRegistrarPagos, puedeVerTesoreriaDeLaDiocesis } from '@gps/tesoreria/dominio'
 import { Accion, BOTON_AL_MARGEN, Cargando, Falla, Seccion, Titulo, Vacio, Volver } from '../ui'
-
-const pesos = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS',
-  maximumFractionDigits: 0,
-})
 
 const NOMBRE_DEL_MOVIMIENTO = {
   cargo_afiliacion: 'Afiliación',
@@ -43,7 +37,7 @@ export function CuentaDeGrupo(props: { grupoId: string }) {
             className={`text-2xl font-bold tabular-nums ${cuenta.saldo > 0 ? 'text-danger' : 'text-ink'}`}
           >
             {cuenta.saldo > 0 ? '−' : ''}
-            {pesos.format(Math.abs(cuenta.saldo))}
+            {enPesos(Math.abs(cuenta.saldo))}
           </p>
           <p className="mt-0.5 text-sm text-ink-muted">
             {cuenta.saldo > 0 ? 'De deuda' : cuenta.saldo < 0 ? 'A favor del grupo' : 'Sin deuda'}.
@@ -76,12 +70,12 @@ export function CuentaDeGrupo(props: { grupoId: string }) {
                     lado va el movimiento, no si el número es grande. */}
                 <strong className="shrink-0 tabular-nums">
                   {movimiento.tipo === 'pago' ? '−' : '+'}
-                  {pesos.format(movimiento.importe)}
+                  {enPesos(movimiento.importe)}
                 </strong>
               </div>
               {movimiento.cantidad && (
                 <p className="mt-0.5 text-label tabular-nums text-ink-muted">
-                  {movimiento.cantidad} × {pesos.format(movimiento.cuota ?? 0)}
+                  {movimiento.cantidad} × {enPesos(movimiento.cuota ?? 0)}
                 </p>
               )}
               {movimiento.referencia && (

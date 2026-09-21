@@ -1,23 +1,18 @@
 import { useActor, useAnularPago, useCuentaDeGrupo, useTesoreria } from '@gps/api'
-import { puedeRegistrarPagos, puedeVerTesoreriaDeLaDiocesis } from '@gps/tesoreria/dominio'
-import { router, useLocalSearchParams } from 'expo-router'
-import { Pressable, ScrollView, Text, View } from 'react-native'
+import { enPesos, puedeRegistrarPagos, puedeVerTesoreriaDeLaDiocesis } from '@gps/tesoreria/dominio'
+import { useLocalSearchParams } from 'expo-router'
+import { ScrollView, Text, View } from 'react-native'
 import {
   Accion,
   AccionAlMargen,
   Cargando,
   Falla,
+  Saldo,
   Seccion,
   Titulo,
   Vacio,
   Volver,
 } from '../../../../src/ui'
-
-const pesos = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS',
-  maximumFractionDigits: 0,
-})
 
 const NOMBRE_DEL_MOVIMIENTO = {
   cargo_afiliacion: 'Afiliación',
@@ -47,27 +42,13 @@ export default function Pantalla() {
       {desdeLaDiocesis ? (
         <Volver href="/tesoreria">Tesorería</Volver>
       ) : (
-        <Pressable
-          accessibilityRole="button"
-          className="min-h-9 justify-center"
-          onPress={() => router.back()}
-        >
-          <Text className="text-label text-ink-muted">← Grupo</Text>
-        </Pressable>
+        <Volver href={`/grupos/${id}`}>Grupo</Volver>
       )}
       <Titulo>{cuenta ? `Grupo ${cuenta.numero} — ${cuenta.nombre}` : 'Cuenta del grupo'}</Titulo>
 
       {cuenta && (
         <View className="mt-5">
-          {/* El saldo positivo es deuda: así lo guarda tesorería. El signo se
-                escribe, no se deduce del color. */}
-          <Text className={`text-2xl font-bold ${cuenta.saldo > 0 ? 'text-danger' : 'text-ink'}`}>
-            {cuenta.saldo > 0 ? '−' : ''}
-            {pesos.format(Math.abs(cuenta.saldo))}
-          </Text>
-          <Text className="mt-0.5 text-sm text-ink-muted">
-            {cuenta.saldo > 0 ? 'De deuda' : cuenta.saldo < 0 ? 'A favor del grupo' : 'Sin deuda'}.
-          </Text>
+          <Saldo importe={cuenta.saldo} />
         </View>
       )}
 
@@ -96,12 +77,12 @@ export default function Pantalla() {
                       qué lado va el movimiento, no si el número es grande. */}
                 <Text className="shrink-0 text-sm font-bold text-ink">
                   {movimiento.tipo === 'pago' ? '−' : '+'}
-                  {pesos.format(movimiento.importe)}
+                  {enPesos(movimiento.importe)}
                 </Text>
               </View>
               {movimiento.cantidad && (
                 <Text className="mt-0.5 text-label text-ink-muted">
-                  {movimiento.cantidad} × {pesos.format(movimiento.cuota ?? 0)}
+                  {movimiento.cantidad} × {enPesos(movimiento.cuota ?? 0)}
                 </Text>
               )}
               {movimiento.referencia && (

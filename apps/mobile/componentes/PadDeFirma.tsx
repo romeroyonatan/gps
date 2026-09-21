@@ -1,13 +1,8 @@
 import type { Trazos } from '@gps/salidas/dominio'
 import { useRef, useState } from 'react'
-import { type LayoutChangeEvent, PanResponder, Pressable, Text, View } from 'react-native'
-import Svg, { Path } from 'react-native-svg'
-
-/** La tinta. Es el valor de `--ink` en claro y no la variable: react-native-svg
- *  no lee clases ni variables CSS, quiere un color.
- *  ponytail: mobile todavía no prende el modo oscuro -`darkMode: 'class'` y
- *  nadie pone la clase-; cuando lo prenda, esto sale del tema y no de acá. */
-const TINTA = '#000000'
+import { type LayoutChangeEvent, PanResponder, View } from 'react-native'
+import Svg from 'react-native-svg'
+import { AccionAlMargen, Trazo } from '../src/ui'
 
 /** El lienzo donde se dibuja la firma, en mobile. Guarda el mismo formato que
  *  el de web -coordenadas normalizadas de 0 a 1- para que una firma hecha en el
@@ -76,11 +71,13 @@ export function PadDeFirma(props: { onCambiar: (trazos: Trazos) => void }) {
         className="h-40 w-full rounded-lg border border-dashed border-line-strong bg-surface-2"
       >
         <Svg width="100%" height="100%" viewBox="0 0 1 1" preserveAspectRatio="none">
+          {/* `text-ink` y no un hex: la app sigue al sistema (ver
+              app/_layout.tsx), y en oscuro una firma negra no se ve. */}
           {trazos.map((trazo) => (
-            <Path
+            <Trazo
               key={trazo.id}
               d={trazo.puntos.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x} ${y}`).join(' ')}
-              stroke={TINTA}
+              className="text-ink"
               strokeWidth={0.008}
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -89,9 +86,7 @@ export function PadDeFirma(props: { onCambiar: (trazos: Trazos) => void }) {
           ))}
         </Svg>
       </View>
-      <Pressable onPress={() => actualizar([])} className="min-h-12 justify-center">
-        <Text className="text-sm text-ink-muted">Borrar y empezar de nuevo</Text>
-      </Pressable>
+      <AccionAlMargen onPress={() => actualizar([])}>Borrar y empezar de nuevo</AccionAlMargen>
     </View>
   )
 }

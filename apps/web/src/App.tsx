@@ -51,8 +51,14 @@ function Salir(props: { personaId: string }) {
         // sesión, y la siguiente vuelve a preguntar.
         olvidarRolActivo(props.personaId)
         // Recarga después de cerrar: la cookie ya no está y todo lo que se
-        // estaba mostrando era de la sesión anterior.
-        cerrar.mutate(undefined, { onSuccess: () => window.location.assign('/') })
+        // estaba mostrando era de la sesión anterior. Va en la promesa y no en
+        // `onSuccess`: cerrar deja `personaActual` en nadie, esto se desmonta
+        // con la cabecera, y react-query saltea los callbacks de `mutate` de un
+        // observador sin oyentes.
+        cerrar.mutateAsync().then(
+          () => window.location.assign('/'),
+          () => {},
+        )
       }}
       disabled={cerrar.isPending}
       className="text-xs font-medium text-ink-muted hover:text-ink"

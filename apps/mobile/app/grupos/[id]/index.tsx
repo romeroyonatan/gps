@@ -3,7 +3,7 @@ import type { TipoDeCargo } from '@gps/api'
 import {
   useActor,
   useAfiliadosEn,
-  useDistritos,
+  useGrupo,
   usePermisos,
   usePersonasDelGrupo,
   useTesoreria,
@@ -14,16 +14,20 @@ import { firmantesRequeridos, puedeFirmarEnLaApp, repartirSalidas } from '@gps/s
 import { Link, router, useLocalSearchParams } from 'expo-router'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { COLOR_DE_RAMA } from '../../../src/ramas'
-import { Boton, Cargando, ChipDeRama, Falla, Seccion, Vacio, Volver } from '../../../src/ui'
+import {
+  Aviso,
+  Boton,
+  Cargando,
+  ChipDeRama,
+  Falla,
+  Saldo,
+  Seccion,
+  Vacio,
+  Volver,
+} from '../../../src/ui'
 
 type Persona = NonNullable<ReturnType<typeof usePersonasDelGrupo>['data']>['personas'][number]
 type Permiso = NonNullable<ReturnType<typeof usePermisos>['data']>['permisos'][number]
-
-const pesos = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS',
-  maximumFractionDigits: 0,
-})
 
 /** La distribución por rama: barra de proporciones más una etiqueta por rama
  *  con su nombre escrito. El color nunca viaja solo. */
@@ -89,7 +93,7 @@ function porRama(
  *  al lado. */
 export default function Pantalla() {
   const { id } = useLocalSearchParams<{ id: string }>()
-  const arbol = useDistritos()
+  const arbol = useGrupo(id)
   const lista = usePersonasDelGrupo(id)
   const permisos = usePermisos(id)
   const tesoreria = useTesoreria()
@@ -109,10 +113,7 @@ export default function Pantalla() {
 
   // Reusa la query del arbol en vez de estrenar grupo(id): ya esta en cache
   // porque venis de ahi, y de paso trae el distrito para el encabezado.
-  const distrito = arbol.data?.distritos.find((candidato) =>
-    candidato.grupos.some((grupo) => grupo.id === id),
-  )
-  const grupo = distrito?.grupos.find((candidato) => candidato.id === id)
+  const { distrito, grupo } = arbol
 
   // El reparto es la misma función pura que usa la web, así que "espera tu
   // firma" quiere decir lo mismo en los dos lados. Quién firma qué lo decide
@@ -157,16 +158,15 @@ export default function Pantalla() {
               que hacer: un bloque destacado que dice "0" no destaca nada. Dice
               "tu firma" porque el dominio ya lo decidió. */}
           {reparto.esperanMiFirma.length > 0 && (
-            <View className="mt-5 rounded-lg bg-warn-soft p-4">
-              <Text className="font-semibold text-warn">
-                {reparto.esperanMiFirma.length === 1
-                  ? '1 salida espera tu firma'
-                  : `${reparto.esperanMiFirma.length} salidas esperan tu firma`}
-              </Text>
-              <View className="mt-3">
+            <Aviso
+              accion={
                 <Boton onPress={() => router.push(`/grupos/${id}/salidas`)}>Ver salidas</Boton>
-              </View>
-            </View>
+              }
+            >
+              {reparto.esperanMiFirma.length === 1
+                ? '1 salida espera tu firma'
+                : `${reparto.esperanMiFirma.length} salidas esperan tu firma`}
+            </Aviso>
           )}
 
           <Seccion
@@ -188,21 +188,9 @@ export default function Pantalla() {
               titulo="Cuenta corriente"
               enlace={{ texto: 'Movimientos', href: `/tesoreria/grupos/${id}` }}
             >
-              {/* El saldo positivo es deuda: así lo guarda tesorería. El signo
-                  se escribe, no se deduce del color. */}
-              <Text
-                className={`mt-1.5 text-2xl font-bold ${cuenta.saldo > 0 ? 'text-danger' : 'text-ink'}`}
-              >
-                {cuenta.saldo > 0 ? '−' : ''}
-                {pesos.format(Math.abs(cuenta.saldo))}
-              </Text>
-              <Text className="mt-0.5 text-sm text-ink-muted">
-                {cuenta.saldo > 0
-                  ? 'De deuda'
-                  : cuenta.saldo < 0
-                    ? 'A favor del grupo'
-                    : 'Sin deuda'}
-              </Text>
+              <View className="mt-1.5">
+                <Saldo importe={cuenta.saldo} />
+              </View>
             </Seccion>
           )}
 

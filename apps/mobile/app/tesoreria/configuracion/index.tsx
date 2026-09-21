@@ -1,12 +1,7 @@
 import { useTesoreria } from '@gps/api'
+import { enPesos } from '@gps/tesoreria/dominio'
 import { ScrollView, Text, View } from 'react-native'
 import { Accion, Cargando, Falla, FILA, Titulo, Vacio, Volver } from '../../../src/ui'
-
-const pesos = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS',
-  maximumFractionDigits: 0,
-})
 
 /** El historial de cuotas. Definir una es una tarea que termina y tiene su
  *  propia pantalla: acá sólo se mira lo que ya está, con la acción arriba. */
@@ -37,9 +32,7 @@ export default function Pantalla() {
                 {'  '}marzo {cuota.periodo} a febrero {cuota.periodo + 1}
               </Text>
             </Text>
-            <Text className="shrink-0 text-sm font-bold text-ink">
-              {pesos.format(cuota.importe)}
-            </Text>
+            <Text className="shrink-0 text-sm font-bold text-ink">{enPesos(cuota.importe)}</Text>
           </View>
         ))}
       </View>

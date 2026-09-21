@@ -41,7 +41,12 @@ export default function Pantalla() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-10">
+    <ScrollView
+      className="flex-1 bg-surface"
+      contentContainerClassName="px-4 pb-10"
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
+    >
       <Volver href={volver}>Cuenta del grupo</Volver>
       {/* En GPS no se paga: se asienta que se pagó. */}
       <Titulo acompaña="El grupo paga por fuera de GPS. Acá se asienta lo recibido y se imputa a la deuda.">

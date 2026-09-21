@@ -30,7 +30,16 @@ export function BarraDeSesion() {
           // El rol elegido se olvida al salir y no al entrar: es la decisión de
           // esta sesión, y la siguiente vuelve a preguntar.
           void olvidarRolActivo(quien.personaId)
-          cerrar.mutate(undefined, { onSuccess: () => olvidarSesion() })
+          // `mutateAsync` y no `mutate(…, { onSuccess })`: cerrar la sesión
+          // deja `personaActual` en nadie, la app pasa al login y esta barra se
+          // desmonta con ella —y react-query no corre los callbacks de `mutate`
+          // de un observador sin oyentes, así que el secreto se quedaba en el
+          // llavero—. La continuación de una promesa sí sobrevive al desmonte.
+          //
+          // Si revocar falla no se borra nada: un secreto tirado del teléfono
+          // sin haber cerrado del otro lado deja la sesión viva y sin forma de
+          // cerrarla. El botón queda disponible para reintentar.
+          cerrar.mutateAsync().then(olvidarSesion, () => {})
         }}
       >
         <Text className="text-xs font-medium text-ink-muted">Salir</Text>

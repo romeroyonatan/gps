@@ -5,11 +5,11 @@ import {
   useAgregarParticipante,
   useAnularPermiso,
   useCrearPermiso,
-  useDistritos,
   useElegirUnidades,
   useEmitirPermiso,
   useFirmarEnApp,
   useFirmarEnPapel,
+  useGrupo,
   usePermisos,
   usePersonasDelGrupo,
   useQuitarAdjunto,
@@ -38,11 +38,19 @@ import { useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
 import { Alert, Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { PadDeFirma } from '../../../componentes/PadDeFirma'
-import { Aviso, Boton, BotonSecundario, Cargando, Chip, Falla, Titulo } from '../../../src/ui'
+import {
+  AccionAlMargen,
+  Aviso,
+  Boton,
+  BotonSecundario,
+  CAMPO,
+  Cargando,
+  Chip,
+  Falla,
+  Titulo,
+} from '../../../src/ui'
 
 type Permiso = PermisosQuery['permisos'][number]
-
-const CLASE_DE_INPUT = 'min-h-12 rounded-lg border border-line-strong px-3 py-2 text-base text-ink'
 
 /** El estado se lee, no se adivina: la píldora lleva su texto escrito y el
  *  color es refuerzo. El tono lo elige el estado; el resto lo pone `Chip`. */
@@ -75,15 +83,12 @@ function Casilla(props: { marcada: boolean; onCambiar: () => void; children: Rea
 
 /** Elegir unidades y quien va. Solo mientras es borrador. */
 function Armado(props: { permiso: Permiso; grupoId: string }) {
-  const arbol = useDistritos()
+  const { grupo } = useGrupo(props.grupoId)
   const lista = usePersonasDelGrupo(props.grupoId)
   const elegirUnidades = useElegirUnidades()
   const agregar = useAgregarParticipante()
   const quitar = useQuitarParticipante()
 
-  const grupo = arbol.data?.distritos
-    .flatMap((distrito) => distrito.grupos)
-    .find((uno) => uno.id === props.grupoId)
   const elegidas = props.permiso.unidadIds
   const puestos = new Set(props.permiso.participantes.map((uno) => uno.personaId))
 
@@ -281,9 +286,7 @@ function Firmas(props: {
                   >
                     Firmar
                   </Boton>
-                  <Pressable onPress={() => setFirmando(null)} className="min-h-12 justify-center">
-                    <Text className="text-sm text-ink-muted">Cancelar</Text>
-                  </Pressable>
+                  <AccionAlMargen onPress={() => setFirmando(null)}>Cancelar</AccionAlMargen>
                 </View>
               </View>
             )}
@@ -325,7 +328,7 @@ function Adjuntos(props: { permiso: Permiso; administra: boolean }) {
             </Pressable>
             {/* Con confirmacion: borra el archivo y no se deshace. */}
             {props.administra && (
-              <Pressable
+              <AccionAlMargen
                 onPress={() =>
                   Alert.alert(
                     'Borrar adjunto',
@@ -341,10 +344,9 @@ function Adjuntos(props: { permiso: Permiso; administra: boolean }) {
                     ],
                   )
                 }
-                className="min-h-12 justify-center px-2"
               >
-                <Text className="text-xs text-ink-muted">quitar</Text>
-              </Pressable>
+                quitar
+              </AccionAlMargen>
             )}
           </View>
         ))
@@ -475,12 +477,11 @@ function Tarjeta(props: {
 
       {/* Lo menos frecuente, al final y chiquito. */}
       {(permiso.estado === 'emitido' || permiso.estado === 'firmado') && administra && (
-        <Pressable
-          onPress={() => anular.mutate({ permisoId: permiso.id })}
-          className="mt-3 min-h-12 justify-center"
-        >
-          <Text className="text-xs text-ink-muted">Anular permiso</Text>
-        </Pressable>
+        <View className="mt-3">
+          <AccionAlMargen onPress={() => anular.mutate({ permisoId: permiso.id })}>
+            Anular permiso
+          </AccionAlMargen>
+        </View>
       )}
     </View>
   )
@@ -498,21 +499,21 @@ function NuevoPermiso(props: { grupoId: string }) {
     <View className="mt-8 gap-3 rounded-lg border border-line p-4">
       <Text className="text-lg font-bold text-ink">Nueva salida</Text>
       <TextInput
-        className={CLASE_DE_INPUT}
+        className={CAMPO}
         value={datos.lugar}
         onChangeText={(lugar) => setDatos({ ...datos, lugar })}
         placeholder="¿A dónde van?"
       />
       <View className="flex-row gap-2">
         <TextInput
-          className={`${CLASE_DE_INPUT} flex-1`}
+          className={`${CAMPO} flex-1`}
           accessibilityLabel="Salen"
           value={datos.desde}
           onChangeText={(desde) => setDatos({ ...datos, desde })}
           placeholder="aaaa-mm-dd"
         />
         <TextInput
-          className={`${CLASE_DE_INPUT} flex-1`}
+          className={`${CAMPO} flex-1`}
           accessibilityLabel="Vuelven"
           value={datos.hasta}
           onChangeText={(hasta) => setDatos({ ...datos, hasta })}
@@ -520,7 +521,7 @@ function NuevoPermiso(props: { grupoId: string }) {
         />
       </View>
       <TextInput
-        className={CLASE_DE_INPUT}
+        className={CAMPO}
         value={datos.comoSeViaja}
         onChangeText={(comoSeViaja) => setDatos({ ...datos, comoSeViaja })}
         placeholder="Cómo viajan (opcional)"
@@ -545,18 +546,20 @@ function NuevoPermiso(props: { grupoId: string }) {
 export default function Pantalla() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const consulta = usePermisos(id)
-  const arbol = useDistritos()
+  const { distrito } = useGrupo(id)
   const actor = useActor()
 
-  const distrito = arbol.data?.distritos.find((candidato) =>
-    candidato.grupos.some((grupo) => grupo.id === id),
-  )
   // Los tres cargos que firman este permiso, para saber cuál de ellos ocupa
   // quien mira. Sin el distrito todavía no se sabe, y el botón no se dibuja.
   const firmantes = distrito ? firmantesRequeridos(id, distrito.id) : []
 
   return (
-    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-6">
+    <ScrollView
+      className="flex-1 bg-surface"
+      contentContainerClassName="px-4 pb-6"
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
+    >
       <Titulo>Permisos de salida</Titulo>
 
       {consulta.isPending && <Cargando>Consultando…</Cargando>}

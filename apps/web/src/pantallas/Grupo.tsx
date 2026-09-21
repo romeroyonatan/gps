@@ -11,15 +11,10 @@ import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Rama } from '@gps/estructura/dominio'
 import type { TipoDeCargo } from '@gps/personas/dominio'
 import { firmantesRequeridos, puedeFirmarEnLaApp, repartirSalidas } from '@gps/salidas/dominio'
+import { enPesos } from '@gps/tesoreria/dominio'
 import { Link } from 'wouter'
 import { COLOR_DE_RAMA } from '../ramas'
 import { BOTON_PRINCIPAL, Cargando, ChipDeRama, Falla, Seccion, Titulo, Vacio } from '../ui'
-
-const pesos = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS',
-  maximumFractionDigits: 0,
-})
 
 /** La distribución por rama: barra de proporciones más una etiqueta por rama
  *  con su nombre escrito. El color nunca viaja solo. */
@@ -189,7 +184,7 @@ export function Grupo(props: { id: string }) {
             className={`mt-1.5 text-2xl font-bold tabular-nums ${cuenta.saldo > 0 ? 'text-danger' : 'text-ink'}`}
           >
             {cuenta.saldo > 0 ? '−' : ''}
-            {pesos.format(Math.abs(cuenta.saldo))}
+            {enPesos(Math.abs(cuenta.saldo))}
           </p>
           <p className="mt-0.5 text-sm text-ink-muted">
             {cuenta.saldo > 0 ? 'De deuda' : cuenta.saldo < 0 ? 'A favor del grupo' : 'Sin deuda'}

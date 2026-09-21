@@ -1,5 +1,5 @@
 import { periodoDe } from '@gps/afiliacion/dominio'
-import { useAfiliadosEn, useDistritos, usePersonasDelGrupo } from '@gps/api'
+import { useAfiliadosEn, useGrupo, usePersonasDelGrupo } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import { etiquetaDeEdades, ramaDelCatalogo } from '@gps/estructura/dominio'
 import {
@@ -86,7 +86,7 @@ function Unidad(props: {
  *  pestañas. */
 export default function Pantalla() {
   const { id } = useLocalSearchParams<{ id: string }>()
-  const arbol = useDistritos()
+  const arbol = useGrupo(id)
   const lista = usePersonasDelGrupo(id)
   const hoy = new Date()
 
@@ -98,9 +98,7 @@ export default function Pantalla() {
   )
   const afiliados = new Set(consulta.data?.afiliadosEn ?? [])
 
-  const grupo = arbol.data?.distritos
-    .flatMap((distrito) => distrito.grupos)
-    .find((candidato) => candidato.id === id)
+  const { grupo } = arbol
 
   return (
     <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-6">

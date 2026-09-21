@@ -8,6 +8,7 @@
 // Regla para agregar algo acá: que ya exista igual en dos pantallas.
 
 import { type Rama, ramaDelCatalogo } from '@gps/estructura/dominio'
+import { enPesos } from '@gps/tesoreria/dominio'
 import { Link } from 'expo-router'
 import { cssInterop } from 'nativewind'
 import type { ReactNode } from 'react'
@@ -36,6 +37,11 @@ export const FILA = 'min-h-14 flex-row items-center gap-3 border-b border-line p
 // como prop `stroke`-, así un icono se pinta con `text-ink` como cualquier
 // texto y el modo oscuro lo da vuelta solo, sin un hex escrito a mano.
 cssInterop(Path, { className: { target: false, nativeStyleToProp: { color: 'stroke' } } })
+
+/** El `<Path>` de react-native-svg, ya enseñado a leer `className`. Se exporta
+ *  -y no se reconfigura en cada archivo- porque `cssInterop` se llama una sola
+ *  vez por componente: importar `Trazo` es lo que garantiza que corrió. */
+export { Path as Trazo }
 
 /** El único dibujo de la guía: trazo de 1.7, sin relleno. Son los `d` de los
  *  `<path>` y nada más —ver `iconos.ts`—, así que un icono nuevo es una
@@ -317,6 +323,23 @@ export function ChipDeRama(props: { rama: Rama; children?: ReactNode }) {
   )
 }
 
+/** El saldo de la cuenta de un grupo, con la palabra que dice de qué lado va.
+ *  Positivo es deuda: así lo guarda tesorería. El signo y el sustantivo se
+ *  escriben, el color es refuerzo y nunca el dato. */
+export function Saldo(props: { importe: number }) {
+  return (
+    <>
+      <Text className={`text-2xl font-bold ${props.importe > 0 ? 'text-danger' : 'text-ink'}`}>
+        {props.importe > 0 ? '−' : ''}
+        {enPesos(Math.abs(props.importe))}
+      </Text>
+      <Text className="mt-0.5 text-sm text-ink-muted">
+        {props.importe > 0 ? 'De deuda' : props.importe < 0 ? 'A favor del grupo' : 'Sin deuda'}
+      </Text>
+    </>
+  )
+}
+
 /* ── Avisos ─────────────────────────────────────────────────────────────── */
 
 /** Algo salió mal. El mensaje del servidor puede traer un id largo sin
@@ -333,12 +356,20 @@ export function Falla(props: { children: ReactNode }) {
   )
 }
 
-/** Nada salió mal todavía, pero conviene saberlo antes de seguir. */
-export function Aviso(props: { children: ReactNode }) {
+/** Nada salió mal todavía, pero conviene saberlo antes de seguir.
+ *
+ *  Con `accion` es además lo que hay que hacer hoy: el cartel destacado que
+ *  abre el inicio del grupo y el de Tesorería. Crece en vez de duplicarse
+ *  porque es el mismo cartel -mismo fondo, mismo tono- con un botón adentro;
+ *  lo que cambia es que pide algo, y eso se ve en el aire y en la negrita. */
+export function Aviso(props: { children: ReactNode; detalle?: ReactNode; accion?: ReactNode }) {
   if (!props.children) return null
+  const pide = props.accion !== undefined
   return (
-    <View className="mt-3 rounded-lg bg-warn-soft p-3">
-      <Text className="text-sm text-warn">{props.children}</Text>
+    <View className={`mt-3 rounded-lg bg-warn-soft ${pide ? 'p-4' : 'p-3'}`}>
+      <Text className={`text-sm text-warn ${pide ? 'font-semibold' : ''}`}>{props.children}</Text>
+      {props.detalle && <Text className="mt-1 text-label text-warn">{props.detalle}</Text>}
+      {props.accion && <View className="mt-3">{props.accion}</View>}
     </View>
   )
 }

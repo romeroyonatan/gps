@@ -15,4 +15,4 @@ export {
   puedeRegistrarPagos,
   puedeVerTesoreriaDeLaDiocesis,
 } from './politicas'
-export { fechaValida, importeEnPesosValido, saldoDe } from './reglas'
+export { enPesos, fechaValida, importeEnPesosValido, saldoDe } from './reglas'

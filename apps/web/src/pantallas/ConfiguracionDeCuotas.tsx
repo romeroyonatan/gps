@@ -1,11 +1,6 @@
 import { useTesoreria } from '@gps/api'
+import { enPesos } from '@gps/tesoreria/dominio'
 import { Accion, Cargando, Falla, FILA, Titulo, Vacio, Volver } from '../ui'
-
-const pesos = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS',
-  maximumFractionDigits: 0,
-})
 
 /** El historial de cuotas. Definir una es una tarea que termina y tiene su
  *  propia pantalla: acá sólo se mira lo que ya está, con la acción arriba. */
@@ -36,7 +31,7 @@ export function ConfiguracionDeCuotas() {
                 marzo {cuota.periodo} a febrero {cuota.periodo + 1}
               </span>
             </span>
-            <strong className="shrink-0 text-sm tabular-nums">{pesos.format(cuota.importe)}</strong>
+            <strong className="shrink-0 text-sm tabular-nums">{enPesos(cuota.importe)}</strong>
           </li>
         ))}
       </ul>

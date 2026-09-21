@@ -1,4 +1,5 @@
 import { useGenerarDeudasPendientes, useTesoreria } from '@gps/api'
+import { enPesos } from '@gps/tesoreria/dominio'
 import { useState } from 'react'
 import { Link } from 'wouter'
 import {
@@ -14,12 +15,6 @@ import {
 } from '../ui'
 
 type Filtro = 'todos' | 'deuda' | 'favor' | 'cero'
-
-const pesos = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS',
-  maximumFractionDigits: 0,
-})
 
 const FILTROS = [
   { id: 'todos', etiqueta: 'Todos' },
@@ -100,7 +95,7 @@ export function Tesoreria() {
                 <strong
                   className={`shrink-0 text-sm tabular-nums ${cuenta.saldo > 0 ? 'text-danger' : cuenta.saldo < 0 ? 'text-ok' : 'text-ink-muted'}`}
                 >
-                  {pesos.format(Math.abs(cuenta.saldo))}
+                  {enPesos(Math.abs(cuenta.saldo))}
                   {cuenta.saldo < 0 ? ' a favor' : ''}
                 </strong>
               </Link>

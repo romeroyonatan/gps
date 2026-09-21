@@ -1,16 +1,22 @@
 import { useGenerarDeudasPendientes, useTesoreria } from '@gps/api'
+import { enPesos } from '@gps/tesoreria/dominio'
 import { Link } from 'expo-router'
 import { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
-import { Boton, Cargando, Falla, FILA, Filtros, Seccion, Titulo, Vacio, Volver } from '../../src/ui'
+import {
+  Aviso,
+  Boton,
+  Cargando,
+  Falla,
+  FILA,
+  Filtros,
+  Seccion,
+  Titulo,
+  Vacio,
+  Volver,
+} from '../../src/ui'
 
 type Filtro = 'todos' | 'deuda' | 'favor' | 'cero'
-
-const pesos = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS',
-  maximumFractionDigits: 0,
-})
 
 const FILTROS = [
   { id: 'todos', etiqueta: 'Todos' },
@@ -50,24 +56,23 @@ export default function Pantalla() {
       {/* Lo que exige acción va arriba de todo, y sólo aparece si hay algo
             que hacer: un bloque destacado que dice "0" no destaca nada. */}
       {pendientes && pendientes.cantidad > 0 && (
-        <View className="mt-5 rounded-lg bg-warn-soft p-4">
-          <Text className="font-semibold text-warn">
-            Hay {pendientes.cantidad}{' '}
-            {pendientes.cantidad === 1 ? 'deuda pendiente' : 'deudas pendientes'}.
-          </Text>
-          {pendientes.periodosSinCuota.length > 0 && (
-            <Text className="mt-1 text-label text-warn">
-              Falta configurar la cuota de: {pendientes.periodosSinCuota.join(', ')}.
-            </Text>
-          )}
-          <View className="mt-3">
+        <Aviso
+          detalle={
+            pendientes.periodosSinCuota.length > 0
+              ? `Falta configurar la cuota de: ${pendientes.periodosSinCuota.join(', ')}.`
+              : undefined
+          }
+          accion={
             <Boton disabled={generar.isPending} onPress={() => generar.mutate()}>
               {generar.isPending
                 ? 'Generando…'
                 : `Generar ${pendientes.cantidad} deudas pendientes`}
             </Boton>
-          </View>
-        </View>
+          }
+        >
+          Hay {pendientes.cantidad}{' '}
+          {pendientes.cantidad === 1 ? 'deuda pendiente' : 'deudas pendientes'}.
+        </Aviso>
       )}
 
       <Seccion titulo="Cuentas de grupos" cuantos={cuentas.length}>
@@ -93,7 +98,7 @@ export default function Pantalla() {
                         : 'text-ink-muted'
                   }`}
                 >
-                  {pesos.format(Math.abs(cuenta.saldo))}
+                  {enPesos(Math.abs(cuenta.saldo))}
                   {cuenta.saldo < 0 ? ' a favor' : ''}
                 </Text>
               </Pressable>

@@ -158,10 +158,16 @@ escrita una sola vez —no una librería de propósito general— y ya tiene est
 El color de rama vive aparte, en `apps/web/src/ramas.ts` (`COLOR_DE_RAMA`), escrito entero
 y no interpolado, porque Tailwind lee las clases del fuente.
 
-Todo esto es de web. Mobile no tiene equivalente todavía: `apps/mobile/componentes/` son
-dos pantallas grandes y nada compartido. Lo que se comparte entre las dos apps son los
-`/dominio` de los módulos, no la interfaz —React DOM y React Native no dibujan con las
-mismas etiquetas—, así que la paridad se copia a mano y hay que decirlo cuando se rompe.
+Esa tabla es de web. **Mobile tiene su gemela**, con los mismos nombres y las mismas
+decisiones, en `apps/mobile/src/ui.tsx`: el catálogo entero está en
+`apps/mobile/README.md`, junto con lo que es distinto por ser un teléfono (el teclado, el
+color que no se escribe a mano, la falta de `<select>`). Antes de escribir markup en
+mobile, ese README.
+
+Lo que se comparte entre las dos apps son los `/dominio` de los módulos, no la interfaz
+—React DOM y React Native no dibujan con las mismas etiquetas—, así que la paridad se
+copia a mano y hay que decirlo cuando se rompe. Una pieza que existe en las dos se llama
+igual en las dos, aunque el markup sea otro.
 
 **Agregar una pieza nueva es bienvenido**, con una condición: que la misma forma ya esté
 escrita en dos pantallas. Lo que aparece una sola vez se queda en su pantalla —una

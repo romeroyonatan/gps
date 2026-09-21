@@ -19,7 +19,12 @@ export default function Pantalla() {
   const periodo = periodoElegido ?? (periodos[0] === undefined ? null : String(periodos[0]))
 
   return (
-    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-10">
+    <ScrollView
+      className="flex-1 bg-surface"
+      contentContainerClassName="px-4 pb-10"
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
+    >
       <Volver href="/tesoreria/configuracion">Cuotas</Volver>
       <Titulo acompaña="Se aplica a las declaraciones del período. Lo ya cobrado conserva su importe.">
         Definir una cuota

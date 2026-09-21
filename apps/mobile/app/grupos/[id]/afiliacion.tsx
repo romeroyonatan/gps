@@ -1,8 +1,17 @@
 import { useDeclaraciones, useDeclararAfiliacion } from '@gps/api'
 import { nombreDelTipo } from '@gps/personas/dominio'
 import { useLocalSearchParams } from 'expo-router'
-import { Pressable, ScrollView, Text, View } from 'react-native'
-import { Cargando, Chip, Falla, FILA, Titulo, Vacio, Volver } from '../../../src/ui'
+import { ScrollView, Text, View } from 'react-native'
+import {
+  BotonSecundario,
+  Cargando,
+  Chip,
+  Falla,
+  FILA,
+  Titulo,
+  Vacio,
+  Volver,
+} from '../../../src/ui'
 
 type Declaracion = NonNullable<ReturnType<typeof useDeclaraciones>['data']>['declaraciones'][number]
 
@@ -62,18 +71,14 @@ export default function Pantalla() {
       {/* Lo menos frecuente, así que va al final y no compite por lugar. Es el
           botón secundario y no el negro: declarar fuera de término no es la
           acción de esta pantalla, es la excepción. */}
-      <Pressable
-        accessibilityRole="button"
-        disabled={declarar.isPending}
-        onPress={() => declarar.mutate({ grupoId: id })}
-        className={`mt-8 min-h-12 items-center justify-center rounded-lg border border-line-strong px-3.5 ${
-          declarar.isPending ? 'opacity-40' : ''
-        }`}
-      >
-        <Text className="text-sm font-semibold text-ink">
+      <View className="mt-8">
+        <BotonSecundario
+          disabled={declarar.isPending}
+          onPress={() => declarar.mutate({ grupoId: id })}
+        >
           {declarar.isPending ? 'Declarando…' : 'Declarar afiliación extraordinaria'}
-        </Text>
-      </Pressable>
+        </BotonSecundario>
+      </View>
 
       {declarar.error && <Falla>{declarar.error.message}</Falla>}
     </ScrollView>

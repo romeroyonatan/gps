@@ -1,5 +1,5 @@
 import type { Actor, Alcance } from '@gps/core'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import {
   CerrarSesionDocument,
@@ -64,8 +64,6 @@ export function useAlcance(): Alcance | null {
   }
 }
 
-/** Cierra la sesión en el servidor y tira todo el cache: lo que quedó adentro
- *  son datos que esta persona podía ver, y la siguiente puede no poder. */
 /** Mira un enlace de activación o recuperación sin consumirlo, para mostrar a
  *  quién le da acceso antes de que alguien confirme. */
 export function useInvitacion(secreto: string) {
@@ -77,15 +75,31 @@ export function useInvitacion(secreto: string) {
   })
 }
 
+/** Tira lo que quedó de la sesión que se cierra: eran datos que esa persona
+ *  podía ver, y la siguiente puede no poder.
+ *
+ *  No es `clear()`. `clear()` vacía el cache **sin avisarle a los observadores
+ *  montados**: la pantalla se queda con el último resultado en la mano y sigue
+ *  dibujando a quien ya salió. En la web no se notaba porque después recargaba
+ *  la página entera; el teléfono no tiene recarga, así que salir no llevaba al
+ *  login.
+ *
+ *  `resetQueries` sobre `personaActual` sí avisa -la deja en pendiente y vuelve
+ *  a preguntar-, y esa respuesta anónima es la que hace aparecer el login. El
+ *  resto se saca y no se resetea: no hay por qué volver a pedir el padrón de un
+ *  grupo justo cuando se está yendo. */
+export async function limpiarCacheDeSesion(cliente: QueryClient): Promise<void> {
+  await cliente.cancelQueries()
+  cliente.removeQueries({ predicate: (query) => query.queryKey[0] !== 'personaActual' })
+  await cliente.resetQueries({ queryKey: ['personaActual'] })
+}
+
 export function useCerrarSesion() {
   const transporte = useTransporte()
   const clienteDeQueries = useQueryClient()
   return useMutation({
     mutationFn: () => transporte.ejecutar(CerrarSesionDocument),
-    onSuccess: async () => {
-      await clienteDeQueries.cancelQueries()
-      clienteDeQueries.clear()
-    },
+    onSuccess: () => limpiarCacheDeSesion(clienteDeQueries),
   })
 }
 
