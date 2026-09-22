@@ -371,7 +371,7 @@ function Adjuntos(props: { permiso: Permiso; administra: boolean }) {
         ))
       )}
 
-      {props.administra && (
+      {props.administra && props.permiso.estado !== 'anulado' && (
         <View className="mt-1.5 flex-row gap-2">
           <BotonSecundario
             onPress={async () => {
@@ -415,6 +415,7 @@ function Detalle(props: {
   grupoId: string
   actor: Actor
   firmantes: readonly FirmanteRequerido[]
+  fueReEmitido: boolean
 }) {
   const { permiso } = props
   const emitir = useEmitirPermiso()
@@ -477,13 +478,16 @@ function Detalle(props: {
         )}
         {/* Ver y bajar son la misma cosa en el teléfono: el visor del sistema
             abre el PDF y desde ahí se guarda o se manda. */}
-        {permiso.estado !== 'borrador' && (
+        {permiso.pdfId && (
           <BotonSecundario onPress={() => Linking.openURL(`${origen}/permisos/${permiso.id}/pdf`)}>
             Ver PDF
           </BotonSecundario>
         )}
-        {permiso.estado === 'anulado' && administra && (
-          <BotonSecundario onPress={() => reEmitir.mutate({ permisoId: permiso.id })}>
+        {permiso.estado === 'anulado' && permiso.pdfId && !props.fueReEmitido && administra && (
+          <BotonSecundario
+            disabled={reEmitir.isPending}
+            onPress={() => reEmitir.mutate({ permisoId: permiso.id })}
+          >
             Re-emitir
           </BotonSecundario>
         )}
@@ -500,10 +504,10 @@ function Detalle(props: {
       <Falla>{(emitir.error ?? anular.error ?? reEmitir.error)?.message}</Falla>
 
       {/* Lo menos frecuente, al final y chiquito. */}
-      {(permiso.estado === 'emitido' || permiso.estado === 'firmado') && administra && (
+      {permiso.estado !== 'anulado' && administra && (
         <View className="mt-3">
           <AccionAlMargen onPress={() => anular.mutate({ permisoId: permiso.id })}>
-            Anular permiso
+            Anular {permiso.estado === 'borrador' ? 'borrador' : 'permiso'}
           </AccionAlMargen>
         </View>
       )}
@@ -540,7 +544,15 @@ export default function Pantalla() {
       )}
 
       {permiso && actor && (
-        <Detalle permiso={permiso} grupoId={id} actor={actor} firmantes={firmantes} />
+        <Detalle
+          permiso={permiso}
+          grupoId={id}
+          actor={actor}
+          firmantes={firmantes}
+          fueReEmitido={
+            consulta.data?.permisos.some((uno) => uno.reemplazaA === permiso.id) ?? false
+          }
+        />
       )}
     </ScrollView>
   )

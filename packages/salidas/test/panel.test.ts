@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { type PermisoDelPanel, repartirSalidas } from '../src/dominio/panel'
+import { categoriaDeSalida, type PermisoDelPanel, repartirSalidas } from '../src/dominio/panel'
 
 const HOY = '2026-09-20'
 
@@ -19,6 +19,15 @@ function permiso(
 }
 
 const soyJefeDeGrupo = (cargo: string) => cargo === 'jefeDeGrupo'
+
+describe('categoriaDeSalida', () => {
+  test('separa las actuales, las finalizadas y las anuladas', () => {
+    expect(categoriaDeSalida({ estado: 'anulado', hasta: '2026-10-01' }, HOY)).toBe('anuladas')
+    expect(categoriaDeSalida({ estado: 'firmado', hasta: '2026-09-19' }, HOY)).toBe('finalizadas')
+    expect(categoriaDeSalida({ estado: 'firmado', hasta: HOY }, HOY)).toBe('actuales')
+    expect(categoriaDeSalida({ estado: 'borrador', hasta: '2026-10-01' }, HOY)).toBe('actuales')
+  })
+})
 
 describe('repartirSalidas', () => {
   test('un emitido con mi firma pendiente espera mi firma', () => {

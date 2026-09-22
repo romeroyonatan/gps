@@ -145,8 +145,8 @@ describe('puedeTransicionar', () => {
     expect(puedeTransicionar('emitido', 'firmado')).toBe(true)
   })
 
-  test('un borrador no se anula: se borra o se deja', () => {
-    expect(puedeTransicionar('borrador', 'anulado')).toBe(false)
+  test('un borrador se puede anular', () => {
+    expect(puedeTransicionar('borrador', 'anulado')).toBe(true)
   })
 
   test('emitido y firmado si se anulan', () => {

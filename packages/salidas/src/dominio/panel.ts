@@ -10,6 +10,18 @@ export interface PermisoDelPanel {
   readonly firmas: readonly { readonly cargo: TipoDeCargo; readonly firmada: boolean }[]
 }
 
+export type CategoriaDeSalida = 'actuales' | 'finalizadas' | 'anuladas'
+
+/** Una salida que termina hoy sigue en la lista habitual porque todavía está
+ *  en curso. Lo anulado queda aparte aunque su fecha ya haya pasado. */
+export function categoriaDeSalida(
+  permiso: { readonly estado: Estado; readonly hasta: string },
+  hoy: string,
+): CategoriaDeSalida {
+  if (permiso.estado === 'anulado') return 'anuladas'
+  return permiso.hasta < hoy ? 'finalizadas' : 'actuales'
+}
+
 /** Cómo se reparten las salidas de un grupo: lo que espera una firma de quien
  *  mira, lo que espera la de otro, y lo firmado que todavía no pasó.
  *

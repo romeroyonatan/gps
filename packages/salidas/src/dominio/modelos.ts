@@ -4,8 +4,8 @@ import type { TipoDeCargo, TipoDeDocumento } from '@gps/personas/dominio'
 /** Por donde pasa un permiso de salida.
  *
  *      borrador --emitir--> emitido --3/3 firmas--> firmado
- *                              |                       |
- *                              +-------> anulado <-----+
+ *          |                   |                       |
+ *          +-------------------+-------> anulado <-----+
  *
  *  Emitido y firmado no se editan: lo que se firmo tiene que seguir diciendo lo
  *  mismo. Cambiar algo es anular y re-emitir. */

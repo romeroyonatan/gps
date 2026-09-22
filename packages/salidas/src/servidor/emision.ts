@@ -201,8 +201,17 @@ export function crearOperacionesDeEmision(
      *  permiso que recuerda de cual salio. */
     async reEmitir(permisoId: string): Promise<Permiso> {
       const anulado = borradores.permisoDe(permisoId)
-      if (anulado.estado !== 'anulado') {
-        throw new PermisoNoEditable('Solo se re-emite un permiso anulado.')
+      if (anulado.estado !== 'anulado' || anulado.pdfId === null) {
+        throw new PermisoNoEditable('Solo se re-emite un permiso emitido y anulado.')
+      }
+      if (
+        core.bd
+          .select({ id: permisos.id })
+          .from(permisos)
+          .where(eq(permisos.reemplazaA, permisoId))
+          .get()
+      ) {
+        throw new PermisoNoEditable('Este permiso ya fue re-emitido.')
       }
 
       const ahora = core.reloj.ahora()
