@@ -463,6 +463,7 @@ function Detalle(props: {
   distritoId: string | undefined
   actor: Actor | null
   administra: boolean
+  fueReEmitido: boolean
 }) {
   const { permiso } = props
   const emitir = useEmitirPermiso()
@@ -547,7 +548,7 @@ function Detalle(props: {
             Emitir permiso
           </button>
         )}
-        {permiso.estado !== 'borrador' && (
+        {permiso.pdfId && (
           <>
             <Bajar href={`/permisos/${permiso.id}/pdf`} nuevaPestaña>
               Ver PDF
@@ -559,16 +560,20 @@ function Detalle(props: {
             <Bajar href={`/permisos/${permiso.id}/pdf?descargar`}>Descargar para imprimir</Bajar>
           </>
         )}
-        {permiso.estado === 'anulado' && props.administra && (
-          <button
-            type="button"
-            onClick={() => reEmitir.mutate({ permisoId: permiso.id })}
-            className={BOTON_SECUNDARIO}
-          >
-            Re-emitir
-          </button>
-        )}
-        {props.administra && (
+        {permiso.estado === 'anulado' &&
+          permiso.pdfId &&
+          !props.fueReEmitido &&
+          props.administra && (
+            <button
+              type="button"
+              disabled={reEmitir.isPending}
+              onClick={() => reEmitir.mutate({ permisoId: permiso.id })}
+              className={BOTON_SECUNDARIO}
+            >
+              Re-emitir
+            </button>
+          )}
+        {props.administra && permiso.estado !== 'anulado' && (
           <label className={`${BOTON_SECUNDARIO} cursor-pointer`}>
             Adjuntar
             {/* Mas ancho que el de la firma en papel: una planificacion puede ser
@@ -641,13 +646,14 @@ function Detalle(props: {
       {/* Lo menos frecuente, al final y chiquito: el mismo criterio que
           "declarar extraordinaria" en afiliacion. Firmar no se deshace desde
           acá: si hay un error, se anula y se re-emite. */}
-      {props.administra && (permiso.estado === 'emitido' || permiso.estado === 'firmado') && (
+      {props.administra && permiso.estado !== 'anulado' && (
         <button
           type="button"
+          disabled={anular.isPending}
           onClick={() => anular.mutate({ permisoId: permiso.id })}
           className={`${BOTON_AL_MARGEN} mt-3`}
         >
-          Anular permiso
+          Anular {permiso.estado === 'borrador' ? 'borrador' : 'permiso'}
         </button>
       )}
     </>
@@ -686,6 +692,7 @@ export function Salida(props: { grupoId: string; permisoId: string }) {
       distritoId={distrito?.id}
       actor={actor}
       administra={actor !== null && puedeAdministrarPermisosDelGrupo(actor, props.grupoId)}
+      fueReEmitido={consulta.data?.permisos.some((uno) => uno.reemplazaA === permiso.id) ?? false}
     />
   )
 }

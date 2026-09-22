@@ -207,7 +207,7 @@ export function contenidoDelPermiso(datos: {
 /** Que transiciones existen. Tenerlas en una tabla y no repartidas en ifs es lo
  *  que hace que se puedan leer de una: lo que no esta aca, no pasa. */
 const TRANSICIONES: Readonly<Record<Estado, readonly Estado[]>> = {
-  borrador: ['emitido'],
+  borrador: ['emitido', 'anulado'],
   // A firmado llega solo, cuando entra la tercera firma.
   emitido: ['firmado', 'anulado'],
   firmado: ['anulado'],
