@@ -2,8 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AsignarCargoDocument,
   type AsignarCargoMutationVariables,
+  CambiarDeUnidadDocument,
+  type CambiarDeUnidadMutationVariables,
   CrearPersonaDocument,
   type CrearPersonaMutationVariables,
+  EditarPersonaDocument,
+  type EditarPersonaMutationVariables,
   IntegrarEquipoDocument,
   type IntegrarEquipoMutationVariables,
   JefesDeGruposDocument,
@@ -49,6 +53,28 @@ export function useCrearPersona() {
   return useMutation({
     mutationFn: (variables: CrearPersonaMutationVariables) =>
       transporte.ejecutar(CrearPersonaDocument, variables),
+    onSuccess: () => clienteDeQueries.invalidateQueries({ queryKey: ['personas'] }),
+  })
+}
+
+/** Corregir los datos y pasar de unidad invalidan lo mismo que el alta: la
+ *  nomina del grupo es de donde salen las dos pantallas que los muestran. */
+export function useEditarPersona() {
+  const transporte = useTransporte()
+  const clienteDeQueries = useQueryClient()
+  return useMutation({
+    mutationFn: (variables: EditarPersonaMutationVariables) =>
+      transporte.ejecutar(EditarPersonaDocument, variables),
+    onSuccess: () => clienteDeQueries.invalidateQueries({ queryKey: ['personas'] }),
+  })
+}
+
+export function useCambiarDeUnidad() {
+  const transporte = useTransporte()
+  const clienteDeQueries = useQueryClient()
+  return useMutation({
+    mutationFn: (variables: CambiarDeUnidadMutationVariables) =>
+      transporte.ejecutar(CambiarDeUnidadDocument, variables),
     onSuccess: () => clienteDeQueries.invalidateQueries({ queryKey: ['personas'] }),
   })
 }

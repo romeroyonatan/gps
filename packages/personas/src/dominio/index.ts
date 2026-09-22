@@ -9,7 +9,7 @@ export {
 export type { Categoria } from './categorias'
 export { CATEGORIAS } from './categorias'
 export type { TipoDeDocumento } from './documentos'
-export { nombreDelTipo, normalizarNumero, TIPOS_DE_DOCUMENTO } from './documentos'
+export { nombreDelTipo, normalizarNumero, paraMarcar, TIPOS_DE_DOCUMENTO } from './documentos'
 export type { Equipo, IntegranteDeEquipo, TipoDeEquipo } from './equipos'
 export { TIPOS_DE_EQUIPO } from './equipos'
 export type { DatosDePersona, Persona } from './modelos'
@@ -32,4 +32,9 @@ export type {
   PersonaConVinculos,
   Pertenencia,
 } from './vinculos'
-export { estaVigente, estaVigenteParaAcceso } from './vinculos'
+export {
+  estaVigente,
+  estaVigenteParaAcceso,
+  puedeCambiarDeUnidad,
+  validarCambioDeUnidad,
+} from './vinculos'

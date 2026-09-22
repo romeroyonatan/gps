@@ -35,3 +35,14 @@ export function nombreDelTipo(tipo: TipoDeDocumento): string {
 export function normalizarNumero(numero: string): string {
   return numero.replace(/[\s.-]/g, '').toUpperCase()
 }
+
+/** El teléfono como lo espera un enlace `tel:`: sólo dígitos y un `+` inicial.
+ *  "11 5555-1234" con espacios y guiones no siempre marca, y el número se
+ *  guarda como lo escribe la gente. Vive acá, en /dominio, porque lo usan las
+ *  dos apps y ninguna puede tener su propia versión. */
+export function paraMarcar(telefono: string): string {
+  const limpio = telefono.replace(/[^\d+]/g, '')
+  return limpio.startsWith('+')
+    ? `+${limpio.slice(1).replace(/\+/g, '')}`
+    : limpio.replace(/\+/g, '')
+}

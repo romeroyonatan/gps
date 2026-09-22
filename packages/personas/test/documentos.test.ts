@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test'
-import { nombreDelTipo, normalizarNumero, TIPOS_DE_DOCUMENTO } from '../src/dominio/documentos'
+import {
+  nombreDelTipo,
+  normalizarNumero,
+  paraMarcar,
+  TIPOS_DE_DOCUMENTO,
+} from '../src/dominio/documentos'
 
 describe('catalogo TIPOS_DE_DOCUMENTO', () => {
   test('tiene DNI y pasaporte, en ese orden', () => {
@@ -31,5 +36,17 @@ describe('normalizarNumero', () => {
 
   test('un numero ya limpio no cambia', () => {
     expect(normalizarNumero('30111222')).toBe('30111222')
+  })
+})
+
+describe('paraMarcar', () => {
+  test('saca espacios, guiones y paréntesis', () => {
+    expect(paraMarcar('11 5555-1234')).toBe('1155551234')
+    expect(paraMarcar('(011) 4555.1234')).toBe('01145551234')
+  })
+
+  test('conserva el + del prefijo internacional, y sólo ése', () => {
+    expect(paraMarcar('+54 9 11 5555-1234')).toBe('+5491155551234')
+    expect(paraMarcar('11+5555')).toBe('115555')
   })
 })

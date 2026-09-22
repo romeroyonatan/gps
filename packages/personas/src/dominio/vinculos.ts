@@ -1,9 +1,10 @@
 import type { Marcas } from '@gps/core'
-import { aFechaDeCalendario } from '@gps/core/fechas'
+import { aFechaDeCalendario, esFechaDeCalendario } from '@gps/core/fechas'
 import type { TipoDeCargo } from './cargos'
 import type { Categoria } from './categorias'
 import type { IntegranteDeEquipo, TipoDeEquipo } from './equipos'
 import type { Persona } from './modelos'
+import type { Problema } from './validaciones'
 
 /** La pertenencia de una persona a un grupo. Es un hecho propio y continuo, con
  *  alta y baja en cualquier momento: no se deriva de la afiliacion, que es
@@ -82,6 +83,62 @@ export type DatosDeCargo = Omit<
 export interface DatosDeIngreso
   extends Omit<Pertenencia, 'id' | 'personaId' | 'hasta' | keyof Marcas> {
   readonly cargos: readonly DatosDeCargo[]
+}
+
+/** Si la persona puede cambiar de unidad por la pantalla de cambio de rama.
+ *
+ *  Solo los activos: el pase de un beneficiario de una rama a la siguiente es
+ *  una ceremonia, y va a tener su propia pantalla. Un adherente no esta en
+ *  ninguna unidad, que es justo lo que lo define.
+ *
+ *  Toma lo minimo de la pertenencia y no la Pertenencia entera para que sirva
+ *  sobre lo que devuelve una query de GraphQL. */
+export function puedeCambiarDeUnidad(pertenencia: Pick<Pertenencia, 'categoria'>): boolean {
+  return pertenencia.categoria === 'activo'
+}
+
+/** Las reglas del cambio de unidad de un dirigente, con la misma forma que
+ *  `validarIngreso`: pura, con las unidades abiertas y el `hoy` por parametro,
+ *  y corriendo en los dos lados.
+ *
+ *  La fecha tiene que ser posterior al `desde` de la pertenencia vigente -si no,
+ *  la que se cierra naceria terminada- y no futura, porque el indice parcial de
+ *  la tabla se apoya en que `hasta IS NULL` y "vigente" sean lo mismo. */
+export function validarCambioDeUnidad(
+  pertenencia: Pick<Pertenencia, 'categoria' | 'unidadId' | 'desde'>,
+  unidadId: string,
+  desde: string,
+  unidadesAbiertas: readonly { id: string }[],
+  hoy: Date,
+): readonly Problema[] {
+  const problemas: Problema[] = []
+
+  if (!puedeCambiarDeUnidad(pertenencia)) {
+    problemas.push({
+      campo: 'unidad',
+      mensaje: 'Sólo los dirigentes cambian de unidad por acá.',
+    })
+  } else if (pertenencia.unidadId === unidadId) {
+    problemas.push({ campo: 'unidad', mensaje: 'Ya está en esa unidad.' })
+  } else if (!unidadesAbiertas.some((unidad) => unidad.id === unidadId)) {
+    problemas.push({ campo: 'unidad', mensaje: 'El grupo no tiene abierta esa unidad.' })
+  }
+
+  if (!esFechaDeCalendario(desde)) {
+    problemas.push({
+      campo: 'desde',
+      mensaje: 'La fecha del cambio tiene que ser una fecha real, con formato aaaa-mm-dd.',
+    })
+  } else if (desde > aFechaDeCalendario(hoy)) {
+    problemas.push({ campo: 'desde', mensaje: 'La fecha del cambio no puede ser futura.' })
+  } else if (desde <= pertenencia.desde) {
+    problemas.push({
+      campo: 'desde',
+      mensaje: `El cambio tiene que ser posterior al ${pertenencia.desde}, que es desde cuándo está en la unidad actual.`,
+    })
+  }
+
+  return problemas
 }
 
 /** Si el vinculo esta vigente el dia `hoy`, con las dos puntas incluidas.

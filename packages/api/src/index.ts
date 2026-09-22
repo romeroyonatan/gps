@@ -28,7 +28,9 @@ export type {
 } from './generated/graphql'
 export {
   useAsignarCargo,
+  useCambiarDeUnidad,
   useCrearPersona,
+  useEditarPersona,
   useIntegrarEquipo,
   useJefesDeGrupos,
   usePersonasDelGrupo,
