@@ -22,6 +22,7 @@ import equiposYRevocacion from '../../migraciones/0006_equipos_y_revocacion.sql'
 import eventosDeAutoridad from '../../migraciones/0007_eventos_de_autoridad.sql' with {
   type: 'text',
 }
+import datosPersonales from '../../migraciones/0008_datos-personales.sql' with { type: 'text' }
 
 /** Las migraciones del modulo, en orden. Agregar una es generarla con
  *  `bunx drizzle-kit generate --name <x>` y sumarle una linea a esta lista.
@@ -38,4 +39,5 @@ export const migraciones: readonly Migracion[] = [
   { nombre: '0005_baja_grupo_de_cargo', sql: bajaGrupoDeCargo },
   { nombre: '0006_equipos_y_revocacion', sql: equiposYRevocacion },
   { nombre: '0007_eventos_de_autoridad', sql: eventosDeAutoridad },
+  { nombre: '0008_datos-personales', sql: datosPersonales },
 ]

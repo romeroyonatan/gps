@@ -177,9 +177,9 @@ export function crearOperacionesDeBorrador(core: Core, personas: Personas, estru
       return permisoDe(permisoId)
     },
 
-    /** Reemplaza las unidades que van. Reemplaza y no agrega porque es lo que
-     *  hace la pantalla: se marcan y desmarcan casillas y se guarda el
-     *  resultado.
+    /** Reemplaza las unidades que van y anota a toda la gente de las que se
+     *  acaban de elegir. Después se quita sólo a quien no viaja: en un
+     *  campamento grande es mucho menos trabajo que marcar a todos de a uno.
      *
      *  Quita tambien a los participantes que quedaron fuera de las unidades
      *  elegidas: si no, desmarcar una tropa dejaria a su gente en la lista y el
@@ -199,11 +199,16 @@ export function crearOperacionesDeBorrador(core: Core, personas: Personas, estru
 
       const ahora = core.reloj.ahora()
       const elegidas = [...new Set(unidadIds)]
-      const admitidos = new Set(
-        (await quienesPuedenIr(permiso.grupoId, permiso.desde, elegidas)).map(
-          (uno) => uno.persona.id,
-        ),
-      )
+      const anteriores = new Set(unidadesElegidas(permisoId))
+      const puedenIr = await quienesPuedenIr(permiso.grupoId, permiso.desde, elegidas)
+      const admitidos = new Set(puedenIr.map((uno) => uno.persona.id))
+      const aAgregar =
+        elegidas.length === 0
+          ? []
+          : puedenIr.filter(
+              (uno) =>
+                uno.pertenencia.unidadId !== null && !anteriores.has(uno.pertenencia.unidadId),
+            )
 
       core.bd.transaction((tx) => {
         tx.delete(unidadesDelPermiso).where(eq(unidadesDelPermiso.permisoId, permisoId)).run()
@@ -224,6 +229,21 @@ export function crearOperacionesDeBorrador(core: Core, personas: Personas, estru
           tx.delete(participantes)
             .where(
               and(eq(participantes.permisoId, permisoId), inArray(participantes.personaId, sobran)),
+            )
+            .run()
+        }
+
+        const yaPuestos = new Set(puestos)
+        const faltan = aAgregar.filter((uno) => !yaPuestos.has(uno.persona.id))
+        if (faltan.length > 0) {
+          tx.insert(participantes)
+            .values(
+              faltan.map((uno) => ({
+                permisoId,
+                personaId: uno.persona.id,
+                marca: marcaSegunCategoria(uno.categoria),
+                creadoEn: ahora,
+              })),
             )
             .run()
         }
@@ -254,6 +274,7 @@ export function crearOperacionesDeBorrador(core: Core, personas: Personas, estru
           marca: marcaSegunCategoria(suyo.categoria),
           creadoEn: core.reloj.ahora(),
         })
+        .onConflictDoNothing()
         .run()
     },
 

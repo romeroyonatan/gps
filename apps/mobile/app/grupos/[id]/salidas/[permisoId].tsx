@@ -23,6 +23,7 @@ import { nombreCompleto } from '@gps/personas/dominio'
 import {
   avisoDeAnticipacion,
   candidatos,
+  cuentaRegresivaDeSalida,
   type FirmanteRequerido,
   firmantesRequeridos,
   marcaSegunCategoria,
@@ -420,7 +421,8 @@ function Detalle(props: {
   const anular = useAnularPermiso()
   const reEmitir = useReEmitirPermiso()
   const { origen } = useTransporte()
-  const aviso = avisoDeAnticipacion(aFechaDeCalendario(new Date()), permiso.desde)
+  const hoy = aFechaDeCalendario(new Date())
+  const aviso = avisoDeAnticipacion(hoy, permiso.desde)
   const administra = puedeAdministrarPermisosDelGrupo(props.actor, props.grupoId)
 
   const estado = estadoDelPermiso(permiso, miFirmaPendiente(permiso, props.actor, props.firmantes))
@@ -428,7 +430,7 @@ function Detalle(props: {
   return (
     <>
       <Titulo
-        acompaña={`${permiso.desde} a ${permiso.hasta}${
+        acompaña={`${permiso.desde} a ${permiso.hasta} · ${cuentaRegresivaDeSalida(hoy, permiso.desde)}${
           permiso.comoSeViaja ? ` · ${permiso.comoSeViaja}` : ''
         }`}
       >

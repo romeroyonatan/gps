@@ -125,7 +125,7 @@ const DIOCESIS: readonly {
  *  El grueso va al grupo 42, que tiene las seis ramas abiertas: es el que
  *  ejercita la pantalla llena. El 88 queda sin nadie a proposito. */
 const PERSONAS: readonly {
-  datos: DatosDePersona
+  datos: Omit<DatosDePersona, 'domicilio' | 'telefonoDeContacto'>
   numeroDeGrupo: number
   categoria: Categoria
   rama: Rama | null
@@ -454,13 +454,21 @@ export async function sembrarEscenario(ctx: Context, ahora: Date): Promise<void>
     if (persona.rama !== null && !suya) {
       throw new Error(`El grupo ${persona.numeroDeGrupo} no tiene unidad de ${persona.rama}.`)
     }
-    const creada = await ctx.personas.crearPersona(alcanceSinLimites(), persona.datos, {
-      grupoId: grupo.id,
-      categoria: persona.categoria,
-      unidadId: suya?.id ?? null,
-      desde: persona.desde,
-      cargos: persona.cargos ?? [],
-    })
+    const creada = await ctx.personas.crearPersona(
+      alcanceSinLimites(),
+      {
+        ...persona.datos,
+        domicilio: 'Av. Siempre Viva 742',
+        telefonoDeContacto: '11 5555-1234',
+      },
+      {
+        grupoId: grupo.id,
+        categoria: persona.categoria,
+        unidadId: suya?.id ?? null,
+        desde: persona.desde,
+        cargos: persona.cargos ?? [],
+      },
+    )
 
     // Aparte del alta: el ambito de estos no es el grupo al que ingresa. El
     // catalogo dice cual es, y de ahi sale a que entidad apuntan.

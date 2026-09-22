@@ -10,6 +10,14 @@ function diasEntre(desde: string, hasta: string): number {
   return Math.round((Date.parse(`${hasta}T00:00:00Z`) - Date.parse(`${desde}T00:00:00Z`)) / UN_DIA)
 }
 
+/** La cuenta corta para la lista de salidas. */
+export function cuentaRegresivaDeSalida(hoy: string, desde: string): string {
+  const faltan = diasEntre(hoy, desde)
+  if (faltan === 0) return 'Sale hoy'
+  if (faltan < 0) return `Empezó hace ${Math.abs(faltan)} ${faltan === -1 ? 'día' : 'días'}`
+  return `Faltan ${faltan} ${faltan === 1 ? 'día' : 'días'}`
+}
+
 /** El aviso de que se esta emitiendo tarde, o null si hay tiempo de sobra.
  *
  *  Avisa y no impide: el numero es provisorio (ver config.ts) y una salida que

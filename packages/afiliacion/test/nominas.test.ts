@@ -14,6 +14,8 @@ function miembro(personaId: string, grupoId: string): MiembroActivo {
       nombres: personaId,
       apellidos: 'Prueba',
       fechaDeNacimiento: '1950-01-01',
+      domicilio: 'Av. Siempre Viva 742',
+      telefonoDeContacto: '11 5555-1234',
       creadoEn: HORA,
       actualizadoEn: HORA,
     },

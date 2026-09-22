@@ -104,17 +104,21 @@ describe('responsable a cargo', () => {
     const { servicio } = montar()
     const permiso = await servicio.crearPermiso(alcanceSinLimites(), GRUPO_ID, datos)
     await servicio.elegirUnidades(alcanceSinLimites(), permiso.id, [TROPA])
-    await servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_jefe')
     expect(servicio.emitir(alcanceSinLimites(), permiso.id)).rejects.toThrow(PermisoInvalido)
   })
 })
 
 describe('unidades que participan', () => {
-  test('quedan registradas las elegidas y no las otras', async () => {
+  test('quedan registradas las elegidas y se anota automáticamente a toda su gente', async () => {
     const { servicio } = montar()
     const permiso = await servicio.crearPermiso(alcanceSinLimites(), GRUPO_ID, datos)
     await servicio.elegirUnidades(alcanceSinLimites(), permiso.id, [TROPA])
     expect(servicio.unidadesElegidas(permiso.id)).toEqual([TROPA])
+    expect(
+      (await servicio.listarParticipantes(alcanceSinLimites(), permiso.id))
+        .map((uno) => uno.personaId)
+        .sort(),
+    ).toEqual(['persona_chico', 'persona_jefe'])
   })
 
   test('una unidad de otro grupo se rechaza', async () => {
@@ -130,9 +134,12 @@ describe('unidades que participan', () => {
     const { servicio } = montar()
     const permiso = await servicio.crearPermiso(alcanceSinLimites(), GRUPO_ID, datos)
     await servicio.elegirUnidades(alcanceSinLimites(), permiso.id, [TROPA, MANADA])
-    await servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_lobato')
     await servicio.elegirUnidades(alcanceSinLimites(), permiso.id, [TROPA])
-    expect(await servicio.listarParticipantes(alcanceSinLimites(), permiso.id)).toEqual([])
+    expect(
+      (await servicio.listarParticipantes(alcanceSinLimites(), permiso.id)).some(
+        (uno) => uno.personaId === 'persona_lobato',
+      ),
+    ).toBeFalse()
   })
 })
 
@@ -172,12 +179,15 @@ describe('participantes', () => {
     expect((await servicio.listarParticipantes(alcanceSinLimites(), permiso.id)).length).toBe(3)
   })
 
-  test('la misma persona dos veces se rechaza', async () => {
+  test('agregar de nuevo a la misma persona no la duplica', async () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
+    await servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_chico')
     expect(
-      servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_chico'),
-    ).rejects.toThrow()
+      (await servicio.listarParticipantes(alcanceSinLimites(), permiso.id)).filter(
+        (uno) => uno.personaId === 'persona_chico',
+      ),
+    ).toHaveLength(1)
   })
 
   test('quitar saca de la lista', async () => {
@@ -205,7 +215,8 @@ describe('emitir', () => {
     const { servicio } = montar()
     const permiso = await servicio.crearPermiso(alcanceSinLimites(), GRUPO_ID, datos)
     await servicio.elegirUnidades(alcanceSinLimites(), permiso.id, [TROPA])
-    await servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_chico')
+    await servicio.quitarParticipante(alcanceSinLimites(), permiso.id, 'persona_jefe')
+    await servicio.quitarParticipante(alcanceSinLimites(), permiso.id, 'persona_cocinera')
     expect(servicio.emitir(alcanceSinLimites(), permiso.id)).rejects.toThrow(PermisoInvalido)
   })
 

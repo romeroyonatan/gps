@@ -52,6 +52,8 @@ export const persona = (id: string, apellidos: string): Persona => ({
   nombres: 'Nombre',
   apellidos,
   fechaDeNacimiento: '2010-05-01',
+  domicilio: 'Av. Siempre Viva 742',
+  telefonoDeContacto: '11 5555-1234',
   creadoEn: HORA,
   actualizadoEn: HORA,
 })
@@ -219,8 +221,6 @@ export async function permisoConGente(servicio: ServicioDeSalidas) {
     comoSeViaja: 'Micro contratado',
   })
   await servicio.elegirUnidades(alcanceSinLimites(), permiso.id, [TROPA])
-  await servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_jefe')
-  await servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_chico')
   await servicio.elegirResponsable(alcanceSinLimites(), permiso.id, 'persona_jefe')
   return permiso
 }

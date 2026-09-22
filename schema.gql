@@ -121,9 +121,11 @@ Los datos que necesita el alta de una persona.
 """
 input DatosDePersona {
   apellidos: String!
+  domicilio: String!
   fechaDeNacimiento: String!
   nombres: String!
   numeroDeDocumento: String!
+  telefonoDeContacto: String!
   tipoDeDocumento: TipoDeDocumento!
 }
 
@@ -500,6 +502,7 @@ type Persona {
   Todos, también los vencidos: la vigencia la decide el cliente.
   """
   cargos: [Cargo!]!
+  domicilio: String!
 
   """
   Los equipos que integra hoy. Secretaría no es un cargo: es esto.
@@ -514,6 +517,7 @@ type Persona {
   nombres: String!
   numeroDeDocumento: String!
   pertenencia: Pertenencia!
+  telefonoDeContacto: String!
   tipoDeDocumento: TipoDeDocumento!
 }
 

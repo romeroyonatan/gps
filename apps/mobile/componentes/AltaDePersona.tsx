@@ -24,6 +24,8 @@ const VACIO: DatosDePersona = {
   nombres: '',
   apellidos: '',
   fechaDeNacimiento: '',
+  domicilio: '',
+  telefonoDeContacto: '',
 }
 
 export function AltaDePersona(props: {
@@ -152,6 +154,28 @@ export function AltaDePersona(props: {
           keyboardType="numbers-and-punctuation"
           value={datos.fechaDeNacimiento}
           onChangeText={(texto) => setDatos({ ...datos, fechaDeNacimiento: texto })}
+        />
+      </Campo>
+
+      <Campo etiqueta="Domicilio" problema={problemaDe('domicilio')}>
+        <TextInput
+          className={CAMPO}
+          value={datos.domicilio}
+          onChangeText={(domicilio) => setDatos({ ...datos, domicilio })}
+          autoComplete="street-address"
+        />
+      </Campo>
+
+      <Campo
+        etiqueta="Teléfono de contacto / emergencias"
+        problema={problemaDe('telefonoDeContacto')}
+      >
+        <TextInput
+          className={CAMPO}
+          value={datos.telefonoDeContacto}
+          onChangeText={(telefonoDeContacto) => setDatos({ ...datos, telefonoDeContacto })}
+          keyboardType="phone-pad"
+          autoComplete="tel"
         />
       </Campo>
 

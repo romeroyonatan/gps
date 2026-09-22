@@ -57,6 +57,13 @@
       "when": 1789777708664,
       "tag": "0007_eventos_de_autoridad",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1790033831963,
+      "tag": "0008_datos-personales",
+      "breakpoints": true
     }
   ]
 }

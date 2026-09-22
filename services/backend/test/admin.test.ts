@@ -79,6 +79,8 @@ describe('bun run admin asignar', () => {
           nombres: 'Ana',
           apellidos: 'Pérez',
           fechaDeNacimiento: '1950-01-01',
+          domicilio: 'Av. Siempre Viva 742',
+          telefonoDeContacto: '11 5555-1234',
         },
         {
           grupoId: (

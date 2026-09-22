@@ -155,6 +155,7 @@ describe('migraciones de estructura', () => {
     vieja.run(sql`INSERT INTO grupos VALUES ('g1', 42, 'Ceferino', 'd1', 0, 0, NULL)`)
     vieja.run(sql`INSERT INTO ramas_del_grupo VALUES ('g1', 'lobatos', 111)`)
     vieja.run(sql`INSERT INTO ramas_del_grupo VALUES ('g1', 'scouts', 222)`)
+    vieja.run(sql`INSERT INTO ramas_del_grupo VALUES ('g1', 'adultos', 333)`)
 
     aplicarMigraciones(coreDePrueba(vieja), [moduloFalso])
 
@@ -162,6 +163,7 @@ describe('migraciones de estructura', () => {
       sql`SELECT id, grupo_id, rama, sexo, nombre, cerrada_en, creado_en FROM unidades ORDER BY rama`,
     )
     expect(filas).toEqual([
+      ['unidad_g1_adultos', 'g1', 'adultos', 'mixta', 'Tropa Scout Adultos', null, 333],
       ['unidad_g1_lobatos', 'g1', 'lobatos', 'mixta', 'Manada', null, 111],
       ['unidad_g1_scouts', 'g1', 'scouts', 'mixta', 'Tropa scout', null, 222],
     ])
@@ -176,6 +178,7 @@ describe('migraciones de estructura', () => {
       '0001_cierre',
       '0002_unidades',
       '0003_baja_ramas_del_grupo',
+      '0004_tropa_scout_adultos',
     ])
   })
 })

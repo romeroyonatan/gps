@@ -83,6 +83,8 @@ function personasFalsas(miembros: readonly Miembro[]): Personas {
               nombres: uno.nombres,
               apellidos: uno.apellidos,
               fechaDeNacimiento: '1950-01-01',
+              domicilio: 'Av. Siempre Viva 742',
+              telefonoDeContacto: '11 5555-1234',
               creadoEn: HORA,
               actualizadoEn: HORA,
             },

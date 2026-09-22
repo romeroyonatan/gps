@@ -35,7 +35,7 @@ describe('catalogo de RAMAS', () => {
       'Tropa scout',
       'Tropa raider',
       'Clan',
-      'Tropa',
+      'Tropa Scout Adultos',
     ])
   })
 })

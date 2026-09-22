@@ -22,6 +22,8 @@ function miembro(
       tipoDeDocumento: 'dni',
       numeroDeDocumento: '40000000',
       fechaDeNacimiento: '2010-01-01',
+      domicilio: 'Av. Siempre Viva 742',
+      telefonoDeContacto: '11 5555-1234',
       creadoEn: new Date(0),
       actualizadoEn: new Date(0),
     },
