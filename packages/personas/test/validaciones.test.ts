@@ -180,6 +180,15 @@ describe('validarIngreso', () => {
     ).toEqual(['desde'])
   })
 
+  test('un cargo que no es del grupo no se puede cargar en el alta', () => {
+    // El alta lo guardaria con el grupo como ambito, y un comisionado de
+    // distrito con un grupo por distrito no es ningun cargo.
+    const cargos = [{ cargo: 'comisionadoDeDistrito' as const, hasta: null }]
+    expect(camposDeIngreso(validarIngreso({ ...ingreso, cargos }, ABIERTAS, HOY_INGRESO))).toEqual([
+      'cargos',
+    ])
+  })
+
   test('el mismo cargo no puede ir dos veces', () => {
     const cargos = [
       { cargo: 'jefeDeRama' as const, hasta: null },

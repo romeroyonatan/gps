@@ -11,7 +11,7 @@ import { aFechaDeCalendario } from '@gps/core/fechas'
 import { estaVigente, nombreCompleto, puedeAdministrarPlantelDeGrupo } from '@gps/personas/dominio'
 import { useLocalSearchParams } from 'expo-router'
 import { Pressable, ScrollView, Share, Text, View } from 'react-native'
-import { AccionAlMargen, Cargando, Chip, Falla, Nota, Titulo, Volver } from '../../../src/ui'
+import { AccionAlMargen, Cargando, Etiqueta, Falla, Nota, Titulo, Volver } from '../../../src/ui'
 
 /** Lo que esta pantalla administra: la jefatura del grupo y su Secretaría.
  *  Son los dos vínculos que conceden acceso, que son los que hay que poder
@@ -114,17 +114,29 @@ export default function Pantalla() {
               <Text className="text-sm font-semibold text-ink">{nombreCompleto(persona)}</Text>
 
               <View className="mt-1.5 flex-row flex-wrap items-center gap-2">
-                {jefatura && <Chip>Jefatura</Chip>}
-                {secretaria && <Chip>Secretaría</Chip>}
-
-                {puede && jefatura && (
-                  <AccionAlMargen
-                    onPress={() => revocarCargo.mutate({ cargoId: jefatura.id })}
-                    disabled={revocarCargo.isPending}
+                {jefatura && (
+                  <Etiqueta
+                    onQuitar={
+                      puede ? () => revocarCargo.mutate({ cargoId: jefatura.id }) : undefined
+                    }
+                    quitando={revocarCargo.isPending}
                   >
-                    Quitar jefatura
-                  </AccionAlMargen>
+                    Jefatura
+                  </Etiqueta>
                 )}
+                {secretaria && (
+                  <Etiqueta
+                    onQuitar={
+                      puede
+                        ? () => revocarEquipo.mutate({ integranteId: secretaria.id })
+                        : undefined
+                    }
+                    quitando={revocarEquipo.isPending}
+                  >
+                    Secretaría
+                  </Etiqueta>
+                )}
+
                 {puede && !jefatura && (
                   <AccionAlMargen
                     disabled={asignar.isPending}
@@ -138,14 +150,6 @@ export default function Pantalla() {
                     }
                   >
                     + Jefatura
-                  </AccionAlMargen>
-                )}
-                {puede && secretaria && (
-                  <AccionAlMargen
-                    onPress={() => revocarEquipo.mutate({ integranteId: secretaria.id })}
-                    disabled={revocarEquipo.isPending}
-                  >
-                    Quitar Secretaría
                   </AccionAlMargen>
                 )}
                 {puede && !secretaria && (

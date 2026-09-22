@@ -257,6 +257,32 @@ export function ChipDeRama(props: { rama: Rama; children?: ReactNode }) {
   )
 }
 
+/** Un hecho que alguien le puso a una persona y le puede sacar: un cargo, un
+ *  equipo. Es un `Chip` con una × al lado; sin `onQuitar` es un `Chip` y nada
+ *  más, que es como se ve cuando quien mira no puede administrar. */
+export function Etiqueta(props: {
+  children: ReactNode
+  onQuitar?: () => void
+  quitando?: boolean
+}) {
+  return (
+    <Chip>
+      {props.children}
+      {props.onQuitar && (
+        <button
+          type="button"
+          onClick={props.onQuitar}
+          disabled={props.quitando}
+          className="text-ink-faint hover:text-danger disabled:opacity-40"
+          aria-label="Quitar"
+        >
+          ×
+        </button>
+      )}
+    </Chip>
+  )
+}
+
 /* ── Plata ──────────────────────────────────────────────────────────────── */
 
 /** Los pesos, escritos igual en todas las pantallas. Sin centavos: la cuota se

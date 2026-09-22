@@ -7,6 +7,8 @@ query Personas($grupoId: ID!) {
     nombres
     apellidos
     fechaDeNacimiento
+    domicilio
+    telefonoDeContacto
     pertenencia {
       categoria
       unidadId
@@ -68,4 +70,12 @@ query JefesDeGrupos($grupoIds: [ID!]!, $fecha: String!) {
     nombres
     apellidos
   }
+}
+
+mutation EditarPersona($personaId: ID!, $datos: DatosDePersona!) {
+  editarPersona(personaId: $personaId, datos: $datos)
+}
+
+mutation CambiarDeUnidad($personaId: ID!, $unidadId: ID!, $desde: String!) {
+  cambiarDeUnidad(personaId: $personaId, unidadId: $unidadId, desde: $desde)
 }

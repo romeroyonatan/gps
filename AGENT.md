@@ -155,7 +155,7 @@ escrita una sola vez —no una librería de propósito general— y ya tiene est
 | `BOTON_SECUNDARIO` | La otra acción: con borde, 44px. También la usa `Bajar`. |
 | `BOTON_AL_MARGEN` | Lo infrecuente y lo que no se deshace: chiquito y al final. |
 | `FILA` | Fila de lista de 56px. Las de 72px, con dos líneas de dato, las escribe cada pantalla. |
-| `Icono` | El único dibujo de la guía: trazos de 1.7 sobre `viewBox` de 24, hereda el color. No hay librería de iconos: un icono nuevo es una constante con sus `d`. |
+| `Icono` | El único dibujo de la guía: trazos de 1.7 sobre `viewBox` de 24, hereda el color. No hay librería de iconos: un icono nuevo es una constante con sus `d`. Ojo: el `className` **reemplaza** al de por omisión, así que el que pases lleva su propio `size-*`, o el SVG se estira hasta llenar la fila. |
 | `CHEVRON` | Los trazos del chevron. Rotado 90° es el que apunta abajo. |
 | `Volver` | El camino de vuelta, siempre arriba del título. |
 | `Titulo` | El título de la pantalla y su único enlace de salida. |
@@ -166,6 +166,7 @@ escrita una sola vez —no una librería de propósito general— y ya tiene est
 | `Campo` | Un control con su etiqueta arriba y su problema debajo. |
 | `Chip` | La píldora de estado, con su texto siempre escrito y el color como refuerzo. |
 | `ChipDeRama` | La etiqueta de rama: el punto de color de 8px adentro de un `Chip`. |
+| `Etiqueta` | Un `Chip` con una × al lado: un cargo o un equipo que se le puede sacar a alguien. Sin `onQuitar` es un `Chip` a secas. |
 | `Falla` / `Aviso` / `Nota` | Salió mal / conviene saberlo / se mira pero no se toca. |
 | `Cargando` / `Vacio` | La consulta no volvió / volvió sin nada. |
 
@@ -267,9 +268,14 @@ emite `AfiliacionDeclarada` después de guardar la foto y Tesorería intenta gen
 cargo sin bloquear la declaración; si falla o falta la cuota, la reconciliación manual
 recupera la deuda pendiente.
 
-Tampoco hay baja ni edición de personas (las columnas `hasta` existen y el historial se
-puede escribir, pero por ahora sólo se llena con altas), ni forma de buscar una persona
-sin saber su grupo (la única consulta es `personas(grupoId: ID!)`). Los cargos **sí**
+Los datos personales **sí** se corrigen, desde la pantalla de detalle de una persona
+(`/grupos/:id/personas/:personaId`): el documento incluido, y un documento que ya tiene
+otra persona se rechaza. Un dirigente también se pasa de unidad desde ahí, y el pase
+cierra la pertenencia vigente la víspera y abre otra, así que una consulta a una fecha
+pasada ve la unidad de ese día. El pase de un beneficiario no: es una ceremonia y llega
+con esa pantalla. Lo que sigue sin haber es baja de personas, cambio de categoría,
+cambio de grupo, edición de un cargo ya cargado, y forma de buscar a alguien sin saber su
+grupo (la única consulta es `personas(grupoId: ID!)`). Los cargos **sí**
 tienen ámbito: `grupo`, `distrito` y `diocesis`, con comisionado de distrito y jefe
 scout diocesano. Un cargo distrital no aparece en ninguna pantalla todavía:
 `listarPersonas` filtra los cargos por el grupo, así que el comisionado sólo se ve como

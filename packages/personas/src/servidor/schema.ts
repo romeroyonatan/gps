@@ -21,14 +21,28 @@ import {
   GrupoInexistente,
 } from './servicio'
 
-/** Un cambio de plantel denegado es un error de negocio, no una caída: la
- *  pantalla tiene que poder decir "no podés nombrar en ese grupo". */
+/** Los errores de negocio del servicio, dichos como los puede mostrar una
+ *  pantalla. Yoga enmascara todo lo que no sea un GraphQLError: sin esta
+ *  traduccion, el formulario recibe "Unexpected error." en vez del motivo.
+ *  Traducir en el resolver y no en el servicio es lo que mantiene al servicio
+ *  sin conocer el framework. */
 async function traduciendo<T>(correr: () => Promise<T>): Promise<T> {
   try {
     return await correr()
   } catch (error) {
     if (error instanceof CambioDeAutoridadDenegado) {
       throw new GraphQLError(error.message, { extensions: { code: error.name } })
+    }
+    if (error instanceof DatosInvalidos) {
+      throw new GraphQLError(error.message, {
+        extensions: { code: 'DATOS_INVALIDOS', problemas: error.problemas },
+      })
+    }
+    if (error instanceof DocumentoDuplicado) {
+      throw new GraphQLError(error.message, { extensions: { code: 'DOCUMENTO_DUPLICADO' } })
+    }
+    if (error instanceof GrupoInexistente) {
+      throw new GraphQLError(error.message, { extensions: { code: 'GRUPO_INEXISTENTE' } })
     }
     throw error
   }
@@ -210,8 +224,8 @@ export function registrarSchema(builder: Builder): void {
         datos: t.arg({ type: DatosDePersonaRef, required: true }),
         ingreso: t.arg({ type: DatosDeIngresoRef, required: true }),
       },
-      resolve: async (_padre, args, contexto) => {
-        try {
+      resolve: async (_padre, args, contexto) =>
+        await traduciendo(async () => {
           // Pothos entrega los campos de lista de un input como array simple,
           // sin el `readonly` que pide DatosDeIngreso: se arma campo por campo
           // en vez de castear el argumento entero.
@@ -226,27 +240,53 @@ export function registrarSchema(builder: Builder): void {
             })),
           }
           return await contexto.personas.crearPersona(alcanceDe(contexto), args.datos, ingreso)
-        } catch (error) {
-          // Yoga enmascara todo lo que no sea un GraphQLError: sin esta
-          // traduccion, el formulario recibe "Unexpected error." en vez del
-          // motivo. Traducir en el resolver y no en el servicio es lo que
-          // mantiene al servicio sin conocer el framework.
-          if (error instanceof DatosInvalidos) {
-            throw new GraphQLError(error.message, {
-              extensions: { code: 'DATOS_INVALIDOS', problemas: error.problemas },
-            })
-          }
-          if (error instanceof DocumentoDuplicado) {
-            throw new GraphQLError(error.message, { extensions: { code: 'DOCUMENTO_DUPLICADO' } })
-          }
-          if (error instanceof GrupoInexistente) {
-            throw new GraphQLError(error.message, { extensions: { code: 'GRUPO_INEXISTENTE' } })
-          }
-          throw error
-        }
-      },
+        }),
     }),
   )
+
+  // Devuelven Boolean y no la persona: la pantalla invalida la nomina del
+  // grupo, que es de donde sale todo lo que muestra. Lo mismo que revocarCargo.
+  builder.mutationField('editarPersona', (t) =>
+    t.boolean({
+      description: 'Corrige los datos personales de alguien del grupo.',
+      args: {
+        personaId: t.arg.id({ required: true }),
+        datos: t.arg({ type: DatosDePersonaRef, required: true }),
+      },
+      resolve: async (_padre, args, contexto) =>
+        await traduciendo(async () => {
+          await contexto.personas.editarPersona(
+            alcanceDe(contexto),
+            String(args.personaId),
+            args.datos,
+          )
+          return true
+        }),
+    }),
+  )
+
+  builder.mutationField('cambiarDeUnidad', (t) =>
+    t.boolean({
+      description:
+        'Pasa a un dirigente a otra unidad de su grupo desde una fecha, conservando el historial.',
+      args: {
+        personaId: t.arg.id({ required: true }),
+        unidadId: t.arg.id({ required: true }),
+        desde: t.arg.string({ required: true }),
+      },
+      resolve: async (_padre, args, contexto) =>
+        await traduciendo(async () => {
+          await contexto.personas.cambiarDeUnidad(
+            alcanceDe(contexto),
+            String(args.personaId),
+            String(args.unidadId),
+            args.desde,
+          )
+          return true
+        }),
+    }),
+  )
+
   /** Las cuatro operaciones de plantel. Todas reciben el actor y no el
    *  alcance: quién puede nombrar a quién es una pregunta de función -jefatura
    *  y Secretaría en su grupo, autoridades diocesanas en la diócesis-, y la

@@ -1,6 +1,6 @@
 import { aFechaDeCalendario, esFechaDeCalendario } from '@gps/core/fechas'
 import type { Unidad } from '@gps/estructura/dominio'
-import { nombreDelCargo, type TipoDeCargo } from './cargos'
+import { ambitoDelCargo, nombreDelCargo, type TipoDeCargo } from './cargos'
 import { normalizarNumero } from './documentos'
 import { calcularEdad, type DatosDePersona } from './modelos'
 import type { DatosDeIngreso } from './vinculos'
@@ -151,6 +151,12 @@ export function validarIngreso(
   const vistos = new Set<TipoDeCargo>()
   for (const cargo of ingreso.cargos) {
     const nombre = nombreDelCargo(cargo.cargo)
+    // El alta carga cargos del grupo al que ingresa: son los unicos cuyo ambito
+    // es ese grupo. Uno de distrito o de diocesis se guardaria con el grupo
+    // como ambito, que es un cargo que no existe.
+    if (ambitoDelCargo(cargo.cargo) !== 'grupo') {
+      problemas.push({ campo: 'cargos', mensaje: `${nombre} no es un cargo del grupo.` })
+    }
     if (vistos.has(cargo.cargo)) {
       problemas.push({ campo: 'cargos', mensaje: `${nombre} está cargado dos veces.` })
     }
