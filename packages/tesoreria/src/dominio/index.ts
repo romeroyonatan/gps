@@ -16,6 +16,7 @@ export {
   puedeVerTesoreriaDeLaDiocesis,
 } from './politicas'
 export {
+  enPesos,
   fechaValida,
   type ImputacionDelPago,
   importeEnPesosValido,

@@ -60,18 +60,15 @@ Ejemplo del final de la cadena: `salidas` —el permiso de salida— depende de 
 firmantes, qué candidatos hay según las unidades elegidas, qué mensaje se sella) y las
 pantallas usan esas mismas funciones; su `/servidor` se parte por caso de uso
 (`borradores.ts`, `emision.ts`, `firmas.ts`, `pdf.ts`, `consultas.ts`) y `servicio.ts` es
-sólo contrato y composición. El permiso lleva dos huellas y no una: `hashDelPdf` es el sha256 del archivo emitido
-—lo que sellan las firmas— y `hashDelContenido` es el hash de `contenidoDelPermiso`, un
-texto canónico de lo que el papel dice. La segunda existe porque la primera no se puede
-imprimir (un archivo no contiene su propio hash) y porque rediagramar el PDF no tiene que
-invalidar lo emitido: se imprime en el pie de cada hoja y se recalcula al bajarlo, y si no
-coincide el PDF sale avisándolo. El número de expediente (`SAL-2026-0147`) es una serie corrida
-por año y de la diócesis entera: se reserva al emitir —antes de dibujar, porque va
-impreso— leyendo el mayor del año y escribiendo el siguiente en una misma transacción, y
-el `UNIQUE (anio, numero)` de la tabla es lo que impide que dos emisiones simultáneas se
-queden con el mismo. Si el PDF falla después, el número queda sin usar: una serie con
-huecos es normal, dos papeles con el mismo número no. El PDF se queda en `/servidor` aunque `pdf-lib` sea isomorfo:
-`/dominio` lo importa el navegador, y un import de valor entraría al bundle de mobile.
+sólo contrato y composición. El permiso lleva dos huellas: `hashDelPdf` es el sha256 del
+archivo emitido —lo que sellan las firmas— y `hashDelContenido` es el hash de
+`contenidoDelPermiso`, un texto canónico de lo que el papel dice. La segunda se imprime en
+cada hoja y permite verificar el contenido aunque se rediagrame el PDF. El número de
+expediente (`SAL-2026-0147`) es una serie corrida por año para toda la diócesis: se reserva
+al emitir dentro de una transacción y `UNIQUE (anio, numero)` evita duplicados. Si falla el
+PDF, el hueco queda; dos papeles con el mismo número, no. El PDF se queda en `/servidor`
+aunque `pdf-lib` sea isomorfo: `/dominio` lo importa el navegador, y un import de valor
+entraría al bundle de mobile.
 
 `archivos`, en cambio, **no se parte**: solicitar, confirmar y descargar son orquestación de
 efectos sin decisión separable, y quedan en su `servicio.ts`. Es el otro lado de la misma
@@ -144,11 +141,9 @@ pantallas grandes, nunca arreglan lo que se rompió en chicas.
 **La web angosta y la app son la misma pantalla.** A ancho de teléfono, `apps/web` tiene
 que verse igual —o lo más parecido posible— que la pantalla equivalente de `apps/mobile`:
 mismo orden de bloques, mismas alturas de fila, mismas píldoras, mismo pie. La mayoría de
-la gente entra por la web del teléfono, así que "está bien en la app" no alcanza: si las
-dos se separan, es un bug de paridad y se arregla en las dos. La forma la manda el
-mockup de mobile —es el diseño más apretado y el que decide qué entra—, y el escritorio
-sólo agrega con `sm:`/`md:` sobre esa base. Cuando toques una pantalla de una app,
-abrí la otra al lado antes de dar por terminado.
+la gente entra por la web del teléfono, así que si las dos se separan es un bug de paridad
+y se arregla en ambas. La forma la manda el mockup de mobile; escritorio sólo agrega con
+`sm:`/`md:`. Cuando toques una pantalla, abrí la otra al lado antes de terminar.
 
 **Piezas de interfaz: mirar `apps/web/src/ui.tsx` antes de escribir markup.** Es la guía
 escrita una sola vez —no una librería de propósito general— y ya tiene esto:
@@ -177,16 +172,16 @@ escrita una sola vez —no una librería de propósito general— y ya tiene est
 El color de rama vive aparte, en `apps/web/src/ramas.ts` (`COLOR_DE_RAMA`), escrito entero
 y no interpolado, porque Tailwind lee las clases del fuente.
 
-Mobile tiene su gemelo en `apps/mobile/componentes/ui.tsx`, con los mismos nombres
-escritos con las primitivas de React Native: `Pantalla` (el marco con el pie fijo),
-`Volver`, `Titulo`, `Filtros`, `Campo`, `CAMPO`, `BotonPrincipal`, `Chip`, `Falla`,
-`Cargando` y `Vacio`. Hoy lo usan las pantallas de tesorería; el resto de mobile sigue
-con clases `slate-*` sueltas y es deuda de paridad conocida. Lo que se comparte entre las
-dos apps son los `/dominio` de los módulos, no la interfaz —React DOM y React Native no
-dibujan con las mismas etiquetas—, así que la paridad se copia a mano y hay que decirlo
-cuando se rompe. Ojo con lo que NativeWind no tiene: `last:`, `first-of-type:` y
-`tabular-nums` no llegan a React Native, así que el borde de la última fila se resuelve
-con el markup y no con una variante.
+Esa tabla es de web. **Mobile tiene su gemela**, con los mismos nombres y las mismas
+decisiones, en `apps/mobile/src/ui.tsx`: el catálogo entero está en
+`apps/mobile/README.md`, junto con lo que es distinto por ser un teléfono (el teclado, el
+color que no se escribe a mano, la falta de `<select>`). Antes de escribir markup en
+mobile, ese README.
+
+Lo que se comparte entre las dos apps son los `/dominio` de los módulos, no la interfaz
+—React DOM y React Native no dibujan con las mismas etiquetas—, así que la paridad se
+copia a mano y hay que decirlo cuando se rompe. Una pieza que existe en las dos se llama
+igual en las dos, aunque el markup sea otro.
 
 **Agregar una pieza nueva es bienvenido**, con una condición: que la misma forma ya esté
 escrita en dos pantallas. Lo que aparece una sola vez se queda en su pantalla —una
@@ -312,12 +307,9 @@ no puede hacerlo porque la dependencia va al revés —no conoce a `personas`—
 otro módulo lo hace tampoco. `afiliacion` la esquiva filtrando por `gruposAbiertosEn` al
 declarar, pero `listarPersonas` de un grupo cerrado sigue devolviendo gente.
 
-También queda, de deuda de paridad: mobile carga la salida con su dirección pero no
-tiene con qué elegir el dirigente a cargo —eso vive sólo en la pantalla `Salida` de web—,
-así que una salida creada desde el teléfono se termina de armar en la web. Y la pantalla `Grupo` de mobile no tiene el estado "no
-hay ningún grupo abierto con esa dirección" que sí tiene la de web
-(`apps/web/src/pantallas/Grupo.tsx`). Quedó a la vista al construir las pantallas de
-afiliación y no se resolvió ahí.
+También queda una deuda de paridad: mobile carga la salida con su dirección pero todavía
+no permite elegir al dirigente responsable, que sí se elige en la pantalla `Salida` de web.
+Una salida creada desde el teléfono se termina de armar en la web.
 
 La base es SQLite por Drizzle y llega a los módulos por `Core.bd`; las migraciones las
 declara cada módulo y las aplica `aplicarMigraciones` al arrancar. Sigue sin haber
