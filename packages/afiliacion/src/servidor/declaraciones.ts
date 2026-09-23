@@ -81,7 +81,11 @@ export function crearOperacionesDeDeclaracion(
     )
   }
 
-  async function declarar(fecha: string, grupoId?: string): Promise<readonly Declaracion[]> {
+  async function declarar(
+    fecha: string,
+    grupoId?: string,
+    actor: Alcance['actor'] | null = null,
+  ): Promise<readonly Declaracion[]> {
     const gruposAbiertos = await estructura.gruposAbiertosEn(fecha)
     const miembrosActivos = await personas.miembrosActivos(fecha)
     const nominas = armarNominasDeclarables(
@@ -132,6 +136,22 @@ export function crearOperacionesDeDeclaracion(
     core.bd.transaction((tx) => {
       tx.insert(declaraciones).values(nuevas).run()
       tx.insert(afiliados).values(filas).run()
+      for (const declaracion of nuevas) {
+        core.auditoria.registrar(
+          {
+            actorPersonaId: actor?.personaId ?? null,
+            origenInterno: actor ? null : 'barridoDeAfiliacion',
+            modulo: 'afiliacion',
+            accion: 'declararAfiliacion',
+            elevado: actor?.estaElevado ?? false,
+            grupoId: declaracion.grupoId,
+            entidadTipo: 'declaracion',
+            entidadId: declaracion.id,
+            resumen: { fecha: declaracion.fecha, periodo: declaracion.periodo },
+          },
+          tx,
+        )
+      }
     })
 
     for (const declaracion of nuevas) {
@@ -184,7 +204,7 @@ export function crearOperacionesDeDeclaracion(
       await declararPendientes()
 
       const hoy = aFechaDeCalendario(core.reloj.ahora())
-      const [declaracion] = await declarar(hoy, grupoId)
+      const [declaracion] = await declarar(hoy, grupoId, alcance.actor)
       if (declaracion) return declaracion
       if (yaDeclararon(hoy).has(grupoId)) throw new YaDeclaroHoy(grupoId)
       throw new NadaQueDeclarar(grupoId)

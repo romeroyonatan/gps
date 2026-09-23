@@ -19,6 +19,10 @@ const particion = almacenPorPersona({
 })
 
 const persister = createAsyncStoragePersister({ storage: particion.almacen, key: 'gps-cache' })
+const queryClient = crearQueryClient()
+const intencionElevada = () =>
+  queryClient.getQueryData<{ personaActual?: { estaElevado: boolean } | null }>(['personaActual'])
+    ?.personaActual?.estaElevado === true
 
 const raiz = document.getElementById('raiz')
 if (!raiz) throw new Error('Falta el elemento #raiz en index.html')
@@ -26,8 +30,8 @@ if (!raiz) throw new Error('Falta el elemento #raiz en index.html')
 createRoot(raiz).render(
   <StrictMode>
     <ProveedorDeApi
-      transporte={transporteHttp('/graphql')}
-      queryClient={crearQueryClient()}
+      transporte={transporteHttp('/graphql', fetch, undefined, intencionElevada)}
+      queryClient={queryClient}
       persister={persister}
     >
       <App particion={particion} />

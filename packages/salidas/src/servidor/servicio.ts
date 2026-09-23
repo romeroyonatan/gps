@@ -1,5 +1,5 @@
 import type { Archivos } from '@gps/archivos/dominio'
-import type { Alcance, Core } from '@gps/core'
+import type { Actor, Alcance, Core } from '@gps/core'
 import type { Estructura } from '@gps/estructura/dominio'
 import type { Personas, TipoDeCargo } from '@gps/personas/dominio'
 import { firmantesRequeridos } from '../dominio/firmas'
@@ -127,10 +127,12 @@ export function crearServicioDeSalidas(
   }
 
   const administrando =
-    <A extends unknown[], R>(operacion: (permisoId: string, ...args: A) => Promise<R>) =>
+    <A extends unknown[], R>(
+      operacion: (actor: Actor, permisoId: string, ...args: A) => Promise<R>,
+    ) =>
     async (alcance: Alcance, permisoId: string, ...args: A): Promise<R> => {
       await exigirAdministrar(alcance, permisoId)
-      return operacion(permisoId, ...args)
+      return operacion(alcance.actor, permisoId, ...args)
     }
 
   const leyendo =
@@ -145,7 +147,7 @@ export function crearServicioDeSalidas(
       if (!puedeAdministrarPermisosDelGrupo(alcance.actor, grupoId)) {
         throw new PermisoFueraDeAlcance()
       }
-      return borradores.crearPermiso(grupoId, datos)
+      return borradores.crearPermiso(alcance.actor, grupoId, datos)
     },
     editarPermiso: administrando(borradores.editarPermiso),
     elegirUnidades: administrando(borradores.elegirUnidades),
@@ -175,7 +177,7 @@ export function crearServicioDeSalidas(
       if (requerido && !puedeFirmarEnLaApp(alcance.actor, requerido)) {
         throw new PermisoFueraDeAlcance()
       }
-      return firmas.firmarEnApp(permisoId, cargo, trazos)
+      return firmas.firmarEnApp(alcance.actor, permisoId, cargo, trazos)
     },
 
     async listarPermisos(alcance, grupoId) {

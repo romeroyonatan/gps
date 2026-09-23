@@ -1,3 +1,4 @@
+import { alcanceDe } from '@gps/core'
 import type { Builder } from '@gps/core/graphql'
 import { GraphQLError } from 'graphql'
 import { SubidaInvalida, SubidaNoAutorizada } from './servicio'
@@ -50,13 +51,16 @@ export function registrarSchema(builder: Builder): void {
       },
       resolve: async (_padre, args, contexto) =>
         await traduciendoErrores(() =>
-          contexto.archivos.solicitarSubida({
-            nombre: args.nombre,
-            tipo: args.tipo,
-            tamano: args.tamano,
-            modulo: args.modulo,
-            recursoId: String(args.recursoId),
-          }),
+          contexto.archivos.solicitarSubida(
+            {
+              nombre: args.nombre,
+              tipo: args.tipo,
+              tamano: args.tamano,
+              modulo: args.modulo,
+              recursoId: String(args.recursoId),
+            },
+            alcanceDe(contexto),
+          ),
         ),
     }),
   )
@@ -67,7 +71,11 @@ export function registrarSchema(builder: Builder): void {
       description: 'Ultimo paso: valida lo recibido y deja el archivo usable.',
       args: { id: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) =>
-        (await traduciendoErrores(() => contexto.archivos.confirmarSubida(String(args.id)))).id,
+        (
+          await traduciendoErrores(() =>
+            contexto.archivos.confirmarSubida(String(args.id), alcanceDe(contexto)),
+          )
+        ).id,
     }),
   )
 }

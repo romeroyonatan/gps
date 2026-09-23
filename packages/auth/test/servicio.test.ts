@@ -36,6 +36,7 @@ function montar() {
     reloj: { ahora: () => ahora },
     bd,
     eventos: crearBusDeEventos(),
+    auditoria: { registrar: () => 'evento_de_auditoria_test' },
     modulos: ['auth'],
     sellador: { sellar: () => ({ sello: '', claveId: '' }), verificar: () => true },
     almacenamiento: {

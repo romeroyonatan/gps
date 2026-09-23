@@ -228,6 +228,35 @@ cualquier módulo futuro puede llegar a usar, y sacarlo después rompe a quien y
 `Estructura` publica un solo método porque es el único que `personas` necesita hoy — el
 resto se agrega cuando aparezca el consumidor real, no antes.
 
+## Auditar las escrituras
+
+Toda escritura que inicia una persona registra su evento **dentro de la misma
+transacción** que el cambio, con `core.auditoria.registrar(datos, tx)`. Si el evento no se
+puede guardar, el cambio tampoco queda. Una operación de una sola sentencia igual se
+envuelve en una transacción corta para eso.
+
+    core.bd.transaction((tx) => {
+      tx.update(permisos).set({ responsableId }).where(...).run()
+      core.auditoria.registrar(
+        {
+          actorPersonaId: alcance.actor.personaId,
+          modulo: 'salidas',
+          accion: 'elegirResponsable',
+          elevado: alcance.actor.estaElevado,
+          grupoId: permiso.grupoId,
+          entidadTipo: 'permiso',
+          entidadId: permiso.id,
+          cambios: [{ campo: 'responsableId', anterior, nuevo: responsableId }],
+        },
+        tx,
+      )
+    })
+
+Una edición guarda `cambios` con anterior y nuevo; un alta o una acción discreta, un
+`resumen` chico. Nunca los argumentos enteros de la mutation: ni secretos, ni tokens, ni
+bytes, ni trazos de firma. Y la mutation nueva se agrega a `ACCIONES_AUDITADAS` en
+`services/backend/src/auditoria.ts`: si no, el test del inventario falla.
+
 ## Las tablas y las migraciones
 
 `sistema` no tiene tablas — por eso sirve de plantilla para todo lo anterior, pero no

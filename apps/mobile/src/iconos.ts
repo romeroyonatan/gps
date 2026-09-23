@@ -23,5 +23,8 @@ export const MONEDA = [
   'M12 6.5v11M14.6 9.6A2.7 2.7 0 0 0 12 8.2c-1.4 0-2.5.8-2.5 1.9s1.1 1.9 2.5 1.9 2.5.8 2.5 1.9-1.1 1.9-2.5 1.9a2.7 2.7 0 0 1-2.6-1.4',
 ] as const
 
+/** Los tres puntos de Más: lo que no entra en la barra. */
+export const ELIPSIS = ['M5 12h.01M12 12h.01M19 12h.01'] as const
+
 /** Abre, cierra y lleva adelante. Rotado 90° es el que apunta abajo. */
 export const CHEVRON = ['m9 18 6-6-6-6'] as const

@@ -33,6 +33,11 @@ const CONSULTA = {
   // biome-ignore lint/suspicious/noExplicitAny: un documento minimo, sin el tipado generado
 } as any
 
+const MUTACION = {
+  ...CONSULTA,
+  definitions: [{ ...CONSULTA.definitions[0], operation: 'mutation' }],
+}
+
 /** El error que el transporte lanza, ya tipado: lo que importa de estos tests
  *  son `noAutenticado` y `sinPermiso`. */
 const comoErrorDeApi = async (correr: () => Promise<unknown>): Promise<ErrorDeApi> => {
@@ -79,6 +84,15 @@ describe('credenciales', () => {
     const { falso, pedidos } = respondiendo({ data: {} })
     await transporteHttp('http://gps.test/graphql', falso, () => null).ejecutar(CONSULTA)
     expect(cabeceras(pedidos[0]).authorization).toBeUndefined()
+  })
+
+  test('marca sólo mutations iniciadas mientras el cliente veía sudo', async () => {
+    const { falso, pedidos } = respondiendo({ data: {} })
+    const transporte = transporteHttp('/graphql', falso, undefined, () => true)
+    await transporte.ejecutar(CONSULTA)
+    await transporte.ejecutar(MUTACION)
+    expect(cabeceras(pedidos[0])['x-gps-intencion-elevada']).toBeUndefined()
+    expect(cabeceras(pedidos[1])['x-gps-intencion-elevada']).toBe('1')
   })
 })
 

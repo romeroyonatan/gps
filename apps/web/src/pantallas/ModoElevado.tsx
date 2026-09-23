@@ -1,5 +1,6 @@
 import { usePersonaActual, useRefrescarSesion } from '@gps/api'
 import { useEffect, useState } from 'react'
+import { Link } from 'wouter'
 import { cuantoFalta } from './cuenta-regresiva'
 import { enlaceDeElevacion } from './Ingreso'
 
@@ -51,7 +52,10 @@ export function ModoElevado(props: { entorno: string }) {
   return (
     <div className="mt-4 rounded-lg bg-warn-soft px-4 py-2.5 text-sm text-warn">
       Modo elevado: ves y modificás toda la diócesis. Vence en {falta}. Todo lo que escribas queda
-      auditado.
+      auditado.{' '}
+      <Link href="/auditoria" className="font-semibold underline">
+        Ver auditoría →
+      </Link>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import type { Afiliacion, Declaracion } from '@gps/afiliacion/dominio'
-import type { Alcance, Core } from '@gps/core'
+import type { Actor, Alcance, Core } from '@gps/core'
 import { eq, isNotNull } from 'drizzle-orm'
 import type {
   MovimientoDeTesoreria,
@@ -24,7 +24,10 @@ export function crearOperacionesDeCargos(core: Core, afiliacion: Afiliacion) {
 
   /** Genera como máximo un cargo por declaración. Es un no-op si ya existe
    * (idempotente ante reintentos y ante la reconciliación manual). */
-  async function generarCargo(declaracion: Declaracion): Promise<MovimientoDeTesoreria | null> {
+  async function generarCargo(
+    declaracion: Declaracion,
+    actor: Actor | null = null,
+  ): Promise<MovimientoDeTesoreria | null> {
     const existente = movimientoPorDeclaracion(declaracion.id)
     if (existente) return existente
 
@@ -59,7 +62,23 @@ export function crearOperacionesDeCargos(core: Core, afiliacion: Afiliacion) {
       creadoEn: ahora,
       actualizadoEn: ahora,
     }
-    core.bd.insert(movimientosDeTesoreria).values(movimiento).onConflictDoNothing().run()
+    core.bd.transaction((tx) => {
+      tx.insert(movimientosDeTesoreria).values(movimiento).onConflictDoNothing().run()
+      core.auditoria.registrar(
+        {
+          actorPersonaId: actor?.personaId ?? null,
+          origenInterno: actor ? null : 'AfiliacionDeclarada',
+          modulo: 'tesoreria',
+          accion: 'generarCargoDeAfiliacion',
+          elevado: actor?.estaElevado ?? false,
+          grupoId: movimiento.grupoId,
+          entidadTipo: 'movimiento',
+          entidadId: movimiento.id,
+          resumen: { cantidad, cuota: cuota.importe, importe, declaracionId: declaracion.id },
+        },
+        tx,
+      )
+    })
     return movimientoPorDeclaracion(declaracion.id) ?? null
   }
 
@@ -114,7 +133,7 @@ export function crearOperacionesDeCargos(core: Core, afiliacion: Afiliacion) {
     }
     let creados = 0
     for (const declaracion of await declaracionesPendientes()) {
-      if (await generarCargo(declaracion)) creados++
+      if (await generarCargo(declaracion, alcance.actor)) creados++
     }
     return { ...(await resumenDePendientes(alcance)), creados }
   }

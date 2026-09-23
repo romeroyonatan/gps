@@ -12,15 +12,20 @@ export type { Context } from './context'
 export type {
   Almacenamiento,
   Bd,
+  CambioDeAuditoria,
   Config,
   ConfigDeAuth,
   ConversorDeImagenes,
   Core,
+  DatosDeAuditoria,
+  EjecutorDeAuditoria,
   Entorno,
   Logger,
+  RegistroDeAuditoria,
   Reloj,
   Sellador,
   Sello,
+  ValorDeAuditoria,
 } from './core'
 export type { BusDeEventos, Eventos } from './eventos'
 export { crearBusDeEventos } from './eventos'

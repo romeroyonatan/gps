@@ -8,6 +8,7 @@ import {
   type Bd,
   type Core,
   crearBusDeEventos,
+  type DatosDeAuditoria,
   type Module,
   type Rol,
 } from '@gps/core'
@@ -75,12 +76,19 @@ function montar(
 ) {
   const bd: Bd = drizzle(new Database(':memory:'))
   let contador = 0
+  const eventos: DatosDeAuditoria[] = []
   const core: Core = {
     config: { version: '0.0.0', entorno: 'prueba', puerto: 0 },
     logger: { info: () => {}, error: () => {} },
     reloj: { ahora: () => HORA },
     bd,
     eventos: crearBusDeEventos(),
+    auditoria: {
+      registrar: (evento) => {
+        eventos.push(evento)
+        return 'evento_de_auditoria_test'
+      },
+    },
     modulos: ['afiliacion', 'estructura', 'tesoreria'],
     // Falso pero con el comportamiento que importa: sellar y verificar cierran
     // entre si, y un dato alterado no verifica.
@@ -135,7 +143,7 @@ function montar(
     listarDistritosSinGrupos: async () => [DISTRITO],
     gruposAbiertosEn: async () => new Set([GRUPO.id]),
   }
-  return { core, servicio: crearServicioDeTesoreria(core, afiliacion, estructura) }
+  return { core, servicio: crearServicioDeTesoreria(core, afiliacion, estructura), eventos }
 }
 
 describe('cuotas y cargos', () => {
@@ -227,6 +235,35 @@ describe('pagos y cuentas', () => {
     })
 
     expect((await servicio.listarCuentas(alcanceSinLimites()))[0]?.saldo).toBe(-10000)
+  })
+
+  test('audita cuota, cargo interno, pago y anulación sin registrar errores', async () => {
+    const declaracion1 = declaracion('declaracion_1')
+    const { servicio, eventos } = montar({ cantidades: { declaracion_1: 1 } })
+    await servicio.definirCuota(alcanceSinLimites('tesorero'), 1970, 20000)
+    await servicio.generarCargo(declaracion1)
+    const pago = await servicio.registrarPago(alcanceSinLimites('tesorero'), {
+      grupoId: GRUPO.id,
+      fecha: '1970-05-02',
+      importe: 10000,
+      medioDePago: 'transferencia',
+    })
+    await servicio.anularPago(alcanceSinLimites('tesorero'), pago.id)
+    await expect(
+      servicio.registrarPago(alcanceSinLimites('tesorero'), {
+        grupoId: GRUPO.id,
+        fecha: 'mal',
+        importe: 0,
+        medioDePago: 'transferencia',
+      }),
+    ).rejects.toThrow()
+    expect(eventos.map((evento) => evento.accion)).toEqual([
+      'definirCuotaDeAfiliacion',
+      'generarCargoDeAfiliacion',
+      'registrarPago',
+      'anularPago',
+    ])
+    expect(eventos[1]).toMatchObject({ origenInterno: 'AfiliacionDeclarada', grupoId: GRUPO.id })
   })
 
   test('muestra grupos sin movimientos con saldo cero', async () => {

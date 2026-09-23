@@ -1,6 +1,13 @@
 import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
-import { aplicarMigraciones, type Bd, type Core, crearBusDeEventos, type Module } from '@gps/core'
+import {
+  aplicarMigraciones,
+  type Bd,
+  type Core,
+  crearBusDeEventos,
+  type DatosDeAuditoria,
+  type Module,
+} from '@gps/core'
 import type { Estructura } from '@gps/estructura/dominio'
 import type { Personas } from '@gps/personas/dominio'
 import { sql } from 'drizzle-orm'
@@ -43,12 +50,19 @@ function montar() {
   const bd: Bd = drizzle(base)
   const hora = new Date('1970-01-01T00:00:00Z')
   let contador = 0
+  const eventos: DatosDeAuditoria[] = []
   const core: Core = {
     config: { version: '0.0.0', entorno: 'prueba', puerto: 0 },
     logger: { info: () => {}, error: () => {} },
     reloj: { ahora: () => hora },
     bd,
     eventos: crearBusDeEventos(),
+    auditoria: {
+      registrar: (evento) => {
+        eventos.push(evento)
+        return 'evento_de_auditoria_test'
+      },
+    },
     modulos: ['auth'],
     sellador: {
       sellar: (datos: string) => ({ sello: `sellado:${datos}`, claveId: 'prueba' }),
@@ -82,12 +96,12 @@ function montar() {
         ('identidad_admin', 'persona_admin', 'google', 'subject-admin', NULL, 0, 0)`,
   )
   bd.run(sql`INSERT INTO administrador_del_sistema VALUES (1, 'persona_admin', 0, 0)`)
-  return { bd, servicio }
+  return { bd, servicio, eventos }
 }
 
 describe('elevarSesion', () => {
   test('reautenticar una identidad ya vinculada eleva la sesión de la administradora', async () => {
-    const { bd, servicio } = montar()
+    const { servicio, eventos } = montar()
     const sesion = await servicio.crearSesionParaIdentidad('identidad_admin')
     expect((await servicio.resolverSesion(sesion.secreto))?.estaElevada).toBe(false)
 
@@ -99,8 +113,7 @@ describe('elevarSesion', () => {
     })
 
     expect((await servicio.resolverSesion(sesion.secreto))?.estaElevada).toBe(true)
-    const eventos = bd.all<{ tipo: string }>(sql`SELECT tipo FROM eventos_de_seguridad`)
-    expect(eventos.map((e) => e.tipo)).toContain('sesion.elevar')
+    expect(eventos.map((evento) => evento.accion)).toContain('sesion.elevar')
   })
 
   test('una sesión ordinaria no elevada no da alcance global', async () => {
@@ -111,7 +124,7 @@ describe('elevarSesion', () => {
   })
 
   test('una persona que no es la administradora designada no puede elevarse', async () => {
-    const { bd, servicio } = montar()
+    const { bd, servicio, eventos } = montar()
     bd.run(
       sql`INSERT INTO identidades_externas VALUES
           ('identidad_otra', 'persona_otra', 'google', 'subject-otra', NULL, 0, 0)`,
@@ -125,5 +138,10 @@ describe('elevarSesion', () => {
         code: 'c',
       }),
     ).rejects.toThrow(ElevacionDenegada)
+    expect(eventos.at(-1)).toMatchObject({
+      accion: 'sesion.elevar',
+      actorPersonaId: 'persona_otra',
+      resultado: 'rechazado',
+    })
   })
 })

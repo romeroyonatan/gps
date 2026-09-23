@@ -1,3 +1,4 @@
+import { crearRegistroDeAuditoria } from '@gps/auditoria/servidor'
 import {
   type Almacenamiento,
   type Bd,
@@ -24,16 +25,19 @@ export function crearCore(
   almacenamiento: Almacenamiento,
   conversorDeImagenes: ConversorDeImagenes,
 ): Core {
+  const reloj = { ahora: () => new Date() }
+  const nuevoId = (prefijo: string) => `${prefijo}_${Bun.randomUUIDv7()}`
   return {
     config,
     modulos,
     bd,
     eventos: crearBusDeEventos(),
+    auditoria: crearRegistroDeAuditoria(bd, reloj, nuevoId),
     sellador,
     almacenamiento,
     conversorDeImagenes,
-    reloj: { ahora: () => new Date() },
-    nuevoId: (prefijo) => `${prefijo}_${Bun.randomUUIDv7()}`,
+    reloj,
+    nuevoId,
     nuevoSecreto,
     hash: (contenido) => new Bun.CryptoHasher('sha256').update(contenido).digest('hex'),
     logger: {

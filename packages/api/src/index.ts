@@ -1,4 +1,6 @@
 export { useAfiliadosEn, useDeclaraciones, useDeclararAfiliacion } from './afiliacion'
+export type { FiltrosDeAuditoria } from './auditoria'
+export { useAuditoria } from './auditoria'
 export {
   useActor,
   useAlcance,

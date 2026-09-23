@@ -8,6 +8,7 @@ import {
   type Bd,
   type Core,
   crearBusDeEventos,
+  type DatosDeAuditoria,
   type Module,
   type Reloj,
 } from '@gps/core'
@@ -92,18 +93,25 @@ function estructuraFalsa(grupos: readonly GrupoConUnidades[] = [GRUPO]): Estruct
 function montarConBd(
   reloj: Reloj = { ahora: () => HORA },
   estructura: Estructura = estructuraFalsa(),
-): { servicio: ServicioDePersonas; bd: Bd } {
+): { servicio: ServicioDePersonas; bd: Bd; eventos: DatosDeAuditoria[] } {
   const base = new Database(':memory:')
   base.exec('PRAGMA foreign_keys = ON')
   const bd: Bd = drizzle(base)
 
   let contador = 0
+  const eventos: DatosDeAuditoria[] = []
   const core: Core = {
     config: { version: '0.0.0', entorno: 'prueba', puerto: 0 },
     logger: { info: () => {}, error: () => {} },
     reloj,
     bd,
     eventos: crearBusDeEventos(),
+    auditoria: {
+      registrar: (evento) => {
+        eventos.push(evento)
+        return 'evento_de_auditoria_test'
+      },
+    },
     modulos: ['estructura', 'personas'],
     // Falso pero con el comportamiento que importa: sellar y verificar cierran
     // entre si, y un dato alterado no verifica.
@@ -134,7 +142,7 @@ function montarConBd(
     registerSchema: () => {},
   }
   aplicarMigraciones(core, [modulo])
-  return { servicio: crearServicioDePersonas(core, estructura), bd }
+  return { servicio: crearServicioDePersonas(core, estructura), bd, eventos }
 }
 
 function montar(
@@ -616,7 +624,7 @@ describe('administración de autoridades', () => {
   })
 
   test('cada cambio de autoridad queda auditado con actor, objetivo, ambito e instante', async () => {
-    const { servicio, bd } = montarConBd()
+    const { servicio, eventos } = montarConBd()
     const persona = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
     const cargo = await servicio.asignarCargoComo(actor('secretariaDeGrupo'), {
       personaId: persona.id,
@@ -626,19 +634,24 @@ describe('administración de autoridades', () => {
     })
     await servicio.revocarCargo(actor('jefeDeGrupo'), cargo.id)
 
-    const eventos = bd.all<{ tipo: string; actor_persona_id: string; objetivo_persona_id: string }>(
-      sql`SELECT tipo, actor_persona_id, objetivo_persona_id FROM eventos_de_autoridad ORDER BY creado_en, tipo`,
-    )
-    expect(eventos).toEqual([
+    expect(
+      eventos
+        .filter((evento) => evento.accion.startsWith('cargo.'))
+        .map((evento) => ({
+          accion: evento.accion,
+          actor: evento.actorPersonaId,
+          objetivo: evento.objetivoPersonaId,
+        })),
+    ).toEqual([
       {
-        tipo: 'cargo.jefeDeGrupo.asignar',
-        actor_persona_id: 'actor',
-        objetivo_persona_id: persona.id,
+        accion: 'cargo.jefeDeGrupo.asignar',
+        actor: 'actor',
+        objetivo: persona.id,
       },
       {
-        tipo: 'cargo.jefeDeGrupo.revocar',
-        actor_persona_id: 'actor',
-        objetivo_persona_id: persona.id,
+        accion: 'cargo.jefeDeGrupo.revocar',
+        actor: 'actor',
+        objetivo: persona.id,
       },
     ])
   })
@@ -948,6 +961,41 @@ describe('editarPersona', () => {
       }),
     ).rejects.toBeInstanceOf(CambioDeAutoridadDenegado)
   })
+
+  test('la corrección queda auditada con sólo los campos que cambiaron', async () => {
+    const { servicio, eventos } = montarConBd()
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
+
+    await servicio.editarPersona(alcance(actor('secretariaDeGrupo')), persona.id, {
+      ...valida,
+      domicilio: 'Otra calle 1',
+    })
+
+    const evento = eventos.find((uno) => uno.accion === 'editarPersona')
+    expect(evento).toMatchObject({
+      actorPersonaId: 'actor',
+      modulo: 'personas',
+      grupoId: 'grupo_1',
+      entidadId: persona.id,
+      objetivoPersonaId: persona.id,
+    })
+    expect(evento?.cambios).toEqual([
+      { campo: 'domicilio', anterior: valida.domicilio, nuevo: 'Otra calle 1' },
+    ])
+  })
+
+  test('una corrección rechazada no deja evento', async () => {
+    const { servicio, eventos } = montarConBd()
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
+
+    await expect(
+      servicio.editarPersona(alcance(actor('jefeDeGrupo')), persona.id, {
+        ...valida,
+        apellidos: '  ',
+      }),
+    ).rejects.toBeInstanceOf(DatosInvalidos)
+    expect(eventos.some((uno) => uno.accion === 'editarPersona')).toBe(false)
+  })
 })
 
 describe('cambiarDeUnidad', () => {
@@ -975,6 +1023,27 @@ describe('cambiarDeUnidad', () => {
     expect(enLaLista?.pertenencia.unidadId).toBe('unidad_sco')
     // Los cargos no se mueven: su ambito es el grupo, no la pertenencia.
     expect(enLaLista?.cargos).toEqual(persona.cargos)
+  })
+
+  test('el pase queda auditado con la unidad anterior y la nueva', async () => {
+    const { servicio, eventos } = montarConBd()
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, dirigente)
+
+    await servicio.cambiarDeUnidad(
+      alcanceDe(actor('jefeDeGrupo'), ['grupo_1']),
+      persona.id,
+      'unidad_sco',
+      '1969-12-01',
+    )
+
+    const evento = eventos.find((uno) => uno.accion === 'cambiarDeUnidad')
+    expect(evento).toMatchObject({
+      actorPersonaId: 'actor',
+      grupoId: 'grupo_1',
+      objetivoPersonaId: persona.id,
+      resumen: { desde: '1969-12-01' },
+      cambios: [{ campo: 'unidadId', anterior: 'unidad_lob', nuevo: 'unidad_sco' }],
+    })
   })
 
   test('una consulta a una fecha anterior ve la unidad de ese dia', async () => {

@@ -1,7 +1,7 @@
 import type { Almacenamiento, Bd, Config, ConversorDeImagenes, Sellador } from '@gps/core'
 import { createYoga } from 'graphql-yoga'
 import inicio from '../../../apps/web/index.html'
-import { crearInterceptorDeEscriturasElevadas } from './auditoria'
+import { crearInterceptorDeIntentosElevados } from './auditoria'
 import { componer } from './composicion'
 import { crearContexto } from './context'
 import { rutaDeArchivos, rutaDeLaNominaDeUnGrupo, rutaDelPdfDeUnPermiso } from './rutas-de-archivos'
@@ -28,7 +28,7 @@ export async function crearServidor(
     context: contextoPorPedido,
     graphqlEndpoint: '/graphql',
     landingPage: false,
-    plugins: [crearInterceptorDeEscriturasElevadas()],
+    plugins: [crearInterceptorDeIntentosElevados()],
   })
 
   const servidor = Bun.serve({

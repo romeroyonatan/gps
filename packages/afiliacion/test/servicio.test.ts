@@ -132,6 +132,7 @@ function montar(
     reloj?: Reloj
     suscriptor?: (declaracion: Declaracion) => void | Promise<void>
     alError?: (mensaje: string) => void
+    alAuditar?: (evento: import('@gps/core').DatosDeAuditoria) => void
   } = {},
 ): ServicioDeAfiliacion {
   const base = new Database(':memory:')
@@ -145,6 +146,12 @@ function montar(
     reloj: opciones.reloj ?? { ahora: () => HORA },
     bd,
     eventos: crearBusDeEventos(),
+    auditoria: {
+      registrar: (evento) => {
+        opciones.alAuditar?.(evento)
+        return 'evento_de_auditoria_test'
+      },
+    },
     modulos: ['estructura', 'personas', 'afiliacion'],
     // Falso pero con el comportamiento que importa: sellar y verificar cierran
     // entre si, y un dato alterado no verifica.
@@ -387,6 +394,22 @@ describe('declararExtraordinaria', () => {
 
     expect(declaracion.grupoId).toBe('grupo_7')
     expect(declaracion.fecha).toBe('1971-06-01')
+  })
+
+  test('audita actor, grupo y declaración en la misma operación', async () => {
+    const eventos: import('@gps/core').DatosDeAuditoria[] = []
+    const servicio = montar({ miembros: [JUAN], alAuditar: (evento) => eventos.push(evento) })
+    const declaracion = await servicio.declararExtraordinaria(
+      alcanceSinLimites('secretaria'),
+      'grupo_7',
+    )
+    expect(eventos.at(-1)).toMatchObject({
+      actorPersonaId: 'secretaria',
+      modulo: 'afiliacion',
+      accion: 'declararAfiliacion',
+      grupoId: 'grupo_7',
+      entidadId: declaracion.id,
+    })
   })
 
   test('avisa si el grupo no tiene a nadie que declarar', async () => {

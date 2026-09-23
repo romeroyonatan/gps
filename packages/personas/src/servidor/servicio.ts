@@ -23,7 +23,6 @@ import type {
 import { validarCambioDeUnidad } from '../dominio/vinculos'
 import {
   equipos,
-  eventosDeAutoridad,
   integrantesDeEquipo,
   personas,
   pertenencias,
@@ -421,17 +420,20 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
             .run()
         }
         tx.insert(integrantesDeEquipo).values(integrante).run()
-        tx.insert(eventosDeAutoridad)
-          .values({
-            id: core.nuevoId('evento_de_autoridad'),
-            tipo: `equipo.${datos.tipo}.integrar`,
+        core.auditoria.registrar(
+          {
             actorPersonaId: actor.personaId,
+            modulo: 'personas',
+            accion: `equipo.${datos.tipo}.integrar`,
+            elevado: actor.estaElevado,
+            grupoId: datos.ambitoTipo === 'grupo' ? datos.ambitoId : null,
+            entidadTipo: 'integranteDeEquipo',
+            entidadId: integrante.id,
             objetivoPersonaId: datos.personaId,
-            ambitoTipo: datos.ambitoTipo,
-            ambitoId: datos.ambitoId,
-            creadoEn: ahora,
-          })
-          .run()
+            resumen: { tipo: datos.tipo, ambitoTipo: datos.ambitoTipo },
+          },
+          tx,
+        )
       })
       return integrante
     },
@@ -461,17 +463,20 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
           .set({ revocadoEn: ahora, actualizadoEn: ahora })
           .where(eq(integrantesDeEquipo.id, integranteId))
           .run()
-        tx.insert(eventosDeAutoridad)
-          .values({
-            id: core.nuevoId('evento_de_autoridad'),
-            tipo: `equipo.${fila.tipo}.revocar`,
+        core.auditoria.registrar(
+          {
             actorPersonaId: actor.personaId,
+            modulo: 'personas',
+            accion: `equipo.${fila.tipo}.revocar`,
+            elevado: actor.estaElevado,
+            grupoId: fila.ambitoTipo === 'grupo' ? fila.ambitoId : null,
+            entidadTipo: 'integranteDeEquipo',
+            entidadId: integranteId,
             objetivoPersonaId: fila.personaId,
-            ambitoTipo: fila.ambitoTipo,
-            ambitoId: fila.ambitoId,
-            creadoEn: ahora,
-          })
-          .run()
+            resumen: { tipo: fila.tipo, ambitoTipo: fila.ambitoTipo },
+          },
+          tx,
+        )
       })
     },
 
@@ -555,6 +560,23 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
         if (cargosDeLaPersona.length > 0) {
           tx.insert(tablaDeCargos).values(cargosDeLaPersona).run()
         }
+        core.auditoria.registrar(
+          {
+            actorPersonaId: alcance.actor.personaId,
+            modulo: 'personas',
+            accion: 'crearPersona',
+            elevado: alcance.actor.estaElevado,
+            grupoId: ingreso.grupoId,
+            entidadTipo: 'persona',
+            entidadId: persona.id,
+            objetivoPersonaId: persona.id,
+            resumen: {
+              categoria: ingreso.categoria,
+              cargos: ingreso.cargos.map((cargo) => cargo.cargo),
+            },
+          },
+          tx,
+        )
       })
 
       // Recién creada: todavía no integra ningún equipo.
@@ -605,13 +627,38 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
         telefonoDeContacto: datos.telefonoDeContacto.trim(),
         actualizadoEn: hoy,
       }
-      const fila = core.bd
-        .update(personas)
-        .set(corregida)
-        .where(eq(personas.id, personaId))
-        .returning()
-        .get()
-      return fila
+      // La auditoria guarda sólo lo que cambió, con su valor anterior: es lo
+      // que hace falta para entender dos correcciones que se pisan.
+      const anterior = core.bd.select().from(personas).where(eq(personas.id, personaId)).get()
+      const campos = Object.keys(datos) as (keyof DatosDePersona)[]
+      const cambios = anterior
+        ? campos
+            .filter((campo) => anterior[campo] !== corregida[campo])
+            .map((campo) => ({ campo, anterior: anterior[campo], nuevo: corregida[campo] }))
+        : []
+      return core.bd.transaction((tx) => {
+        const fila = tx
+          .update(personas)
+          .set(corregida)
+          .where(eq(personas.id, personaId))
+          .returning()
+          .get()
+        core.auditoria.registrar(
+          {
+            actorPersonaId: alcance.actor.personaId,
+            modulo: 'personas',
+            accion: 'editarPersona',
+            elevado: alcance.actor.estaElevado,
+            grupoId: vigente.grupoId,
+            entidadTipo: 'persona',
+            entidadId: personaId,
+            objetivoPersonaId: personaId,
+            cambios,
+          },
+          tx,
+        )
+        return fila
+      })
     },
 
     async cambiarDeUnidad(alcance, personaId, unidadId, desde) {
@@ -652,6 +699,21 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
           .where(eq(pertenencias.id, vigente.id))
           .run()
         tx.insert(pertenencias).values(nueva).run()
+        core.auditoria.registrar(
+          {
+            actorPersonaId: alcance.actor.personaId,
+            modulo: 'personas',
+            accion: 'cambiarDeUnidad',
+            elevado: alcance.actor.estaElevado,
+            grupoId: vigente.grupoId,
+            entidadTipo: 'pertenencia',
+            entidadId: nueva.id,
+            objetivoPersonaId: personaId,
+            resumen: { desde },
+            cambios: [{ campo: 'unidadId', anterior: vigente.unidadId, nuevo: unidadId }],
+          },
+          tx,
+        )
       })
       return nueva
     },
@@ -724,17 +786,20 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
       const cargo = construirCargo(datos)
       core.bd.transaction((tx) => {
         tx.insert(tablaDeCargos).values(cargo).run()
-        tx.insert(eventosDeAutoridad)
-          .values({
-            id: core.nuevoId('evento_de_autoridad'),
-            tipo: `cargo.${datos.cargo}.asignar`,
+        core.auditoria.registrar(
+          {
             actorPersonaId: actor.personaId,
+            modulo: 'personas',
+            accion: `cargo.${datos.cargo}.asignar`,
+            elevado: actor.estaElevado,
+            grupoId: ambito === 'grupo' ? datos.ambitoId : null,
+            entidadTipo: 'cargo',
+            entidadId: cargo.id,
             objetivoPersonaId: datos.personaId,
-            ambitoTipo: ambito,
-            ambitoId: datos.ambitoId,
-            creadoEn: cargo.creadoEn,
-          })
-          .run()
+            resumen: { cargo: datos.cargo, ambito },
+          },
+          tx,
+        )
       })
       return cargo
     },
@@ -763,17 +828,20 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
           .set({ revocadoEn: ahora, actualizadoEn: ahora })
           .where(eq(tablaDeCargos.id, cargoId))
           .run()
-        tx.insert(eventosDeAutoridad)
-          .values({
-            id: core.nuevoId('evento_de_autoridad'),
-            tipo: `cargo.${fila.cargo}.revocar`,
+        core.auditoria.registrar(
+          {
             actorPersonaId: actor.personaId,
+            modulo: 'personas',
+            accion: `cargo.${fila.cargo}.revocar`,
+            elevado: actor.estaElevado,
+            grupoId: ambito === 'grupo' ? fila.ambitoId : null,
+            entidadTipo: 'cargo',
+            entidadId: cargoId,
             objetivoPersonaId: fila.personaId,
-            ambitoTipo: ambito,
-            ambitoId: fila.ambitoId,
-            creadoEn: ahora,
-          })
-          .run()
+            resumen: { cargo: fila.cargo, ambito },
+          },
+          tx,
+        )
       })
     },
 

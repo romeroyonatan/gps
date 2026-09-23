@@ -19,11 +19,12 @@ export function secretoDelPedido(pedido: Request): string | null {
 /** Resuelve identidad, funciones y alcance exactamente una vez por request. */
 export function crearContexto(base: Context, reloj: Reloj) {
   return async ({ request }: { request: Request }): Promise<Context> => {
+    const intencionElevada = request.headers.get('x-gps-intencion-elevada') === '1'
     const secreto = secretoDelPedido(request)
-    if (!secreto) return base
+    if (!secreto) return { ...base, intencionElevada }
 
     const sesion = await base.auth.resolverSesion(secreto)
-    if (!sesion) return base
+    if (!sesion) return { ...base, intencionElevada }
 
     const fecha = aFechaDeCalendario(reloj.ahora())
     const actor = {
@@ -37,6 +38,7 @@ export function crearContexto(base: Context, reloj: Reloj) {
       actor,
       sesionId: sesion.sesionId,
       elevadaHasta: sesion.elevadaHasta,
+      intencionElevada,
       alcance: await base.estructura.expandirAlcance(actor),
     }
   }
