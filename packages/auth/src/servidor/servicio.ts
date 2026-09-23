@@ -11,12 +11,7 @@ import type { ProveedorDeIdentidad } from '../dominio/modelos'
 import type { Auth } from '../dominio/publico'
 import { despuesDe } from '../dominio/tiempo'
 import type { Plataforma, ProveedorOidc } from './oidc'
-import {
-  administradorDelSistema,
-  identidadesExternas,
-  invitaciones,
-  sesiones,
-} from './tablas'
+import { administradorDelSistema, identidadesExternas, invitaciones, sesiones } from './tablas'
 
 const DURACION_DE_SESION = 30 * 24 * 60 * 60 * 1000
 /** Cuánto vive el sello de la transacción de login entre iniciar y
@@ -307,15 +302,18 @@ export function crearServicioDeAuth(
     resultado: 'exitoso' | 'rechazado' = 'exitoso',
     ejecutor?: EjecutorDeAuditoria,
   ): void {
-    core.auditoria.registrar({
-      actorPersonaId,
-      modulo: 'auth',
-      accion: tipo,
-      resultado,
-      elevado: tipo === 'sesion.elevar' || tipo === 'sudo.escritura',
-      objetivoPersonaId,
-      resumen: detalles,
-    }, ejecutor)
+    core.auditoria.registrar(
+      {
+        actorPersonaId,
+        modulo: 'auth',
+        accion: tipo,
+        resultado,
+        elevado: tipo === 'sesion.elevar' || tipo === 'sudo.escritura',
+        objetivoPersonaId,
+        resumen: detalles,
+      },
+      ejecutor,
+    )
   }
 
   return {

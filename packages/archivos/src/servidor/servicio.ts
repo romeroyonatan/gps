@@ -57,13 +57,16 @@ export type Autorizador = (recursoId: string, alcance: Alcance | null) => Promis
  *  quedar corta sin que TypeScript se entere. */
 export interface ServicioDeArchivos extends Archivos {
   /** Primer paso: reserva un id y devuelve por donde mandar los bytes. */
-  solicitarSubida(datos: {
-    nombre: string
-    tipo: string
-    tamano: number
-    modulo: string
-    recursoId: string
-  }, alcance?: Alcance | null): Promise<{ id: string; url: string; expira: Date }>
+  solicitarSubida(
+    datos: {
+      nombre: string
+      tipo: string
+      tamano: number
+      modulo: string
+      recursoId: string
+    },
+    alcance?: Alcance | null,
+  ): Promise<{ id: string; url: string; expira: Date }>
 
   /** Segundo paso, desde la ruta HTTP: valida el token y guarda los bytes. */
   recibirBytes(id: string, token: string, contenido: Uint8Array): Promise<void>

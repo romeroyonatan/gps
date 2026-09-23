@@ -89,7 +89,9 @@ export function crearOperacionesDeCuotas(core: Core, afiliacion: Afiliacion) {
           entidadTipo: 'cuotaDeAfiliacion',
           entidadId: String(periodo),
           resumen: { periodo, importe },
-          cambios: anterior ? [{ campo: 'importe', anterior: anterior.importe, nuevo: importe }] : [],
+          cambios: anterior
+            ? [{ campo: 'importe', anterior: anterior.importe, nuevo: importe }]
+            : [],
         },
         tx,
       )

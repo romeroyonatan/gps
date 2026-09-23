@@ -12,6 +12,7 @@ export type { Context } from './context'
 export type {
   Almacenamiento,
   Bd,
+  CambioDeAuditoria,
   Config,
   ConfigDeAuth,
   ConversorDeImagenes,
@@ -25,7 +26,6 @@ export type {
   Sellador,
   Sello,
   ValorDeAuditoria,
-  CambioDeAuditoria,
 } from './core'
 export type { BusDeEventos, Eventos } from './eventos'
 export { crearBusDeEventos } from './eventos'

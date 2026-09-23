@@ -60,9 +60,7 @@ export function crearInterceptorDeIntentosElevados(): Plugin<Context> {
       return {
         onExecuteDone({ result }) {
           if (Symbol.asyncIterator in result) return
-          const rechazada = result.errors?.some(
-            (error) => error.extensions?.code === 'SIN_PERMISO',
-          )
+          const rechazada = result.errors?.some((error) => error.extensions?.code === 'SIN_PERMISO')
           if (!rechazada) return
           for (const accion of acciones) {
             // `Core` no vive en Context; auth publica esta operación mínima

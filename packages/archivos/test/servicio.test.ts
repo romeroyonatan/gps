@@ -161,10 +161,7 @@ describe('los tres pasos', () => {
   test('audita reserva y confirmación sin token ni bytes', async () => {
     const { servicio, eventos } = montar()
     const { token } = await subir(servicio)
-    expect(eventos.map((evento) => evento.accion)).toEqual([
-      'solicitarSubida',
-      'confirmarSubida',
-    ])
+    expect(eventos.map((evento) => evento.accion)).toEqual(['solicitarSubida', 'confirmarSubida'])
     const serializado = JSON.stringify(eventos)
     expect(serializado).not.toContain(token)
     expect(serializado).not.toContain('1,2,3,4,5')

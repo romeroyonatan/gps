@@ -543,7 +543,10 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
             entidadTipo: 'persona',
             entidadId: persona.id,
             objetivoPersonaId: persona.id,
-            resumen: { categoria: ingreso.categoria, cargos: ingreso.cargos.map((cargo) => cargo.cargo) },
+            resumen: {
+              categoria: ingreso.categoria,
+              cargos: ingreso.cargos.map((cargo) => cargo.cargo),
+            },
           },
           tx,
         )

@@ -18,12 +18,7 @@ describe('auditoría de salidas', () => {
     })
     await servicio.emitir(alcanceSinLimites('secretaria'), permiso.id)
     const trazos = { trazos: [[[0.1234, 0.5678] as const]] }
-    await servicio.firmarEnApp(
-      alcanceDelFirmante('jefeDeGrupo'),
-      permiso.id,
-      'jefeDeGrupo',
-      trazos,
-    )
+    await servicio.firmarEnApp(alcanceDelFirmante('jefeDeGrupo'), permiso.id, 'jefeDeGrupo', trazos)
 
     expect(eventos.map((evento) => evento.accion)).toContain('crearPermiso')
     expect(eventos.find((evento) => evento.accion === 'editarPermiso')?.cambios).toContainEqual({

@@ -349,7 +349,9 @@ export function crearOperacionesDeBorrador(core: Core, personas: Personas, estru
       const permiso = exigirBorrador(permisoId)
       core.bd.transaction((tx) => {
         tx.delete(participantes)
-          .where(and(eq(participantes.permisoId, permisoId), eq(participantes.personaId, personaId)))
+          .where(
+            and(eq(participantes.permisoId, permisoId), eq(participantes.personaId, personaId)),
+          )
           .run()
         core.auditoria.registrar(
           {
@@ -397,7 +399,9 @@ export function crearOperacionesDeBorrador(core: Core, personas: Personas, estru
             entidadTipo: 'permiso',
             entidadId: permisoId,
             objetivoPersonaId: personaId,
-            cambios: [{ campo: 'responsableId', anterior: permiso.responsableId, nuevo: personaId }],
+            cambios: [
+              { campo: 'responsableId', anterior: permiso.responsableId, nuevo: personaId },
+            ],
           },
           tx,
         )
