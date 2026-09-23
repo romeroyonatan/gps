@@ -8,6 +8,7 @@ import {
   usePersonaActual,
   useVersion,
 } from '@gps/api'
+import { puedeAuditarGrupo } from '@gps/auditoria/dominio'
 import type { Actor } from '@gps/core'
 import { nombreCompleto } from '@gps/personas/dominio'
 import { puedeVerTesoreriaDeLaDiocesis } from '@gps/tesoreria/dominio'
@@ -15,6 +16,7 @@ import { type ReactNode, useEffect, useRef } from 'react'
 import { Link, Route, Switch, useLocation, useRoute } from 'wouter'
 import { Afiliacion } from './pantallas/Afiliacion'
 import { AltaDePersona } from './pantallas/AltaDePersona'
+import { Auditoria } from './pantallas/Auditoria'
 import {
   CambioDeRol,
   inicioDelRol,
@@ -28,6 +30,7 @@ import { Enlace } from './pantallas/Enlace'
 import { Estructura } from './pantallas/Estructura'
 import { Grupo } from './pantallas/Grupo'
 import { ElegirRol, Ingreso } from './pantallas/Ingreso'
+import { Mas } from './pantallas/Mas'
 import { ModoElevado } from './pantallas/ModoElevado'
 import { Nomina } from './pantallas/Nomina'
 import { NuevaCuota } from './pantallas/NuevaCuota'
@@ -77,11 +80,19 @@ interface Tarea {
   readonly href: string
   readonly trazos: readonly string[]
   readonly exacta?: boolean
+  /** Dónde se dibuja, si no es en las dos formas: Más sólo existe en la
+   *  barra, y lo que agrupa sólo en la columna. */
+  readonly solo?: 'columna' | 'barra'
+  /** Otras rutas que también la encienden: Más sigue elegida adentro de lo
+   *  que agrupa. */
+  readonly tambien?: readonly string[]
 }
 
 /** Las tareas del grupo, en el mismo orden en los dos lugares donde se
  *  dibujan: al costado en pantalla grande, abajo en el teléfono. Los iconos
- *  son de una sola pieza cada uno; no vale la pena una librería para cinco. */
+ *  son de una sola pieza cada uno; no vale la pena una librería para cinco.
+ *  El teléfono tiene lugar para cinco destinos: Plantel y Auditoría van
+ *  debajo de Más, y la columna de escritorio los lista directo. */
 const TAREAS = [
   {
     texto: 'Principal',
@@ -99,7 +110,16 @@ const TAREAS = [
     trazos: ['M12 3.5 3 20.5h18L12 3.5Z', 'M12 11.5 7.5 20.5h9L12 11.5Z'],
   },
   {
+    texto: 'Tesorería',
+    a: (id: string) => `/tesoreria/grupos/${id}`,
+    trazos: [
+      'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z',
+      'M12 6.5v11M14.6 9.6A2.7 2.7 0 0 0 12 8.2c-1.4 0-2.5.8-2.5 1.9s1.1 1.9 2.5 1.9 2.5.8 2.5 1.9-1.1 1.9-2.5 1.9a2.7 2.7 0 0 1-2.6-1.4',
+    ],
+  },
+  {
     texto: 'Plantel',
+    solo: 'columna',
     a: (id: string) => `/grupos/${id}/plantel`,
     trazos: [
       'M9.5 11.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z',
@@ -108,24 +128,35 @@ const TAREAS = [
     ],
   },
   {
-    texto: 'Tesorería',
-    a: (id: string) => `/tesoreria/grupos/${id}`,
-    trazos: [
-      'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z',
-      'M12 6.5v11M14.6 9.6A2.7 2.7 0 0 0 12 8.2c-1.4 0-2.5.8-2.5 1.9s1.1 1.9 2.5 1.9 2.5.8 2.5 1.9-1.1 1.9-2.5 1.9a2.7 2.7 0 0 1-2.6-1.4',
-    ],
+    texto: 'Auditoría',
+    solo: 'columna',
+    a: (id: string) => `/grupos/${id}/auditoria`,
+    trazos: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z', 'M12 7v5l3 2'],
+  },
+  {
+    texto: 'Más',
+    solo: 'barra',
+    a: (id: string) => `/grupos/${id}/mas`,
+    trazos: ['M5 12h.01M12 12h.01M19 12h.01'],
   },
 ] as const
 
-const tareasDelGrupo = (grupoId: string): readonly Tarea[] =>
-  TAREAS.map((tarea) => ({
-    texto: tarea.texto,
-    href: tarea.a(grupoId),
-    trazos: tarea.trazos,
-    // "Principal" es la raíz del grupo: sin esto quedaría encendida en todas
-    // las demás, que cuelgan de ella.
-    exacta: tarea.texto === 'Principal',
-  }))
+const tareasDelGrupo = (grupoId: string, actor: Actor): readonly Tarea[] =>
+  TAREAS.filter((tarea) => tarea.texto !== 'Auditoría' || puedeAuditarGrupo(actor, grupoId)).map(
+    (tarea) => ({
+      texto: tarea.texto,
+      href: tarea.a(grupoId),
+      trazos: tarea.trazos,
+      // "Principal" es la raíz del grupo: sin esto quedaría encendida en todas
+      // las demás, que cuelgan de ella.
+      exacta: tarea.texto === 'Principal',
+      solo: 'solo' in tarea ? tarea.solo : undefined,
+      tambien:
+        tarea.texto === 'Más'
+          ? [`/grupos/${grupoId}/plantel`, `/grupos/${grupoId}/auditoria`]
+          : undefined,
+    }),
+  )
 
 /** Las tareas de Tesorería diocesana, que no manda sobre ningún grupo y por
  *  eso no tenía menú. La solapa "Pagos" del mockup no está: un pago se carga
@@ -159,10 +190,14 @@ const TAREAS_DE_TESORERIA: readonly Tarea[] = [
  *  mira la diócesis. */
 function Tareas(props: { tareas: readonly Tarea[]; etiqueta: string; forma: 'columna' | 'barra' }) {
   const [donde] = useLocation()
-  const tareas = props.tareas.map((tarea) => ({
-    ...tarea,
-    activa: tarea.exacta ? donde === tarea.href : donde.startsWith(tarea.href),
-  }))
+  const tareas = props.tareas
+    .filter((tarea) => !tarea.solo || tarea.solo === props.forma)
+    .map((tarea) => ({
+      ...tarea,
+      activa: tarea.exacta
+        ? donde === tarea.href
+        : [tarea.href, ...(tarea.tambien ?? [])].some((ruta) => donde.startsWith(ruta)),
+    }))
 
   if (props.forma === 'barra') {
     return (
@@ -236,6 +271,9 @@ function Rutas() {
       </Route>
       <Route path="/grupos/:id/salidas">{(params) => <Salidas grupoId={params.id} />}</Route>
       <Route path="/grupos/:id/plantel">{(params) => <Plantel grupoId={params.id} />}</Route>
+      <Route path="/grupos/:id/auditoria">{(params) => <Auditoria grupoId={params.id} />}</Route>
+      <Route path="/grupos/:id/mas">{(params) => <Mas grupoId={params.id} />}</Route>
+      <Route path="/auditoria">{() => <Auditoria />}</Route>
       <Route path="/grupos/:id">{(params) => <Grupo id={params.id} />}</Route>
       <Route>
         <p className="mt-8 text-sm text-ink-muted">No hay nada en esta dirección.</p>
@@ -380,7 +418,7 @@ function ConSesion(props: {
   // comisionado- sigue sin barra, que es lo que había antes para todos.
   const grupoId = rol.activo.ambito.tipo === 'grupo' ? rol.activo.ambito.id : null
   const menu = grupoId
-    ? { etiqueta: 'Tareas del grupo', tareas: tareasDelGrupo(grupoId) }
+    ? { etiqueta: 'Tareas del grupo', tareas: tareasDelGrupo(grupoId, props.actor) }
     : puedeVerTesoreriaDeLaDiocesis(props.actor)
       ? { etiqueta: 'Tareas de Tesorería', tareas: TAREAS_DE_TESORERIA }
       : undefined

@@ -52,6 +52,7 @@ export async function componer(
     alcance: null,
     sesionId: null,
     elevadaHasta: null,
+    intencionElevada: false,
     config,
     ...servicios,
   } as Context

@@ -66,6 +66,7 @@ function montar(subject = 'subject-nuevo') {
     reloj: { ahora: () => hora },
     bd,
     eventos: crearBusDeEventos(),
+    auditoria: { registrar: () => 'evento_de_auditoria_test' },
     modulos: ['auth'],
     sellador: {
       sellar: (datos: string) => ({ sello: `sellado:${datos}`, claveId: 'prueba' }),

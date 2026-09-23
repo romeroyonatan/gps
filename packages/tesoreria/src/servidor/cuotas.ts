@@ -72,14 +72,28 @@ export function crearOperacionesDeCuotas(core: Core, afiliacion: Afiliacion) {
     }
 
     const ahora = core.reloj.ahora()
-    core.bd
-      .insert(cuotasDeAfiliacion)
-      .values({ periodo, importe, creadoEn: anterior?.creadoEn ?? ahora, actualizadoEn: ahora })
-      .onConflictDoUpdate({
-        target: cuotasDeAfiliacion.periodo,
-        set: { importe, actualizadoEn: ahora },
-      })
-      .run()
+    core.bd.transaction((tx) => {
+      tx.insert(cuotasDeAfiliacion)
+        .values({ periodo, importe, creadoEn: anterior?.creadoEn ?? ahora, actualizadoEn: ahora })
+        .onConflictDoUpdate({
+          target: cuotasDeAfiliacion.periodo,
+          set: { importe, actualizadoEn: ahora },
+        })
+        .run()
+      core.auditoria.registrar(
+        {
+          actorPersonaId: alcance.actor.personaId,
+          modulo: 'tesoreria',
+          accion: 'definirCuotaDeAfiliacion',
+          elevado: alcance.actor.estaElevado,
+          entidadTipo: 'cuotaDeAfiliacion',
+          entidadId: String(periodo),
+          resumen: { periodo, importe },
+          cambios: anterior ? [{ campo: 'importe', anterior: anterior.importe, nuevo: importe }] : [],
+        },
+        tx,
+      )
+    })
     return core.bd
       .select()
       .from(cuotasDeAfiliacion)

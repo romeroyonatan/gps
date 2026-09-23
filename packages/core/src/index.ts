@@ -16,11 +16,16 @@ export type {
   ConfigDeAuth,
   ConversorDeImagenes,
   Core,
+  DatosDeAuditoria,
+  EjecutorDeAuditoria,
   Entorno,
   Logger,
+  RegistroDeAuditoria,
   Reloj,
   Sellador,
   Sello,
+  ValorDeAuditoria,
+  CambioDeAuditoria,
 } from './core'
 export type { BusDeEventos, Eventos } from './eventos'
 export { crearBusDeEventos } from './eventos'

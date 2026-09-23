@@ -16,6 +16,7 @@ function coreDePrueba(bd: Bd): Core {
     reloj: { ahora: () => HORA },
     bd,
     eventos: crearBusDeEventos(),
+    auditoria: { registrar: () => 'evento_de_auditoria_test' },
     modulos: [],
     // Falso pero con el comportamiento que importa: sellar y verificar cierran
     // entre si, y un dato alterado no verifica.

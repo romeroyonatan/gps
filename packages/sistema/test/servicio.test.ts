@@ -11,6 +11,7 @@ function coreFalso(parcial: Partial<Core> = {}): Core {
     // algun dia los usara este test explotaria, que es lo que queremos.
     bd: null as unknown as Bd,
     eventos: crearBusDeEventos(),
+    auditoria: { registrar: () => 'evento_de_auditoria_test' },
     // Falso pero con el comportamiento que importa: sellar y verificar cierran
     // entre si, y un dato alterado no verifica.
     sellador: {

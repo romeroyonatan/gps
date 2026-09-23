@@ -34,6 +34,8 @@ Mapa de piezas en `docs/arquitectura.md`. Tutorial en prosa en `docs/crear-un-mo
    `servicio.ts` declara el contrato y compone las operaciones: no es el destino automático
    de todas las reglas. Separar casos de uso cohesivos o consultas cuando mejora la lectura,
    pero no crear un archivo, una interfaz o un repository por cada método corto.
+   Toda operación que escribe registra su evento de auditoría en la misma transacción
+   (ver **Auditoría** en las reglas) y su mutation se suma a `ACCIONES_AUDITADAS`.
 5. Si otro módulo va a necesitar algo de éste, declararlo en `src/dominio/publico.ts` —
    sólo eso, no la interfaz entera del servicio.
 6. Declarar `accesoAlModulo` en `src/dominio/politicas.ts` y pasarlo al objeto `Module`.
@@ -223,6 +225,30 @@ devuelve `null` —ver `deudasPendientes`—; las escrituras sí lanzan.
 `alcanceSinLimites()` existe para la siembra del demo y los tests que no prueban
 autorización. No sale de ahí: el alcance de un request se construye siempre con
 `estructura.expandirAlcance` a partir del actor real.
+
+**Auditoría: ninguna escritura sin su evento.** Cada vez que agregues o cambies algo que
+modifica datos —una mutation, un caso de uso, un camino HTTP, un suscriptor— registrá su
+evento con `core.auditoria.registrar(datos, tx)` **dentro de la misma transacción** que
+el cambio. No es opcional ni se deja para después: una escritura sin evento es un bug.
+
+- Una edición guarda `cambios` con anterior y nuevo; un alta, anulación, emisión o firma,
+  un `resumen` chico que la identifique.
+- Nunca argumentos GraphQL enteros, secretos, tokens, URLs privadas, bytes ni trazos de
+  firma: sólo referencias (`permisoId`, `archivoId`).
+- Una reacción interna lleva `origenInterno`, nunca una persona inventada.
+- Un intento sensible rechazado (elevación, recuperación, reasignación) también deja
+  evento, como `rechazado`; un error ordinario de formulario, no.
+- Toda mutation nueva va a `ACCIONES_AUDITADAS` en `services/backend/src/auditoria.ts`,
+  o falla el test del inventario. Y el test de servicio del caso de uso verifica que el
+  evento quedó.
+
+El registro es de sólo agregado; lo leen Jefatura y Secretaría de su grupo y el
+administrador elevado toda la diócesis. Detalle en `docs/arquitectura.md`, sección 10.
+
+**Navegación del grupo.** En el teléfono son cinco destinos: Principal, Nómina, Salidas,
+Tesorería y Más. Más es una pantalla (`/grupos/:id/mas`) con Plantel y Auditoría, y
+queda encendida adentro de ellas. En escritorio la columna los lista directo. Un destino
+nuevo del grupo va debajo de Más, no a la barra.
 
 ## Autenticación
 

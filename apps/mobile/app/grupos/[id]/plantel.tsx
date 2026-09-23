@@ -83,7 +83,7 @@ export default function Pantalla() {
 
   return (
     <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-10">
-      <Volver href={`/grupos/${id}`}>Grupo</Volver>
+      <Volver href={`/grupos/${id}/mas`}>Más</Volver>
       <Titulo acompaña="Quién administra este grupo. Los cargos y los equipos son lo que da acceso: al sacarlos, se pierde en el pedido siguiente.">
         Plantel
       </Titulo>

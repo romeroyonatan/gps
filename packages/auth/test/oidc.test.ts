@@ -14,6 +14,7 @@ function coreFalso(): Core {
     reloj: { ahora: () => HORA },
     bd: {} as Core['bd'],
     eventos: crearBusDeEventos(),
+    auditoria: { registrar: () => 'evento_de_auditoria_test' },
     modulos: [],
     sellador: { sellar: () => ({ sello: '', claveId: '' }), verificar: () => true },
     almacenamiento: {

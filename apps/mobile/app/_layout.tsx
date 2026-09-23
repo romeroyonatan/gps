@@ -49,6 +49,10 @@ const urlDeLaApi =
 const particion = almacenPorPersona(AsyncStorage)
 
 const persister = createAsyncStoragePersister({ storage: particion.almacen, key: 'gps-cache' })
+const queryClient = crearQueryClient()
+const intencionElevada = () =>
+  queryClient.getQueryData<{ personaActual?: { estaElevado: boolean } | null }>(['personaActual'])
+    ?.personaActual?.estaElevado === true
 
 /** El origen del backend, para armar las URL que no son GraphQL: el login y
  *  las descargas. Sale de la misma URL de la API. */
@@ -56,7 +60,7 @@ const origen = new URL(urlDeLaApi).origin
 
 /** El transporte manda el secreto como bearer: en mobile no hay cookie, y el
  *  secreto vive en el llavero del sistema (ver src/sesion.ts). */
-const transporte = transporteHttp(urlDeLaApi, fetch, secretoDeSesion)
+const transporte = transporteHttp(urlDeLaApi, fetch, secretoDeSesion, intencionElevada)
 
 function Espera(props: { children: string }) {
   return (
@@ -150,7 +154,7 @@ function Adentro() {
 
 export default function Layout() {
   return (
-    <ProveedorDeApi transporte={transporte} queryClient={crearQueryClient()} persister={persister}>
+    <ProveedorDeApi transporte={transporte} queryClient={queryClient} persister={persister}>
       <Adentro />
     </ProveedorDeApi>
   )

@@ -1,87 +1,66 @@
 import { describe, expect, test } from 'bun:test'
 import type { Context } from '@gps/core'
-import { parse } from 'graphql'
-import { crearInterceptorDeEscriturasElevadas } from '../src/auditoria'
+import { GraphQLError, parse } from 'graphql'
+import { crearInterceptorDeIntentosElevados } from '../src/auditoria'
 
-function contextoCon(actor: Context['actor']): {
-  auditadas: { personaId: string; operacion: string }[]
+function contextoCon(intencionElevada: boolean): {
+  rechazadas: { personaId: string; operacion: string }[]
   contexto: Context
 } {
-  const auditadas: { personaId: string; operacion: string }[] = []
+  const rechazadas: { personaId: string; operacion: string }[] = []
   const contexto = {
-    actor,
+    actor: {
+      personaId: 'admin',
+      roles: [],
+      esAdministradorDesignado: true,
+      estaElevado: false,
+    },
     alcance: null,
+    intencionElevada,
     auth: {
-      auditarEscrituraElevada: (personaId: string, operacion: string) => {
-        auditadas.push({ personaId, operacion })
+      auditarIntentoElevadoRechazado: (personaId: string, operacion: string) => {
+        rechazadas.push({ personaId, operacion })
       },
     },
   } as unknown as Context
-  return { auditadas, contexto }
+  return { rechazadas, contexto }
 }
 
-const elevado: Context['actor'] = {
-  personaId: 'admin',
-  roles: [],
-  esAdministradorDesignado: true,
-  estaElevado: true,
-}
-const ordinario: Context['actor'] = {
-  personaId: 'jefe',
-  roles: [],
-  esAdministradorDesignado: false,
-  estaElevado: false,
+function ejecutar(contexto: Context, error?: GraphQLError) {
+  const plugin = crearInterceptorDeIntentosElevados()
+  const continuacion = plugin.onExecute?.({
+    args: {
+      contextValue: contexto,
+      document: parse('mutation CerrarGrupo { crearPersona }'),
+      operationName: 'CerrarGrupo',
+    },
+  } as Parameters<NonNullable<typeof plugin.onExecute>>[0]) as
+    | { onExecuteDone?: (payload: { result: { errors?: readonly GraphQLError[] } }) => void }
+    | undefined
+  continuacion?.onExecuteDone?.({ result: { errors: error ? [error] : undefined } })
 }
 
-describe('crearInterceptorDeEscriturasElevadas', () => {
-  test('audita una mutation ejecutada con sudo', () => {
-    const { auditadas, contexto } = contextoCon(elevado)
-    const plugin = crearInterceptorDeEscriturasElevadas()
-    plugin.onExecute?.({
-      args: {
-        contextValue: contexto,
-        document: parse('mutation CerrarGrupo { crearPersona }'),
-        operationName: 'CerrarGrupo',
-      },
-    } as Parameters<NonNullable<typeof plugin.onExecute>>[0])
-
-    expect(auditadas).toEqual([{ personaId: 'admin', operacion: 'CerrarGrupo' }])
+describe('crearInterceptorDeIntentosElevados', () => {
+  test('audita una mutation marcada que sudo ya no autoriza', () => {
+    const { rechazadas, contexto } = contextoCon(true)
+    ejecutar(
+      contexto,
+      new GraphQLError('No tenés permiso.', { extensions: { code: 'SIN_PERMISO' } }),
+    )
+    expect(rechazadas).toEqual([{ personaId: 'admin', operacion: 'crearPersona' }])
+    expect(contexto.actor?.estaElevado).toBe(false)
   })
 
-  test('no audita una mutation ordinaria ni una query elevada', () => {
-    const plugin = crearInterceptorDeEscriturasElevadas()
+  test('no audita una mutation exitosa ni un error sin intención elevada', () => {
+    const marcada = contextoCon(true)
+    ejecutar(marcada.contexto)
+    expect(marcada.rechazadas).toEqual([])
 
-    const ordinaria = contextoCon(ordinario)
-    plugin.onExecute?.({
-      args: {
-        contextValue: ordinaria.contexto,
-        document: parse('mutation Algo { crearPersona }'),
-        operationName: 'Algo',
-      },
-    } as Parameters<NonNullable<typeof plugin.onExecute>>[0])
-    expect(ordinaria.auditadas).toEqual([])
-
-    const query = contextoCon(elevado)
-    plugin.onExecute?.({
-      args: {
-        contextValue: query.contexto,
-        document: parse('query Version { version { numero } }'),
-        operationName: 'Version',
-      },
-    } as Parameters<NonNullable<typeof plugin.onExecute>>[0])
-    expect(query.auditadas).toEqual([])
-  })
-
-  test('un pedido anónimo -sin actor- no rompe ni audita', () => {
-    const { auditadas, contexto } = contextoCon(null)
-    const plugin = crearInterceptorDeEscriturasElevadas()
-    plugin.onExecute?.({
-      args: {
-        contextValue: contexto,
-        document: parse('mutation Algo { crearPersona }'),
-        operationName: 'Algo',
-      },
-    } as Parameters<NonNullable<typeof plugin.onExecute>>[0])
-    expect(auditadas).toEqual([])
+    const ordinaria = contextoCon(false)
+    ejecutar(
+      ordinaria.contexto,
+      new GraphQLError('No tenés permiso.', { extensions: { code: 'SIN_PERMISO' } }),
+    )
+    expect(ordinaria.rechazadas).toEqual([])
   })
 })

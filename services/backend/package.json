@@ -15,6 +15,7 @@
     "@gps/afiliacion": "workspace:*",
     "@gps/archivos": "workspace:*",
     "@gps/auth": "workspace:*",
+    "@gps/auditoria": "workspace:*",
     "@gps/core": "workspace:*",
     "@gps/demo": "workspace:*",
     "@gps/estructura": "workspace:*",

@@ -6,6 +6,7 @@
     "@expo/metro-runtime": "~57.0.13",
     "@gps/afiliacion": "workspace:*",
     "@gps/api": "workspace:*",
+    "@gps/auditoria": "workspace:*",
     "@gps/core": "workspace:*",
     "@gps/diseno": "workspace:*",
     "@gps/estructura": "workspace:*",

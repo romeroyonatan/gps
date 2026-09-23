@@ -1,6 +1,11 @@
 import type { Alcance, Core } from '@gps/core'
 import { and, eq } from 'drizzle-orm'
-import { esTipoAdmitido, necesitaConversion, TAMANO_MAXIMO } from '../dominio/archivos'
+import {
+  esTipoAdmitido,
+  necesitaConversion,
+  TAMANO_MAXIMO,
+  type TipoAdmitido,
+} from '../dominio/archivos'
 import type { Archivo } from '../dominio/modelos'
 import type { Archivos } from '../dominio/publico'
 import { archivos } from './tablas'
@@ -58,13 +63,13 @@ export interface ServicioDeArchivos extends Archivos {
     tamano: number
     modulo: string
     recursoId: string
-  }): Promise<{ id: string; url: string; expira: Date }>
+  }, alcance?: Alcance | null): Promise<{ id: string; url: string; expira: Date }>
 
   /** Segundo paso, desde la ruta HTTP: valida el token y guarda los bytes. */
   recibirBytes(id: string, token: string, contenido: Uint8Array): Promise<void>
 
   /** Tercer paso: valida lo recibido, convierte si hace falta, y lo deja usable. */
-  confirmarSubida(id: string): Promise<Archivo>
+  confirmarSubida(id: string, alcance?: Alcance | null): Promise<Archivo>
 }
 
 /** Los bytes van a Almacenamiento y el registro a la base. La clave del
@@ -100,7 +105,7 @@ export function crearServicioDeArchivos(
   }
 
   return {
-    async solicitarSubida(datos) {
+    async solicitarSubida(datos, alcance = null) {
       if (!esTipoAdmitido(datos.tipo)) {
         throw new SubidaInvalida(`No se pueden subir archivos de tipo "${datos.tipo}".`)
       }
@@ -116,22 +121,42 @@ export function crearServicioDeArchivos(
 
       const ahora = core.reloj.ahora()
       const id = core.nuevoId('archivo')
-      core.bd
-        .insert(archivos)
-        .values({
-          id,
-          nombre: datos.nombre,
-          tipo: datos.tipo,
-          // El tamaño declarado; al confirmar se reemplaza por el real.
-          tamano: datos.tamano,
-          sha256: '',
-          modulo: datos.modulo,
-          recursoId: datos.recursoId,
-          confirmado: false,
-          creadoEn: ahora,
-          actualizadoEn: ahora,
-        })
-        .run()
+      core.bd.transaction((tx) => {
+        tx.insert(archivos)
+          .values({
+            id,
+            nombre: datos.nombre,
+            tipo: datos.tipo as TipoAdmitido,
+            // El tamaño declarado; al confirmar se reemplaza por el real.
+            tamano: datos.tamano,
+            sha256: '',
+            modulo: datos.modulo,
+            recursoId: datos.recursoId,
+            confirmado: false,
+            creadoEn: ahora,
+            actualizadoEn: ahora,
+          })
+          .run()
+        core.auditoria.registrar(
+          {
+            actorPersonaId: alcance?.actor.personaId ?? null,
+            origenInterno: alcance ? null : 'servidor',
+            modulo: 'archivos',
+            accion: 'solicitarSubida',
+            elevado: alcance?.actor.estaElevado ?? false,
+            entidadTipo: 'archivo',
+            entidadId: id,
+            resumen: {
+              nombre: datos.nombre,
+              tipo: datos.tipo,
+              tamano: datos.tamano,
+              moduloDueno: datos.modulo,
+              recursoId: datos.recursoId,
+            },
+          },
+          tx,
+        )
+      })
 
       const expira = new Date(ahora.getTime() + VENCIMIENTO_MS)
       return { id, url: `/archivos/${id}?token=${tokenDe(id, expira.getTime())}`, expira }
@@ -150,7 +175,7 @@ export function crearServicioDeArchivos(
       await core.almacenamiento.guardar(id, contenido)
     },
 
-    async confirmarSubida(id) {
+    async confirmarSubida(id, alcance = null) {
       const fila = filaDe(id)
       if (!fila) throw new SubidaInvalida('No hay ninguna subida pedida con ese id.')
       if (fila.confirmado) throw new SubidaInvalida('Esa subida ya esta confirmada.')
@@ -180,17 +205,37 @@ export function crearServicioDeArchivos(
         confirmado: true,
         actualizadoEn: ahora,
       }
-      core.bd
-        .update(archivos)
-        .set({
-          tipo: confirmado.tipo,
-          tamano: confirmado.tamano,
-          sha256: confirmado.sha256,
-          confirmado: true,
-          actualizadoEn: ahora,
-        })
-        .where(eq(archivos.id, id))
-        .run()
+      core.bd.transaction((tx) => {
+        tx.update(archivos)
+          .set({
+            tipo: confirmado.tipo,
+            tamano: confirmado.tamano,
+            sha256: confirmado.sha256,
+            confirmado: true,
+            actualizadoEn: ahora,
+          })
+          .where(eq(archivos.id, id))
+          .run()
+        core.auditoria.registrar(
+          {
+            actorPersonaId: alcance?.actor.personaId ?? null,
+            origenInterno: alcance ? null : 'servidor',
+            modulo: 'archivos',
+            accion: 'confirmarSubida',
+            elevado: alcance?.actor.estaElevado ?? false,
+            entidadTipo: 'archivo',
+            entidadId: id,
+            resumen: {
+              nombre: fila.nombre,
+              tipo: confirmado.tipo,
+              tamano: confirmado.tamano,
+              moduloDueno: fila.modulo,
+              recursoId: fila.recursoId,
+            },
+          },
+          tx,
+        )
+      })
       return confirmado
     },
 

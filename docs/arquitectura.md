@@ -63,7 +63,7 @@ Un módulo no sabe si lo está ejecutando el servidor o el teléfono.
     |     +-- /graphql --> GraphQL Yoga                              |
     |     |                   |                                      |
     |     |                   +-- auditoria.ts                      |
-    |     |                   |     audita toda escritura elevada    |
+    |     |                   |     intentos elevados rechazados     |
     |     |                   +-- envelop.ts            (futuro)     |
     |     |                         rate limiting                    |
     |     |                         cache de respuestas              |
@@ -211,7 +211,7 @@ sólo el registro que evita crearlo dos veces, que es plomería y por eso vive e
     GraphQL Yoga
        |
        v
-    plugins de envelop           auditoria, rate limit
+    plugins de envelop           intentos elevados rechazados
        |
        v
     context.ts                   arma { actor, sistema, personas, ... }
@@ -411,7 +411,6 @@ Los módulos no se llaman entre sí para reaccionar a cosas.
        |
        +--> tesoreria      genera el cargo
        |
-       +--> auditoria      (futuro)
        +--> mensajeria     (futuro)
        +--> notificaciones (futuro)
 
@@ -427,3 +426,45 @@ La declaración es el hecho principal y no se revierte si un suscriptor falla. T
 compara las declaraciones cobrables con los cargos existentes y ofrece **Generar deudas
 pendientes** únicamente cuando falta alguno. Esa reconciliación idempotente recupera un
 evento perdido o una declaración emitida antes de configurar su cuota.
+
+## 10. Auditoría
+
+Toda escritura iniciada por una persona deja un evento en `eventos_de_auditoria`, una
+tabla de sólo agregado del módulo `auditoria`. No hay mutation para editarla ni borrarla,
+ni siquiera con elevación.
+
+    caso de uso de un modulo
+       |
+       | core.bd.transaction((tx) => {
+       |   ...cambio de datos...
+       |   core.auditoria.registrar({ actorPersonaId, modulo, accion, ... }, tx)
+       | })
+       v
+    eventos_de_auditoria        mismo commit: o quedan los dos o ninguno
+
+El registrador es plomería de `Core` (`core.auditoria`), no un servicio que los módulos
+importen: así `auditoria` puede depender de `personas` y `estructura` para mostrar
+nombres sin volver circular la dependencia. La raíz de composición lo conecta con la
+tabla, y el registrador toma instante e id de `Core.reloj` y `Core.nuevoId`.
+
+Qué se guarda lo decide cada caso de uso, nunca una copia de los argumentos GraphQL:
+
+- una edición guarda `cambios`, la lista de `{ campo, anterior, nuevo }`;
+- un alta, anulación, emisión o firma guarda un `resumen` con lo que la identifica;
+- se guardan referencias (`permisoId`, `archivoId`, `sesionId`), y nunca secretos,
+  tokens, URLs privadas, bytes de archivos ni trazos o sellos de firma.
+
+Una reacción interna —la deuda que Tesorería genera por una declaración, el barrido de
+Afiliación— lleva `origenInterno` en vez de una persona. Los errores ordinarios no dejan
+evento; sí lo dejan, como `rechazado`, los intentos sensibles: elevación, recuperación,
+reasignación administrativa y la escritura marcada con `x-gps-intencion-elevada` cuya
+elevación venció en el viaje. Esa cabecera no concede nada: sólo permite reconocer la
+carrera, y el plugin de `services/backend/src/auditoria.ts` la registra cuando la
+respuesta es `SIN_PERMISO`. `ACCIONES_AUDITADAS` en ese archivo es el inventario de
+mutations: una nueva que no se clasifique rompe su test.
+
+La consulta `auditoria(...)` pagina por cursor, del más reciente al más antiguo, con
+filtros combinables de fechas, grupo, actor, módulo y acción. Jefatura y Secretaría ven
+sólo sus grupos; la diócesis entera, y los eventos sin grupo, sólo el administrador
+elevado. Los eventos de `eventos_de_autoridad` y `eventos_de_seguridad` se copiaron al
+registro central al migrar; esas tablas quedan por rollback y ya nadie escribe en ellas.

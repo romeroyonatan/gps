@@ -10,7 +10,7 @@ import {
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import { estaVigente, nombreCompleto, puedeAdministrarPlantelDeGrupo } from '@gps/personas/dominio'
 import { useState } from 'react'
-import { Aviso, Cargando, Chip, Falla, Nota, Titulo } from '../ui'
+import { Aviso, Cargando, Chip, Falla, Nota, Titulo, Volver } from '../ui'
 
 /** Lo que esta pantalla administra: la jefatura del grupo y su Secretaría.
  *  Los demás cargos se cargan al dar de alta a la persona; acá están los dos
@@ -123,6 +123,9 @@ export function Plantel(props: { grupoId: string }) {
 
   return (
     <section>
+      <div className="md:hidden">
+        <Volver href={`/grupos/${props.grupoId}/mas`}>Más</Volver>
+      </div>
       <Titulo acompaña="Quién administra este grupo. Los cargos y los equipos son lo que da acceso: al sacarlos, se pierde en el pedido siguiente.">
         Plantel
       </Titulo>

@@ -1,4 +1,4 @@
-import type { Core } from '@gps/core'
+import type { Actor, Core } from '@gps/core'
 import type { Estructura } from '@gps/estructura/dominio'
 import type { Personas } from '@gps/personas/dominio'
 import { and, eq, inArray } from 'drizzle-orm'
@@ -117,7 +117,7 @@ export function crearOperacionesDeBorrador(core: Core, personas: Personas, estru
     unidadesElegidas,
     quienesPuedenIr,
 
-    async crearPermiso(grupoId: string, datos: DatosDelPermiso): Promise<Permiso> {
+    async crearPermiso(actor: Actor, grupoId: string, datos: DatosDelPermiso): Promise<Permiso> {
       // Primero el grupo: sin el no tiene sentido validar lo demas. Que exista
       // y este abierto lo dice estructura, no una foreign key.
       if (!(await estructura.obtenerGrupo(grupoId))) {
@@ -149,31 +149,66 @@ export function crearOperacionesDeBorrador(core: Core, personas: Personas, estru
         creadoEn: ahora,
         actualizadoEn: ahora,
       }
-      core.bd.insert(permisos).values(permiso).run()
+      core.bd.transaction((tx) => {
+        tx.insert(permisos).values(permiso).run()
+        core.auditoria.registrar(
+          {
+            actorPersonaId: actor.personaId,
+            modulo: 'salidas',
+            accion: 'crearPermiso',
+            elevado: actor.estaElevado,
+            grupoId,
+            entidadTipo: 'permiso',
+            entidadId: permiso.id,
+            resumen: { lugar: permiso.lugar, desde: permiso.desde, hasta: permiso.hasta },
+          },
+          tx,
+        )
+      })
       return permiso
     },
 
-    async editarPermiso(permisoId: string, datos: DatosDelPermiso): Promise<Permiso> {
-      exigirBorrador(permisoId)
+    async editarPermiso(actor: Actor, permisoId: string, datos: DatosDelPermiso): Promise<Permiso> {
+      const anterior = exigirBorrador(permisoId)
       const problemas = validarDatos(datos)
       if (problemas.length > 0) throw new PermisoInvalido(problemas)
 
       const ahora = core.reloj.ahora()
-      core.bd
-        .update(permisos)
-        .set({
-          lugar: datos.lugar.trim(),
-          direccion: datos.direccion.trim(),
-          localidad: datos.localidad.trim(),
-          provincia: datos.provincia.trim(),
-          telefono: datos.telefono.trim(),
-          desde: datos.desde,
-          hasta: datos.hasta,
-          comoSeViaja: datos.comoSeViaja?.trim() || null,
-          actualizadoEn: ahora,
-        })
-        .where(eq(permisos.id, permisoId))
-        .run()
+      const nuevos = {
+        lugar: datos.lugar.trim(),
+        direccion: datos.direccion.trim(),
+        localidad: datos.localidad.trim(),
+        provincia: datos.provincia.trim(),
+        telefono: datos.telefono.trim(),
+        desde: datos.desde,
+        hasta: datos.hasta,
+        comoSeViaja: datos.comoSeViaja?.trim() || null,
+      }
+      core.bd.transaction((tx) => {
+        tx.update(permisos)
+          .set({ ...nuevos, actualizadoEn: ahora })
+          .where(eq(permisos.id, permisoId))
+          .run()
+        core.auditoria.registrar(
+          {
+            actorPersonaId: actor.personaId,
+            modulo: 'salidas',
+            accion: 'editarPermiso',
+            elevado: actor.estaElevado,
+            grupoId: anterior.grupoId,
+            entidadTipo: 'permiso',
+            entidadId: permisoId,
+            cambios: Object.entries(nuevos)
+              .filter(([campo, nuevo]) => anterior[campo as keyof Permiso] !== nuevo)
+              .map(([campo, nuevo]) => ({
+                campo,
+                anterior: anterior[campo as keyof Permiso] as string | null,
+                nuevo,
+              })),
+          },
+          tx,
+        )
+      })
       return permisoDe(permisoId)
     },
 
@@ -184,7 +219,11 @@ export function crearOperacionesDeBorrador(core: Core, personas: Personas, estru
      *  Quita tambien a los participantes que quedaron fuera de las unidades
      *  elegidas: si no, desmarcar una tropa dejaria a su gente en la lista y el
      *  PDF diria algo que la pantalla no muestra. */
-    async elegirUnidades(permisoId: string, unidadIds: readonly string[]): Promise<void> {
+    async elegirUnidades(
+      actor: Actor,
+      permisoId: string,
+      unidadIds: readonly string[],
+    ): Promise<void> {
       const permiso = exigirBorrador(permisoId)
       const grupo = await estructura.obtenerGrupo(permiso.grupoId)
       if (!grupo) throw new PermisoNoEditable('El grupo del permiso ya no esta abierto.')
@@ -247,12 +286,25 @@ export function crearOperacionesDeBorrador(core: Core, personas: Personas, estru
             )
             .run()
         }
+        core.auditoria.registrar(
+          {
+            actorPersonaId: actor.personaId,
+            modulo: 'salidas',
+            accion: 'elegirUnidades',
+            elevado: actor.estaElevado,
+            grupoId: permiso.grupoId,
+            entidadTipo: 'permiso',
+            entidadId: permisoId,
+            cambios: [{ campo: 'unidades', anterior: [...anteriores], nuevo: elegidas }],
+          },
+          tx,
+        )
       })
       soltarResponsableAusente(permisoId)
     },
 
     /** Suma a alguien. La marca no se elige: sale de su categoria. */
-    async agregarParticipante(permisoId: string, personaId: string): Promise<void> {
+    async agregarParticipante(actor: Actor, permisoId: string, personaId: string): Promise<void> {
       const permiso = exigirBorrador(permisoId)
       const suyo = (
         await quienesPuedenIr(permiso.grupoId, permiso.desde, unidadesElegidas(permisoId))
@@ -266,32 +318,62 @@ export function crearOperacionesDeBorrador(core: Core, personas: Personas, estru
         ])
       }
 
-      core.bd
-        .insert(participantes)
-        .values({
-          permisoId,
-          personaId,
-          marca: marcaSegunCategoria(suyo.categoria),
-          creadoEn: core.reloj.ahora(),
-        })
-        .onConflictDoNothing()
-        .run()
+      core.bd.transaction((tx) => {
+        tx.insert(participantes)
+          .values({
+            permisoId,
+            personaId,
+            marca: marcaSegunCategoria(suyo.categoria),
+            creadoEn: core.reloj.ahora(),
+          })
+          .onConflictDoNothing()
+          .run()
+        core.auditoria.registrar(
+          {
+            actorPersonaId: actor.personaId,
+            modulo: 'salidas',
+            accion: 'agregarParticipante',
+            elevado: actor.estaElevado,
+            grupoId: permiso.grupoId,
+            entidadTipo: 'permiso',
+            entidadId: permisoId,
+            objetivoPersonaId: personaId,
+            cambios: [{ campo: 'participantes', anterior: [], nuevo: [personaId] }],
+          },
+          tx,
+        )
+      })
     },
 
-    async quitarParticipante(permisoId: string, personaId: string): Promise<void> {
-      exigirBorrador(permisoId)
-      core.bd
-        .delete(participantes)
-        .where(and(eq(participantes.permisoId, permisoId), eq(participantes.personaId, personaId)))
-        .run()
+    async quitarParticipante(actor: Actor, permisoId: string, personaId: string): Promise<void> {
+      const permiso = exigirBorrador(permisoId)
+      core.bd.transaction((tx) => {
+        tx.delete(participantes)
+          .where(and(eq(participantes.permisoId, permisoId), eq(participantes.personaId, personaId)))
+          .run()
+        core.auditoria.registrar(
+          {
+            actorPersonaId: actor.personaId,
+            modulo: 'salidas',
+            accion: 'quitarParticipante',
+            elevado: actor.estaElevado,
+            grupoId: permiso.grupoId,
+            entidadTipo: 'permiso',
+            entidadId: permisoId,
+            objetivoPersonaId: personaId,
+            cambios: [{ campo: 'participantes', anterior: [personaId], nuevo: [] }],
+          },
+          tx,
+        )
+      })
       soltarResponsableAusente(permisoId)
     },
 
     /** Quien queda a cargo. Tiene que ser uno de los dirigentes que van: el
      *  papel lo imprime como el contacto de la salida, y alguien que no viaja
      *  no le sirve a nadie. */
-    async elegirResponsable(permisoId: string, personaId: string): Promise<void> {
-      exigirBorrador(permisoId)
+    async elegirResponsable(actor: Actor, permisoId: string, personaId: string): Promise<void> {
+      const permiso = exigirBorrador(permisoId)
       if (!esResponsablePosible(anotados(permisoId), personaId)) {
         throw new PermisoInvalido([
           {
@@ -300,11 +382,26 @@ export function crearOperacionesDeBorrador(core: Core, personas: Personas, estru
           },
         ])
       }
-      core.bd
-        .update(permisos)
-        .set({ responsableId: personaId, actualizadoEn: core.reloj.ahora() })
-        .where(eq(permisos.id, permisoId))
-        .run()
+      core.bd.transaction((tx) => {
+        tx.update(permisos)
+          .set({ responsableId: personaId, actualizadoEn: core.reloj.ahora() })
+          .where(eq(permisos.id, permisoId))
+          .run()
+        core.auditoria.registrar(
+          {
+            actorPersonaId: actor.personaId,
+            modulo: 'salidas',
+            accion: 'elegirResponsable',
+            elevado: actor.estaElevado,
+            grupoId: permiso.grupoId,
+            entidadTipo: 'permiso',
+            entidadId: permisoId,
+            objetivoPersonaId: personaId,
+            cambios: [{ campo: 'responsableId', anterior: permiso.responsableId, nuevo: personaId }],
+          },
+          tx,
+        )
+      })
     },
   }
 }

@@ -2,27 +2,75 @@ import type { Context } from '@gps/core'
 import { getOperationAST } from 'graphql'
 import type { Plugin } from 'graphql-yoga'
 
-/** Audita toda mutation ejecutada con alcance global (`actor.estaElevado`).
- *  No es la única auditoría: cada módulo sigue registrando sus propios
- *  eventos de dominio (ver `eventos_de_autoridad` en personas). Esto agrega
- *  la marca "se escribió con sudo prendido", que ningún módulo puede saber
- *  por sí solo porque `estaElevado` es un hecho de la sesión, no del dominio.
- *
- *  No habilita sudo: sólo lo observa. `Alcance.esAdministrador` sigue
- *  viniendo únicamente de `estructura.expandirAlcance`, y este plugin no lo
- *  toca ni corre para pedidos internos -el barrido de afiliación, la siembra
- *  de demo- porque esos no pasan por Yoga. */
-export function crearInterceptorDeEscriturasElevadas(): Plugin<Context> {
+/** Inventario explícito: una mutation nueva rompe el test hasta decidir cómo
+ *  y dónde se registra. No contiene payloads ni reemplaza los eventos de cada
+ *  caso de uso. */
+export const ACCIONES_AUDITADAS = [
+  'adjuntarAPermiso',
+  'agregarParticipante',
+  'anularPago',
+  'anularPermiso',
+  'asignarCargo',
+  'cerrarSesion',
+  'confirmarSubida',
+  'crearPermiso',
+  'crearPersona',
+  'declararAfiliacion',
+  'definirCuotaDeAfiliacion',
+  'elegirResponsable',
+  'elegirUnidades',
+  'emitirPermiso',
+  'firmarEnApp',
+  'firmarEnPapel',
+  'generarDeudasPendientes',
+  'integrarEquipo',
+  'invitar',
+  'quitarAdjuntoDePermiso',
+  'quitarParticipante',
+  'reEmitirPermiso',
+  'registrarPago',
+  'revocarCargo',
+  'revocarIntegranteDeEquipo',
+  'revocarInvitacion',
+  'solicitarSubida',
+] as const
+
+/** La cabecera sólo expresa qué creía el cliente al iniciar la mutation. La
+ * autorización sigue dependiendo exclusivamente del Actor reconstruido por el
+ * servidor. Si sudo venció durante el viaje y la operación fue rechazada,
+ * conserva ese intento sensible sin convertir errores ordinarios en ruido. */
+export function crearInterceptorDeIntentosElevados(): Plugin<Context> {
   return {
     onExecute({ args }) {
       const contexto = args.contextValue
-      if (!contexto.actor?.estaElevado) return
+      const actor = contexto.actor
+      if (
+        !contexto.intencionElevada ||
+        !actor ||
+        actor.estaElevado ||
+        !actor.esAdministradorDesignado
+      ) {
+        return
+      }
       const operacion = getOperationAST(args.document, args.operationName)
       if (operacion?.operation !== 'mutation') return
-      contexto.auth.auditarEscrituraElevada(
-        contexto.actor.personaId,
-        args.operationName ?? 'mutación anónima',
+      const acciones = operacion.selectionSet.selections.flatMap((seleccion) =>
+        seleccion.kind === 'Field' ? [seleccion.name.value] : [],
       )
+      return {
+        onExecuteDone({ result }) {
+          if (Symbol.asyncIterator in result) return
+          const rechazada = result.errors?.some(
+            (error) => error.extensions?.code === 'SIN_PERMISO',
+          )
+          if (!rechazada) return
+          for (const accion of acciones) {
+            // `Core` no vive en Context; auth publica esta operación mínima
+            // para registrar el rechazo desde la frontera GraphQL.
+            contexto.auth.auditarIntentoElevadoRechazado(actor.personaId, accion)
+          }
+        },
+      }
     },
   }
 }

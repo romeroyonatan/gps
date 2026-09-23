@@ -17,6 +17,7 @@
         "@expo/metro-runtime": "~57.0.13",
         "@gps/afiliacion": "workspace:*",
         "@gps/api": "workspace:*",
+        "@gps/auditoria": "workspace:*",
         "@gps/core": "workspace:*",
         "@gps/diseno": "workspace:*",
         "@gps/estructura": "workspace:*",
@@ -64,6 +65,7 @@
         "@gps/afiliacion": "workspace:*",
         "@gps/api": "workspace:*",
         "@gps/archivos": "workspace:*",
+        "@gps/auditoria": "workspace:*",
         "@gps/core": "workspace:*",
         "@gps/diseno": "workspace:*",
         "@gps/estructura": "workspace:*",
@@ -131,6 +133,23 @@
       "version": "0.1.0",
       "dependencies": {
         "@gps/core": "workspace:*",
+        "drizzle-orm": "^0.45.2",
+        "graphql": "^16.9.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "drizzle-kit": "^0.31.10",
+        "typescript": "^5.7.0",
+      },
+    },
+    "packages/auditoria": {
+      "name": "@gps/auditoria",
+      "version": "0.1.0",
+      "dependencies": {
+        "@gps/auth": "workspace:*",
+        "@gps/core": "workspace:*",
+        "@gps/estructura": "workspace:*",
+        "@gps/personas": "workspace:*",
         "drizzle-orm": "^0.45.2",
         "graphql": "^16.9.0",
       },
@@ -272,6 +291,7 @@
       "dependencies": {
         "@gps/afiliacion": "workspace:*",
         "@gps/archivos": "workspace:*",
+        "@gps/auditoria": "workspace:*",
         "@gps/auth": "workspace:*",
         "@gps/core": "workspace:*",
         "@gps/demo": "workspace:*",
@@ -600,6 +620,8 @@
     "@gps/api": ["@gps/api@workspace:packages/api"],
 
     "@gps/archivos": ["@gps/archivos@workspace:packages/archivos"],
+
+    "@gps/auditoria": ["@gps/auditoria@workspace:packages/auditoria"],
 
     "@gps/auth": ["@gps/auth@workspace:packages/auth"],
 

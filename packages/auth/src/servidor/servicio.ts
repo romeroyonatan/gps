@@ -1,4 +1,4 @@
-import type { Actor, Core } from '@gps/core'
+import type { Actor, Core, EjecutorDeAuditoria } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Estructura } from '@gps/estructura/dominio'
 import {
@@ -13,7 +13,6 @@ import { despuesDe } from '../dominio/tiempo'
 import type { Plataforma, ProveedorOidc } from './oidc'
 import {
   administradorDelSistema,
-  eventosDeSeguridad,
   identidadesExternas,
   invitaciones,
   sesiones,
@@ -195,10 +194,9 @@ export interface ServicioDeAuth extends Auth {
     datos: { transaccion: string; stateRecibido: string; code: string },
   ): Promise<void>
 
-  /** Audita una escritura ejecutada con alcance global. La llama el
-   *  interceptor de GraphQL, no un resolver: separar la escritura de dominio
-   *  de su auditoría evita que un modulo tenga que acordarse de auditarse. */
-  auditarEscrituraElevada(personaId: string, operacion: string): void
+  /** Registra la carrera en que el cliente inició una acción con sudo visible
+   *  pero el servidor ya lo encontró vencido y denegó la mutation. */
+  auditarIntentoElevadoRechazado(personaId: string, operacion: string): void
 
   /** Reemplaza a la persona administradora del sistema. No hay mutation
    *  pública equivalente a propósito: es la válvula de emergencia -documentada
@@ -305,19 +303,19 @@ export function crearServicioDeAuth(
     tipo: string,
     actorPersonaId: string | null,
     objetivoPersonaId: string | null,
-    detalles: Record<string, unknown>,
+    detalles: Record<string, string | number | boolean | null>,
+    resultado: 'exitoso' | 'rechazado' = 'exitoso',
+    ejecutor?: EjecutorDeAuditoria,
   ): void {
-    core.bd
-      .insert(eventosDeSeguridad)
-      .values({
-        id: core.nuevoId('evento_de_seguridad'),
-        tipo,
-        actorPersonaId,
-        objetivoPersonaId,
-        detalles: JSON.stringify(detalles),
-        creadoEn: core.reloj.ahora(),
-      })
-      .run()
+    core.auditoria.registrar({
+      actorPersonaId,
+      modulo: 'auth',
+      accion: tipo,
+      resultado,
+      elevado: tipo === 'sesion.elevar' || tipo === 'sudo.escritura',
+      objetivoPersonaId,
+      resumen: detalles,
+    }, ejecutor)
   }
 
   return {
@@ -653,11 +651,32 @@ export function crearServicioDeAuth(
         invitacion.revocadaEn !== null ||
         invitacion.expiraEn <= ahora
       ) {
+        registrarEvento('invitacion.recuperacion.consumir', null, null, {}, 'rechazado')
         throw new InvitacionInvalida('venció, ya se usó o no existe')
       }
 
-      const { proveedor, subject } = await resolverSubject(datos)
+      let identidad: { proveedor: ProveedorDeIdentidad; subject: string }
+      try {
+        identidad = await resolverSubject(datos)
+      } catch (error) {
+        registrarEvento(
+          'invitacion.recuperacion.consumir',
+          invitacion.personaId,
+          invitacion.personaId,
+          { invitacionId: invitacion.id },
+          'rechazado',
+        )
+        throw error
+      }
+      const { proveedor, subject } = identidad
       if (proveedor !== invitacion.proveedorAReemplazar) {
+        registrarEvento(
+          'invitacion.recuperacion.consumir',
+          invitacion.personaId,
+          invitacion.personaId,
+          { invitacionId: invitacion.id },
+          'rechazado',
+        )
         throw new InvitacionInvalida('el proveedor no coincide con el de la invitación')
       }
       const enUso = core.bd
@@ -672,7 +691,16 @@ export function crearServicioDeAuth(
           ),
         )
         .get()
-      if (enUso) throw new ProveedorYaVinculado()
+      if (enUso) {
+        registrarEvento(
+          'invitacion.recuperacion.consumir',
+          invitacion.personaId,
+          invitacion.personaId,
+          { invitacionId: invitacion.id },
+          'rechazado',
+        )
+        throw new ProveedorYaVinculado()
+      }
 
       const identidadId = core.nuevoId('identidad')
       // Mismo cierre del doble consumo que en la activacion: se relee adentro
@@ -717,19 +745,27 @@ export function crearServicioDeAuth(
           .set({ revocadaEn: ahora, actualizadoEn: ahora })
           .where(and(eq(sesiones.personaId, invitacion.personaId), isNull(sesiones.revocadaEn)))
           .run()
+        registrarEvento(
+          'invitacion.recuperacion.consumir',
+          invitacion.personaId,
+          invitacion.personaId,
+          { invitacionId: invitacion.id, proveedor },
+          'exitoso',
+          tx,
+        )
         return true
       })
-      if (!consumida) throw new InvitacionInvalida('venció, ya se usó o no existe')
+      if (!consumida) {
+        registrarEvento(
+          'invitacion.recuperacion.consumir',
+          invitacion.personaId,
+          invitacion.personaId,
+          { invitacionId: invitacion.id },
+          'rechazado',
+        )
+        throw new InvitacionInvalida('venció, ya se usó o no existe')
+      }
 
-      registrarEvento(
-        'invitacion.recuperacion.consumir',
-        invitacion.personaId,
-        invitacion.personaId,
-        {
-          invitacionId: invitacion.id,
-          proveedor,
-        },
-      )
       return crearSesion(identidadId, invitacion.personaId)
     },
 
@@ -745,10 +781,35 @@ export function crearServicioDeAuth(
           ),
         )
         .get()
-      if (!sesion) throw new ElevacionDenegada()
-      if (!esAdministrador(sesion.personaId)) throw new ElevacionDenegada()
+      if (!sesion) {
+        registrarEvento('sesion.elevar', null, null, { sesionId }, 'rechazado')
+        throw new ElevacionDenegada()
+      }
+      if (!esAdministrador(sesion.personaId)) {
+        registrarEvento(
+          'sesion.elevar',
+          sesion.personaId,
+          sesion.personaId,
+          { sesionId },
+          'rechazado',
+        )
+        throw new ElevacionDenegada()
+      }
 
-      const { proveedor, subject } = await resolverSubject(datos)
+      let identidad: { proveedor: ProveedorDeIdentidad; subject: string }
+      try {
+        identidad = await resolverSubject(datos)
+      } catch (error) {
+        registrarEvento(
+          'sesion.elevar',
+          sesion.personaId,
+          sesion.personaId,
+          { sesionId },
+          'rechazado',
+        )
+        throw error
+      }
+      const { proveedor, subject } = identidad
       const identidadDeLaPersona = core.bd
         .select({ id: identidadesExternas.id })
         .from(identidadesExternas)
@@ -764,42 +825,68 @@ export function crearServicioDeAuth(
       // La reautenticacion tiene que ser de una identidad ya vinculada a esta
       // misma persona: repetir el login de otra persona -aunque sea valido
       // para ella- no eleva esta sesion.
-      if (!identidadDeLaPersona) throw new ElevacionDenegada()
+      if (!identidadDeLaPersona) {
+        registrarEvento(
+          'sesion.elevar',
+          sesion.personaId,
+          sesion.personaId,
+          { sesionId },
+          'rechazado',
+        )
+        throw new ElevacionDenegada()
+      }
 
       const ahora = core.reloj.ahora()
-      core.bd
-        .update(sesiones)
-        .set({ elevadaHasta: despuesDe(ahora, DURACION_DE_ELEVACION), actualizadoEn: ahora })
-        .where(eq(sesiones.id, sesionId))
-        .run()
-      registrarEvento('sesion.elevar', sesion.personaId, sesion.personaId, { sesionId })
+      core.bd.transaction((tx) => {
+        tx.update(sesiones)
+          .set({ elevadaHasta: despuesDe(ahora, DURACION_DE_ELEVACION), actualizadoEn: ahora })
+          .where(eq(sesiones.id, sesionId))
+          .run()
+        registrarEvento(
+          'sesion.elevar',
+          sesion.personaId,
+          sesion.personaId,
+          { sesionId },
+          'exitoso',
+          tx,
+        )
+      })
     },
 
-    auditarEscrituraElevada(personaId, operacion) {
-      registrarEvento('sudo.escritura', personaId, null, { operacion })
+    auditarIntentoElevadoRechazado(personaId, operacion) {
+      registrarEvento('sudo.escritura', personaId, null, { operacion }, 'rechazado')
     },
 
     async asignarAdministrador(personaId) {
-      if (!(await personas.personaExiste(personaId)))
+      if (!(await personas.personaExiste(personaId))) {
+        registrarEvento('administrador.reasignar', null, personaId, {}, 'rechazado')
         throw new Error(`La persona ${personaId} no existe.`)
+      }
       const anterior = core.bd
         .select({ personaId: administradorDelSistema.personaId })
         .from(administradorDelSistema)
         .get()
       const ahora = core.reloj.ahora()
-      if (anterior) {
-        core.bd
-          .update(administradorDelSistema)
-          .set({ personaId, actualizadoEn: ahora })
-          .where(eq(administradorDelSistema.singleton, 1))
-          .run()
-      } else {
-        core.bd
-          .insert(administradorDelSistema)
-          .values({ singleton: 1, personaId, creadoEn: ahora, actualizadoEn: ahora })
-          .run()
-      }
-      registrarEvento('administrador.reasignar', anterior?.personaId ?? null, personaId, {})
+      core.bd.transaction((tx) => {
+        if (anterior) {
+          tx.update(administradorDelSistema)
+            .set({ personaId, actualizadoEn: ahora })
+            .where(eq(administradorDelSistema.singleton, 1))
+            .run()
+        } else {
+          tx.insert(administradorDelSistema)
+            .values({ singleton: 1, personaId, creadoEn: ahora, actualizadoEn: ahora })
+            .run()
+        }
+        registrarEvento(
+          'administrador.reasignar',
+          anterior?.personaId ?? null,
+          personaId,
+          {},
+          'exitoso',
+          tx,
+        )
+      })
     },
 
     async crearSesionParaIdentidad(identidadId) {
@@ -853,12 +940,27 @@ export function crearServicioDeAuth(
     },
 
     async revocarSesion(sesionId) {
-      const ahora = core.reloj.ahora()
-      core.bd
-        .update(sesiones)
-        .set({ revocadaEn: ahora, actualizadoEn: ahora })
+      const sesion = core.bd
+        .select({ personaId: sesiones.personaId })
+        .from(sesiones)
         .where(eq(sesiones.id, sesionId))
-        .run()
+        .get()
+      if (!sesion) return
+      const ahora = core.reloj.ahora()
+      core.bd.transaction((tx) => {
+        tx.update(sesiones)
+          .set({ revocadaEn: ahora, actualizadoEn: ahora })
+          .where(eq(sesiones.id, sesionId))
+          .run()
+        registrarEvento(
+          'sesion.revocar',
+          sesion.personaId,
+          sesion.personaId,
+          { sesionId },
+          'exitoso',
+          tx,
+        )
+      })
     },
   }
 }

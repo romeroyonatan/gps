@@ -1,6 +1,6 @@
 import type { Archivos } from '@gps/archivos/dominio'
 import { sePuedeAnexar } from '@gps/archivos/dominio'
-import type { Core } from '@gps/core'
+import type { Actor, Core } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Estructura } from '@gps/estructura/dominio'
 import { nombreDelCargo, type Personas, type TipoDeCargo } from '@gps/personas/dominio'
@@ -146,7 +146,12 @@ export function crearOperacionesDeFirma(
     /** Firma dibujada en la app. El sello ata esta firma a este PDF, este cargo,
      *  esta persona y este dia: sin eso, los trazos se podrian copiar a otro
      *  permiso. */
-    async firmarEnApp(permisoId: string, cargo: TipoDeCargo, trazos: Trazos): Promise<Firma> {
+    async firmarEnApp(
+      actor: Actor,
+      permisoId: string,
+      cargo: TipoDeCargo,
+      trazos: Trazos,
+    ): Promise<Firma> {
       if (estaVacio(trazos)) throw new FirmaInvalida('No dibujaste nada.')
       const { permiso, cuales, fecha, quien } = await prepararFirma(permisoId, cargo)
       if (permiso.hashDelPdf === null) {
@@ -180,7 +185,23 @@ export function crearOperacionesDeFirma(
         creadoEn: ahora,
         actualizadoEn: ahora,
       }
-      core.bd.insert(firmas).values(firma).run()
+      core.bd.transaction((tx) => {
+        tx.insert(firmas).values(firma).run()
+        core.auditoria.registrar(
+          {
+            actorPersonaId: actor.personaId,
+            modulo: 'salidas',
+            accion: 'firmarEnApp',
+            elevado: actor.estaElevado,
+            grupoId: permiso.grupoId,
+            entidadTipo: 'firma',
+            entidadId: firma.id,
+            objetivoPersonaId: quien.id,
+            resumen: { permisoId, cargo, modo: 'app' },
+          },
+          tx,
+        )
+      })
       completarSiCorresponde(permisoId, cuales.length)
       return firma
     },
@@ -193,6 +214,7 @@ export function crearOperacionesDeFirma(
      *  firmo. El respaldo es el escaneo. Cuando exista auth, se registra ademas
      *  quien lo declaro. */
     async firmarEnPapel(
+      actor: Actor,
       permisoId: string,
       cargos: readonly TipoDeCargo[],
       escaneoId: string,
@@ -213,9 +235,11 @@ export function crearOperacionesDeFirma(
 
       const puestas: Firma[] = []
       let cuantas = 0
+      let grupoId: string | null = null
       for (const cargo of cargos) {
-        const { cuales, fecha, quien } = await prepararFirma(permisoId, cargo)
+        const { permiso, cuales, fecha, quien } = await prepararFirma(permisoId, cargo)
         cuantas = cuales.length
+        grupoId = permiso.grupoId
         const ahora = core.reloj.ahora()
         const firma: Firma = {
           id: core.nuevoId('firma'),
@@ -233,9 +257,24 @@ export function crearOperacionesDeFirma(
           creadoEn: ahora,
           actualizadoEn: ahora,
         }
-        core.bd.insert(firmas).values(firma).run()
         puestas.push(firma)
       }
+      core.bd.transaction((tx) => {
+        tx.insert(firmas).values(puestas).run()
+        core.auditoria.registrar(
+          {
+            actorPersonaId: actor.personaId,
+            modulo: 'salidas',
+            accion: 'firmarEnPapel',
+            elevado: actor.estaElevado,
+            grupoId,
+            entidadTipo: 'permiso',
+            entidadId: permisoId,
+            resumen: { permisoId, cargos: [...cargos], modo: 'papel', escaneoId },
+          },
+          tx,
+        )
+      })
       completarSiCorresponde(permisoId, cuantas)
       return puestas
     },

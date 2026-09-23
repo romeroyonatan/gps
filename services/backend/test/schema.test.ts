@@ -74,6 +74,7 @@ describe('esquema compuesto', () => {
           'tesoreria',
           'archivos',
           'salidas',
+          'auditoria',
         ],
       },
     })

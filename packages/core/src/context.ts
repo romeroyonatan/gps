@@ -13,6 +13,9 @@ export interface Context {
    *  politicas deciden con `estaElevado`, que es un booleano, y esto es solo
    *  para que la pantalla pueda mostrar la cuenta regresiva. */
   readonly elevadaHasta: Date | null
+  /** Marca del cliente para reconocer una mutation iniciada mientras mostraba
+   *  sudo. Es sólo evidencia de intención: nunca participa de autorización. */
+  readonly intencionElevada: boolean
   /** La configuracion ya validada. Un resolver que necesita el origen publico
    *  -armar un enlace de invitacion- no tiene otra forma de conocerlo: `Core`
    *  es de los servicios, no del contexto. */

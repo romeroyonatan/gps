@@ -42,6 +42,40 @@ export interface Reloj {
  *  abierta y no sabe cual es. */
 export type Bd = BaseSQLiteDatabase<'sync', unknown>
 
+export type ValorDeAuditoria = string | number | boolean | null | readonly ValorDeAuditoria[]
+
+export interface CambioDeAuditoria {
+  readonly campo: string
+  readonly anterior: ValorDeAuditoria
+  readonly nuevo: ValorDeAuditoria
+}
+
+/** Un hecho que los modulos entregan ya reducido a datos de negocio. Nunca
+ *  recibe argumentos GraphQL completos: asi secretos y bytes no entran por
+ *  accidente al registro. */
+export interface DatosDeAuditoria {
+  readonly actorPersonaId: string | null
+  readonly origenInterno?: string | null
+  readonly modulo: string
+  readonly accion: string
+  readonly resultado?: 'exitoso' | 'rechazado'
+  readonly elevado?: boolean
+  readonly grupoId?: string | null
+  readonly entidadTipo?: string | null
+  readonly entidadId?: string | null
+  readonly objetivoPersonaId?: string | null
+  readonly resumen?: Readonly<Record<string, ValorDeAuditoria>>
+  readonly cambios?: readonly CambioDeAuditoria[]
+}
+
+/** Tanto `Bd` como una transaccion SQLite exponen `run`; alcanza para insertar
+ *  el evento sin filtrar el resto de la base por esta interfaz transversal. */
+export type EjecutorDeAuditoria = Pick<Bd, 'run'>
+
+export interface RegistroDeAuditoria {
+  registrar(datos: DatosDeAuditoria, ejecutor?: EjecutorDeAuditoria): string
+}
+
 /** Un sello: la prueba de que unos datos se sellaron con una clave nuestra, y
  *  cual. El `claveId` viaja con el sello y se guarda con el: sin el, rotar la
  *  clave invalidaria todo lo sellado antes. */
@@ -101,6 +135,7 @@ export interface Core {
   readonly reloj: Reloj
   readonly bd: Bd
   readonly eventos: BusDeEventos
+  readonly auditoria: RegistroDeAuditoria
   readonly sellador: Sellador
   readonly almacenamiento: Almacenamiento
   readonly conversorDeImagenes: ConversorDeImagenes
