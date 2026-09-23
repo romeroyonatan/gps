@@ -880,3 +880,236 @@ describe('alcance entre grupos', () => {
     expect(persona.pertenencia.grupoId).toBe('grupo_1')
   })
 })
+
+describe('editarPersona', () => {
+  const alcance = (quien: Actor) => alcanceDe(quien, ['grupo_1'])
+
+  test('corrige un DNI mal tipeado y no toca pertenencia ni cargos', async () => {
+    const servicio = montar()
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, {
+      ...ingreso,
+      cargos: [{ cargo: 'jefeDeRama', hasta: null }],
+    })
+
+    const corregida = await servicio.editarPersona(
+      alcance(actor('secretariaDeGrupo')),
+      persona.id,
+      {
+        ...valida,
+        numeroDeDocumento: '30.111.999',
+        domicilio: 'Otra calle 1',
+      },
+    )
+
+    expect(corregida.numeroDeDocumento).toBe('30111999')
+    const [enLaLista] = await servicio.listarPersonas(alcanceSinLimites(), 'grupo_1')
+    expect(enLaLista?.domicilio).toBe('Otra calle 1')
+    expect(enLaLista?.pertenencia).toEqual(persona.pertenencia)
+    expect(enLaLista?.cargos).toEqual(persona.cargos)
+  })
+
+  test('el documento de otra persona se rechaza con un mensaje que se puede mostrar', async () => {
+    const servicio = montar()
+    const una = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
+    await servicio.crearPersona(
+      alcanceSinLimites(),
+      { ...valida, numeroDeDocumento: '30111333' },
+      ingreso,
+    )
+
+    expect(
+      servicio.editarPersona(alcance(actor('jefeDeGrupo')), una.id, {
+        ...valida,
+        numeroDeDocumento: '30111333',
+      }),
+    ).rejects.toBeInstanceOf(DocumentoDuplicado)
+  })
+
+  test('guardar sin tocar el documento no choca consigo misma', async () => {
+    const servicio = montar()
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
+
+    const corregida = await servicio.editarPersona(alcance(actor('jefeDeGrupo')), persona.id, {
+      ...valida,
+      telefonoDeContacto: '11 4444-0000',
+    })
+    expect(corregida.telefonoDeContacto).toBe('11 4444-0000')
+  })
+
+  test('datos invalidos no llegan a la base', async () => {
+    const servicio = montar()
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
+
+    expect(
+      servicio.editarPersona(alcance(actor('jefeDeGrupo')), persona.id, {
+        ...valida,
+        apellidos: '  ',
+      }),
+    ).rejects.toBeInstanceOf(DatosInvalidos)
+    const [sinCambios] = await servicio.listarPersonas(alcanceSinLimites(), 'grupo_1')
+    expect(sinCambios?.apellidos).toBe('Fernández Ruiz')
+  })
+
+  test('la jefatura de otro grupo no puede corregirla', async () => {
+    const servicio = montar()
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
+
+    expect(
+      servicio.editarPersona(alcanceDe(actor('jefeDeGrupo', 'grupo_9'), ['grupo_9']), persona.id, {
+        ...valida,
+        domicilio: 'Calle ajena 1',
+      }),
+    ).rejects.toBeInstanceOf(CambioDeAutoridadDenegado)
+  })
+
+  test('la corrección queda auditada con sólo los campos que cambiaron', async () => {
+    const { servicio, eventos } = montarConBd()
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
+
+    await servicio.editarPersona(alcance(actor('secretariaDeGrupo')), persona.id, {
+      ...valida,
+      domicilio: 'Otra calle 1',
+    })
+
+    const evento = eventos.find((uno) => uno.accion === 'editarPersona')
+    expect(evento).toMatchObject({
+      actorPersonaId: 'actor',
+      modulo: 'personas',
+      grupoId: 'grupo_1',
+      entidadId: persona.id,
+      objetivoPersonaId: persona.id,
+    })
+    expect(evento?.cambios).toEqual([
+      { campo: 'domicilio', anterior: valida.domicilio, nuevo: 'Otra calle 1' },
+    ])
+  })
+
+  test('una corrección rechazada no deja evento', async () => {
+    const { servicio, eventos } = montarConBd()
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
+
+    await expect(
+      servicio.editarPersona(alcance(actor('jefeDeGrupo')), persona.id, {
+        ...valida,
+        apellidos: '  ',
+      }),
+    ).rejects.toBeInstanceOf(DatosInvalidos)
+    expect(eventos.some((uno) => uno.accion === 'editarPersona')).toBe(false)
+  })
+})
+
+describe('cambiarDeUnidad', () => {
+  const dirigente = { ...ingreso, categoria: 'activo' as const, unidadId: 'unidad_lob' }
+
+  test('cierra la pertenencia la vispera y abre la nueva', async () => {
+    const servicio = montar()
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, {
+      ...dirigente,
+      cargos: [{ cargo: 'jefeDeRama', hasta: null }],
+    })
+
+    const nueva = await servicio.cambiarDeUnidad(
+      alcanceDe(actor('jefeDeGrupo'), ['grupo_1']),
+      persona.id,
+      'unidad_sco',
+      '1969-12-01',
+    )
+
+    expect(nueva.unidadId).toBe('unidad_sco')
+    expect(nueva.desde).toBe('1969-12-01')
+    expect(nueva.categoria).toBe('activo')
+
+    const [enLaLista] = await servicio.listarPersonas(alcanceSinLimites(), 'grupo_1')
+    expect(enLaLista?.pertenencia.unidadId).toBe('unidad_sco')
+    // Los cargos no se mueven: su ambito es el grupo, no la pertenencia.
+    expect(enLaLista?.cargos).toEqual(persona.cargos)
+  })
+
+  test('el pase queda auditado con la unidad anterior y la nueva', async () => {
+    const { servicio, eventos } = montarConBd()
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, dirigente)
+
+    await servicio.cambiarDeUnidad(
+      alcanceDe(actor('jefeDeGrupo'), ['grupo_1']),
+      persona.id,
+      'unidad_sco',
+      '1969-12-01',
+    )
+
+    const evento = eventos.find((uno) => uno.accion === 'cambiarDeUnidad')
+    expect(evento).toMatchObject({
+      actorPersonaId: 'actor',
+      grupoId: 'grupo_1',
+      objetivoPersonaId: persona.id,
+      resumen: { desde: '1969-12-01' },
+      cambios: [{ campo: 'unidadId', anterior: 'unidad_lob', nuevo: 'unidad_sco' }],
+    })
+  })
+
+  test('una consulta a una fecha anterior ve la unidad de ese dia', async () => {
+    const servicio = montar()
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, dirigente)
+    await servicio.cambiarDeUnidad(
+      alcanceDe(actor('jefeDeGrupo'), ['grupo_1']),
+      persona.id,
+      'unidad_sco',
+      '1969-12-01',
+    )
+
+    const antes = await servicio.miembrosDelGrupo('grupo_1', '1969-06-01')
+    expect(antes.map((miembro) => miembro.unidadId)).toEqual(['unidad_lob'])
+    const despues = await servicio.miembrosDelGrupo('grupo_1', '1969-12-01')
+    expect(despues.map((miembro) => miembro.unidadId)).toEqual(['unidad_sco'])
+    // La vispera del cambio todavia es de la unidad vieja, y de una sola.
+    const vispera = await servicio.miembrosDelGrupo('grupo_1', '1969-11-30')
+    expect(vispera.map((miembro) => miembro.unidadId)).toEqual(['unidad_lob'])
+  })
+
+  test('un beneficiario no cambia de unidad por aca', async () => {
+    const servicio = montar()
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
+
+    expect(
+      servicio.cambiarDeUnidad(
+        alcanceDe(actor('jefeDeGrupo'), ['grupo_1']),
+        persona.id,
+        'unidad_sco',
+        '1969-12-01',
+      ),
+    ).rejects.toBeInstanceOf(DatosInvalidos)
+  })
+
+  test('la jefatura de otro grupo no puede pasarlo de unidad', async () => {
+    const servicio = montar()
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, dirigente)
+
+    expect(
+      servicio.cambiarDeUnidad(
+        alcanceDe(actor('jefeDeGrupo', 'grupo_9'), ['grupo_9']),
+        persona.id,
+        'unidad_sco',
+        '1969-12-01',
+      ),
+    ).rejects.toBeInstanceOf(CambioDeAutoridadDenegado)
+  })
+})
+
+describe('listarPersonas y la revocación', () => {
+  test('un cargo revocado deja de aparecer, uno vencido no', async () => {
+    const servicio = montar()
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, {
+      ...ingreso,
+      // Uno vencido y uno vigente: el vencido es historia y se muestra igual.
+      cargos: [
+        { cargo: 'jefeDeRama', hasta: '1969-06-01' },
+        { cargo: 'jefeDeGrupo', hasta: null },
+      ],
+    })
+    const jefatura = persona.cargos.find((cargo) => cargo.cargo === 'jefeDeGrupo')
+
+    await servicio.revocarCargo(actor('jefeDeGrupo'), jefatura?.id ?? '')
+
+    const [enLaLista] = await servicio.listarPersonas(alcanceSinLimites(), 'grupo_1')
+    expect(enLaLista?.cargos.map((cargo) => cargo.cargo)).toEqual(['jefeDeRama'])
+  })
+})

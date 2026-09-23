@@ -323,6 +323,40 @@ export function ChipDeRama(props: { rama: Rama; children?: ReactNode }) {
   )
 }
 
+/** Un hecho que alguien le puso a una persona y le puede sacar: un cargo, un
+ *  equipo. Es un `Chip` con una × al lado; sin `onQuitar` es un `Chip` y nada
+ *  más, que es como se ve cuando quien mira no puede administrar. La × es un
+ *  `Pressable` propio —y no la etiqueta entera— porque quitar no es tocar la
+ *  etiqueta: la gemela de web hace lo mismo con un `<button>`.
+ *
+ *  Va con `hitSlop`: 26px de alto es la píldora, no el área de toque. */
+export function Etiqueta(props: {
+  children: ReactNode
+  onQuitar?: () => void
+  quitando?: boolean
+}) {
+  return (
+    <View className="min-h-[26px] shrink-0 flex-row items-center gap-1.5 rounded-full bg-surface-3 px-2.5 py-0.5">
+      <Text className="text-label font-semibold text-ink-muted">{props.children}</Text>
+      {props.onQuitar && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Quitar"
+          onPress={props.onQuitar}
+          disabled={props.quitando}
+          hitSlop={10}
+        >
+          <Text
+            className={`text-label font-semibold ${props.quitando ? 'text-ink-faint opacity-40' : 'text-ink-faint'}`}
+          >
+            ×
+          </Text>
+        </Pressable>
+      )}
+    </View>
+  )
+}
+
 /** El saldo de la cuenta de un grupo, con la palabra que dice de qué lado va.
  *  Positivo es deuda: así lo guarda tesorería. El signo y el sustantivo se
  *  escriben, el color es refuerzo y nunca el dato. */

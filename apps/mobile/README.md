@@ -41,6 +41,7 @@ de propósito general.
 | `Campo` | Un control con su etiqueta arriba y su problema debajo. |
 | `Chip` | La píldora de estado, con su texto siempre escrito y el color como refuerzo. Tonos: `ok`, `warn`, `info`, `neutro`. |
 | `ChipDeRama` | La etiqueta de rama: el punto de color de 8px adentro de un `Chip`. |
+| `Etiqueta` | Un `Chip` con una × al lado, con `hitSlop`: un cargo o un equipo que se le puede sacar a alguien. Sin `onQuitar` es un `Chip` a secas. |
 | `Saldo` | El saldo de una cuenta con la palabra que dice de qué lado va. Positivo es deuda. |
 | `Falla` / `Aviso` / `Nota` | Salió mal / conviene saberlo / se mira pero no se toca. `Aviso` con `accion` es además el cartel destacado de lo que hay que hacer hoy. |
 | `Cargando` / `Vacio` | La consulta no volvió / volvió sin nada. |

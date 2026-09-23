@@ -9,43 +9,54 @@ import {
   nombreDelCargo,
   nombreDelTipo,
 } from '@gps/personas/dominio'
-import { useLocalSearchParams } from 'expo-router'
-import { ScrollView, Text, View } from 'react-native'
-import { Accion, Cargando, Chip, Falla, Titulo, Vacio } from '../../../src/ui'
+import { Link, useLocalSearchParams } from 'expo-router'
+import { Pressable, ScrollView, Text, View } from 'react-native'
+import { Accion, Cargando, Chevron, Chip, Falla, Titulo, Vacio } from '../../../src/ui'
 
 type Persona = NonNullable<ReturnType<typeof usePersonasDelGrupo>['data']>['personas'][number]
 
-function FilaDePersona(props: { persona: Persona; hoy: Date; afiliada: boolean; periodo: number }) {
+function FilaDePersona(props: {
+  grupoId: string
+  persona: Persona
+  hoy: Date
+  afiliada: boolean
+  periodo: number
+}) {
   // El "hasta" generado es opcional (string | null | undefined); el del
   // dominio es string | null a secas. Se normaliza solo en esta frontera.
   const vigentes = props.persona.cargos.filter((cargo) =>
     estaVigente({ desde: cargo.desde, hasta: cargo.hasta ?? null }, props.hoy),
   )
   return (
-    <View className="min-h-[72px] flex-row items-center gap-3 border-b border-line py-3">
-      <View className="min-w-0 flex-1">
-        <Text className="text-sm font-semibold text-ink">{nombreCompleto(props.persona)}</Text>
-        <Text className="mt-0.5 text-xs text-ink-muted">
-          {nombreDelTipo(props.persona.tipoDeDocumento)} {props.persona.numeroDeDocumento} ·{' '}
-          {calcularEdad(props.persona.fechaDeNacimiento, props.hoy)} años
-        </Text>
-        {vigentes.length > 0 && (
-          <Text className="mt-1.5 text-xs text-ink-faint">
-            {vigentes.map((cargo) => nombreDelCargo(cargo.cargo)).join(' · ')}
+    // La fila entera se toca: es como se llega a una persona, acá y en la web.
+    <Link href={`/grupos/${props.grupoId}/personas/${props.persona.id}`} asChild>
+      <Pressable className="min-h-[72px] flex-row items-center gap-3 border-b border-line py-3">
+        <View className="min-w-0 flex-1">
+          <Text className="text-sm font-semibold text-ink">{nombreCompleto(props.persona)}</Text>
+          <Text className="mt-0.5 text-xs text-ink-muted">
+            {nombreDelTipo(props.persona.tipoDeDocumento)} {props.persona.numeroDeDocumento} ·{' '}
+            {calcularEdad(props.persona.fechaDeNacimiento, props.hoy)} años
           </Text>
-        )}
-      </View>
-      {/* El período va escrito: pertenecer no es estar afiliado, y "afiliado"
+          {vigentes.length > 0 && (
+            <Text className="mt-1.5 text-xs text-ink-faint">
+              {vigentes.map((cargo) => nombreDelCargo(cargo.cargo)).join(' · ')}
+            </Text>
+          )}
+        </View>
+        {/* El período va escrito: pertenecer no es estar afiliado, y "afiliado"
           a secas no dice de cuándo. El sustantivo y no el adjetivo porque el
           padrón no guarda el género de la persona. */}
-      <Chip tono={props.afiliada ? 'ok' : 'warn'}>
-        {props.afiliada ? `Afiliación ${props.periodo}` : 'Sin afiliar'}
-      </Chip>
-    </View>
+        <Chip tono={props.afiliada ? 'ok' : 'warn'}>
+          {props.afiliada ? `Afiliación ${props.periodo}` : 'Sin afiliar'}
+        </Chip>
+        <Chevron />
+      </Pressable>
+    </Link>
   )
 }
 
 function Unidad(props: {
+  grupoId: string
   titulo: string
   detalle?: string
   personas: readonly Persona[]
@@ -68,6 +79,7 @@ function Unidad(props: {
           {props.personas.map((persona) => (
             <FilaDePersona
               key={persona.id}
+              grupoId={props.grupoId}
               persona={persona}
               hoy={props.hoy}
               afiliada={props.afiliados.has(persona.id)}
@@ -128,6 +140,7 @@ export default function Pantalla() {
             return (
               <Unidad
                 key={unidad.id}
+                grupoId={id}
                 titulo={unidad.nombre}
                 detalle={
                   rama ? `${rama.nombre} · ${etiquetaDeEdades(rama)} · ${unidad.sexo}` : undefined
@@ -146,6 +159,7 @@ export default function Pantalla() {
           {grupo.unidades.length === 0 && <Vacio>El grupo todavía no abrió ninguna unidad.</Vacio>}
 
           <Unidad
+            grupoId={id}
             titulo="Adherentes"
             personas={personas.filter((p) => p.pertenencia.categoria === 'adherente')}
             hoy={hoy}

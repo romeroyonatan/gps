@@ -87,10 +87,15 @@ function ConSesion(props: { actor: Actor; nombre: string | null }) {
   const activo = rol.activo
   const listo = rol.elegido && activo !== null
   useEffect(() => {
-    if (yaAterrizo.current || !listo || !activo) return
-    yaAterrizo.current = true
+    // La ruta se mira ANTES de gastar el disparo: el rol guardado llega tarde
+    // -AsyncStorage es asincrónico- y cuando llega la app puede no estar
+    // todavía en la portada. Marcando primero, ese único intento se perdía y
+    // la jefatura entraba al directorio en vez de a su grupo.
+    if (yaAterrizo.current || !listo || !activo || donde !== '/') return
     const inicio = inicioDelRol(activo)
-    if (donde === '/' && inicio !== '/') router.replace(inicio)
+    if (inicio === '/') return
+    yaAterrizo.current = true
+    router.replace(inicio)
   }, [listo, activo, donde])
 
   if (rol.leyendo) return <Espera>Un momento…</Espera>

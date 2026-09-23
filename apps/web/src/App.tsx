@@ -35,6 +35,7 @@ import { ModoElevado } from './pantallas/ModoElevado'
 import { Nomina } from './pantallas/Nomina'
 import { NuevaCuota } from './pantallas/NuevaCuota'
 import { NuevaSalida } from './pantallas/NuevaSalida'
+import { CambioDeRama, EditarPersona, Persona } from './pantallas/Persona'
 import { Plantel } from './pantallas/Plantel'
 import { RegistrarPago } from './pantallas/RegistrarPago'
 import { Reportes } from './pantallas/Reportes'
@@ -262,6 +263,15 @@ function Rutas() {
       <Route path="/tesoreria" component={Tesoreria} />
       <Route path="/grupos/:id/afiliacion">{(params) => <Afiliacion grupoId={params.id} />}</Route>
       <Route path="/grupos/:id/nomina">{(params) => <Nomina grupoId={params.id} />}</Route>
+      <Route path="/grupos/:id/personas/:personaId/editar">
+        {(params) => <EditarPersona grupoId={params.id} personaId={params.personaId} />}
+      </Route>
+      <Route path="/grupos/:id/personas/:personaId/rama">
+        {(params) => <CambioDeRama grupoId={params.id} personaId={params.personaId} />}
+      </Route>
+      <Route path="/grupos/:id/personas/:personaId">
+        {(params) => <Persona grupoId={params.id} personaId={params.personaId} />}
+      </Route>
       <Route path="/grupos/:id/alta">{(params) => <AltaDePersona grupoId={params.id} />}</Route>
       <Route path="/grupos/:id/salidas/nueva">
         {(params) => <NuevaSalida grupoId={params.id} />}

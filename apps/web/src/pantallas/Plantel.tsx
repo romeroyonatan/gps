@@ -10,7 +10,7 @@ import {
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import { estaVigente, nombreCompleto, puedeAdministrarPlantelDeGrupo } from '@gps/personas/dominio'
 import { useState } from 'react'
-import { Aviso, Cargando, Chip, Falla, Nota, Titulo, Volver } from '../ui'
+import { Aviso, Cargando, Etiqueta, Falla, Nota, Titulo, Volver } from '../ui'
 
 /** Lo que esta pantalla administra: la jefatura del grupo y su Secretaría.
  *  Los demás cargos se cargan al dar de alta a la persona; acá están los dos
@@ -22,25 +22,6 @@ const SECRETARIA = 'secretaria'
  *  null explícito. Es la misma regla de siempre: las dos puntas inclusivas. */
 const vigente = (periodo: { desde: string; hasta?: string | null }, hoy: Date) =>
   estaVigente({ desde: periodo.desde, hasta: periodo.hasta ?? null }, hoy)
-
-function Etiqueta(props: { children: React.ReactNode; onQuitar?: () => void; quitando?: boolean }) {
-  return (
-    <Chip>
-      {props.children}
-      {props.onQuitar && (
-        <button
-          type="button"
-          onClick={props.onQuitar}
-          disabled={props.quitando}
-          className="text-ink-faint hover:text-danger disabled:opacity-40"
-          aria-label="Quitar"
-        >
-          ×
-        </button>
-      )}
-    </Chip>
-  )
-}
 
 /** El enlace de activación o recuperación, para compartir a mano.
  *

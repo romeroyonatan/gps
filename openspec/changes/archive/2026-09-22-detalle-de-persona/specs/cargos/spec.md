@@ -1,11 +1,4 @@
-# cargos
-
-## Purpose
-
-Los cargos que ocupan las personas, con su ámbito —grupo, distrito o diócesis— y su
-período, y la consulta de quién ocupaba un cargo un día dado.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Cargos con ámbito
 Cada tipo de cargo SHALL pertenecer a un único ámbito. Los cargos de grupo son jefe de
@@ -34,19 +27,3 @@ aceptar sólo cargos de grupo, porque apuntan al grupo de la persona.
 #### Scenario: Cargo con fin de mandato desde el detalle
 - **WHEN** la jefa del grupo le asigna a una persona el cargo de subjefe con fecha de fin
 - **THEN** el cargo queda registrado desde hoy hasta esa fecha, con ámbito el grupo
-
-### Requirement: Quién ocupaba un cargo
-El sistema SHALL responder, para un tipo de cargo, una entidad de su ámbito y una fecha,
-qué personas ocupaban ese cargo ese día, incluyendo las dos puntas del período.
-
-#### Scenario: Cargo ocupado
-- **WHEN** se consulta el director de un grupo en una fecha dentro del período de su cargo
-- **THEN** se devuelve esa persona
-
-#### Scenario: Último día del período
-- **WHEN** se consulta en la fecha exacta del `hasta` del cargo
-- **THEN** la persona todavía se devuelve
-
-#### Scenario: Vacante
-- **WHEN** se consulta un cargo que nadie ocupaba ese día
-- **THEN** se devuelve una lista vacía

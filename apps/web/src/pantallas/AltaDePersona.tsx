@@ -1,11 +1,6 @@
 import { ErrorDeApi, useCrearPersona, useGrupo } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
-import {
-  etiquetaDeEdades,
-  ramaDelCatalogo,
-  ramaParaEdad,
-  type Unidad,
-} from '@gps/estructura/dominio'
+import { ramaParaEdad } from '@gps/estructura/dominio'
 import {
   CATEGORIAS,
   type Categoria,
@@ -14,10 +9,6 @@ import {
   type DatosDePersona,
   nombreCompleto,
   type Problema,
-  TIPOS_DE_CARGO,
-  TIPOS_DE_DOCUMENTO,
-  type TipoDeCargo,
-  type TipoDeDocumento,
   validarIngreso,
   validarPersona,
 } from '@gps/personas/dominio'
@@ -35,8 +26,8 @@ import {
   Titulo,
   Volver,
 } from '../ui'
-
-type UnidadAbierta = Pick<Unidad, 'id' | 'rama' | 'nombre' | 'sexo'>
+import { DatosPersonales } from './DatosPersonales'
+import { Cargos, type UnidadAbierta, Unidades } from './Vinculos'
 
 const VACIO: DatosDePersona = {
   tipoDeDocumento: 'dni',
@@ -48,170 +39,6 @@ const VACIO: DatosDePersona = {
   telefonoDeContacto: '',
 }
 
-/** Los meses con nombre, no con número: evita el error de 03/04 contra 04/03.
- *  Del `Intl` del navegador y no de una lista escrita a mano —es exactamente
- *  para esto—; el día 1 de cada mes del 2000 es sólo el vehículo. */
-const MESES = Array.from({ length: 12 }, (_, indice) => ({
-  numero: String(indice + 1),
-  nombre: new Intl.DateTimeFormat('es-AR', { month: 'long' }).format(new Date(2000, indice, 1)),
-}))
-
-const DIAS = Array.from({ length: 31 }, (_, indice) => String(indice + 1))
-
-/** La fecha de nacimiento, con tres selects nativos y no con un calendario.
- *
- *  Un nacimiento es un dato que la persona sabe de memoria: se elige, no se
- *  busca. Un calendario obliga a navegar meses hacia atrás para alguien
- *  nacido en 2013; esto son tres toques. Los años bajan desde el actual, así
- *  que un chico de 9 está a un par de líneas. La fecha de ingreso sí usa
- *  calendario: es una fecha cercana y ahí el calendario ayuda. */
-function FechaDeNacimiento(props: {
-  valor: { dia: string; mes: string; anio: string }
-  onCambiar: (valor: { dia: string; mes: string; anio: string }) => void
-}) {
-  const anioActual = new Date().getFullYear()
-  const anios = Array.from({ length: 101 }, (_, indice) => String(anioActual - indice))
-
-  return (
-    <div className="grid grid-cols-[76px_minmax(0,1fr)_96px] gap-2">
-      <select
-        aria-label="Día"
-        className={`${CAMPO} h-13 tabular-nums`}
-        value={props.valor.dia}
-        onChange={(evento) => props.onCambiar({ ...props.valor, dia: evento.target.value })}
-      >
-        <option value="">Día</option>
-        {DIAS.map((dia) => (
-          <option key={dia} value={dia}>
-            {dia}
-          </option>
-        ))}
-      </select>
-      <select
-        aria-label="Mes"
-        className={`${CAMPO} h-13`}
-        value={props.valor.mes}
-        onChange={(evento) => props.onCambiar({ ...props.valor, mes: evento.target.value })}
-      >
-        <option value="">Mes</option>
-        {MESES.map((mes) => (
-          <option key={mes.numero} value={mes.numero}>
-            {mes.nombre}
-          </option>
-        ))}
-      </select>
-      <select
-        aria-label="Año"
-        className={`${CAMPO} h-13 tabular-nums`}
-        value={props.valor.anio}
-        onChange={(evento) => props.onCambiar({ ...props.valor, anio: evento.target.value })}
-      >
-        <option value="">Año</option>
-        {anios.map((anio) => (
-          <option key={anio} value={anio}>
-            {anio}
-          </option>
-        ))}
-      </select>
-    </div>
-  )
-}
-
-/** A qué unidad entra. No es un campo vacío que haya que completar: la edad ya
- *  dice a dónde va, así que se propone y elegir a mano es corregir. La rama la
- *  decide `ramaParaEdad`; la unidad concreta es la que el grupo tenga abierta
- *  para esa rama, porque un grupo puede tener dos tropas o ninguna. */
-function Unidades(props: {
-  unidades: readonly UnidadAbierta[]
-  sugerida: UnidadAbierta | undefined
-  elegida: string | null
-  onElegir: (unidadId: string) => void
-  problema?: string
-}) {
-  const [abierto, abrir] = useState(false)
-  const actual = props.unidades.find(
-    (unidad) => unidad.id === (props.elegida ?? props.sugerida?.id),
-  )
-
-  if (props.unidades.length === 0) {
-    return (
-      <p className="rounded-lg border border-dashed border-line-strong p-4 text-sm text-ink-muted">
-        El grupo todavía no abrió ninguna unidad. Sólo podés cargar adherentes.
-      </p>
-    )
-  }
-
-  return (
-    <div className="rounded-lg bg-surface-3 p-3.5 md:bg-transparent md:p-0">
-      <p className="text-label text-ink-muted">
-        {props.elegida ? 'Unidad, elegida a mano' : 'Unidad sugerida por la edad'}
-      </p>
-      <div className="mt-2 flex items-center justify-between gap-3">
-        {actual ? (
-          <span className="inline-flex min-h-9 items-center gap-2 rounded-full bg-surface-2 px-3 font-semibold">
-            <span
-              className={`size-2 rounded-full ${COLOR_DE_RAMA[actual.rama]}`}
-              aria-hidden="true"
-            />
-            {actual.nombre}
-          </span>
-        ) : (
-          <span className="text-sm text-ink-muted">
-            {/* Ni la edad ni una elección a mano dan una unidad: el grupo no
-                tiene abierta la rama que le toca. Hay que elegir a dedo. */}
-            Ninguna unidad abierta le corresponde por edad
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={() => abrir(!abierto)}
-          aria-expanded={abierto}
-          className="min-h-9 shrink-0 rounded-lg border border-line-strong bg-surface-2 px-3 text-sm font-semibold hover:bg-surface-4"
-        >
-          Cambiar
-        </button>
-      </div>
-
-      {abierto && (
-        <ul className="mt-3 flex flex-wrap gap-2">
-          {props.unidades.map((unidad) => {
-            const catalogo = ramaDelCatalogo(unidad.rama)
-            const esActual = unidad.id === actual?.id
-            return (
-              <li key={unidad.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    props.onElegir(unidad.id)
-                    abrir(false)
-                  }}
-                  className={`inline-flex min-h-9 items-center gap-2 rounded-full border px-3 text-sm font-semibold ${
-                    esActual
-                      ? 'border-accent bg-accent text-accent-ink'
-                      : 'border-line-strong bg-surface-2 hover:bg-surface-4'
-                  }`}
-                >
-                  {!esActual && (
-                    <span
-                      className={`size-2 rounded-full ${COLOR_DE_RAMA[unidad.rama]}`}
-                      aria-hidden="true"
-                    />
-                  )}
-                  {unidad.nombre}
-                  {catalogo && (
-                    <span className="font-normal opacity-70">{etiquetaDeEdades(catalogo)}</span>
-                  )}
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      )}
-      {props.problema && <p className="mt-2 text-sm text-danger">{props.problema}</p>}
-    </div>
-  )
-}
-
 export function AltaDePersona(props: { grupoId: string }) {
   const { grupo } = useGrupo(props.grupoId)
   const alta = useCrearPersona()
@@ -219,7 +46,6 @@ export function AltaDePersona(props: { grupoId: string }) {
   const hoy = new Date()
 
   const [datos, setDatos] = useState<DatosDePersona>(VACIO)
-  const [nacimiento, setNacimiento] = useState({ dia: '', mes: '', anio: '' })
   const [categoria, setCategoria] = useState<Categoria>('beneficiario')
   // Null quiere decir "la que sugiere la edad". Un id quiere decir que alguien
   // la corrigió a mano, y entonces cambiar la fecha ya no la mueve.
@@ -240,23 +66,6 @@ export function AltaDePersona(props: { grupoId: string }) {
   // Un adherente es, por definición, el que no está en ninguna unidad.
   const unidadId = esAdherente ? null : (unidadElegida ?? sugerida?.id ?? null)
   const unidadDelResumen = unidades.find((unidad) => unidad.id === unidadId)
-
-  function cambiarNacimiento(valor: { dia: string; mes: string; anio: string }) {
-    setNacimiento(valor)
-    const completa = valor.dia && valor.mes && valor.anio
-    setDatos({
-      ...datos,
-      fechaDeNacimiento: completa
-        ? `${valor.anio}-${valor.mes.padStart(2, '0')}-${valor.dia.padStart(2, '0')}`
-        : '',
-    })
-    // La sugerencia vuelve a mandar cuando cambia la edad: corregir la fecha
-    // después de haber elegido a mano suele ser arreglar un tipeo, y dejar la
-    // unidad vieja ahí es dejar el error puesto.
-    setUnidadElegida(null)
-  }
-
-  const cargoElegido = (cargo: TipoDeCargo) => cargos.find((elegido) => elegido.cargo === cargo)
 
   function enviar(evento: FormEvent) {
     evento.preventDefault()
@@ -292,103 +101,26 @@ export function AltaDePersona(props: { grupoId: string }) {
           tiene el bloque gris de la unidad. */}
       <form onSubmit={enviar} className="mt-6 flex flex-col gap-6 md:flex-row md:items-start">
         <div className="flex-1 space-y-5 md:max-w-[560px]">
-          <Campo etiqueta="Apellidos" problema={problemaDe('apellidos')}>
-            <input
-              className={`${CAMPO} h-13`}
-              value={datos.apellidos}
-              onChange={(evento) => setDatos({ ...datos, apellidos: evento.target.value })}
-            />
-          </Campo>
-
-          <Campo etiqueta="Nombres" problema={problemaDe('nombres')}>
-            <input
-              className={`${CAMPO} h-13`}
-              value={datos.nombres}
-              onChange={(evento) => setDatos({ ...datos, nombres: evento.target.value })}
-            />
-          </Campo>
-
-          <div>
-            <span className="text-sm font-semibold">Fecha de nacimiento</span>
-            <div className="mt-2">
-              <FechaDeNacimiento valor={nacimiento} onCambiar={cambiarNacimiento} />
-            </div>
-            <p className="mt-2 text-sm tabular-nums text-ink-muted">
-              {edad === null
-                ? 'Elegí día, mes y año.'
-                : edad < 0
-                  ? 'Revisá la fecha: todavía no nació.'
-                  : `${edad} años cumplidos al ${aFechaDeCalendario(hoy)}`}
-            </p>
-            {problemaDe('fechaDeNacimiento') && (
-              <p className="mt-1.5 text-sm text-danger">{problemaDe('fechaDeNacimiento')}</p>
-            )}
-          </div>
-
-          {!esAdherente && (
-            <Unidades
-              unidades={unidades}
-              sugerida={sugerida}
-              elegida={unidadElegida}
-              onElegir={setUnidadElegida}
-              problema={problemaDe('unidad')}
-            />
-          )}
-
-          <div>
-            <span className="text-sm font-semibold">Documento</span>
-            <div className="mt-2 grid grid-cols-[110px_minmax(0,1fr)] gap-2">
-              <select
-                aria-label="Tipo de documento"
-                className={`${CAMPO} h-13`}
-                value={datos.tipoDeDocumento}
-                onChange={(evento) =>
-                  setDatos({ ...datos, tipoDeDocumento: evento.target.value as TipoDeDocumento })
-                }
-              >
-                {TIPOS_DE_DOCUMENTO.map((tipo) => (
-                  <option key={tipo.id} value={tipo.id}>
-                    {tipo.nombre}
-                  </option>
-                ))}
-              </select>
-              <input
-                aria-label="Número de documento"
-                className={`${CAMPO} h-13 tabular-nums`}
-                value={datos.numeroDeDocumento}
-                onChange={(evento) =>
-                  setDatos({ ...datos, numeroDeDocumento: evento.target.value })
-                }
-                inputMode="numeric"
-                placeholder="44.512.663"
-              />
-            </div>
-            {problemaDe('numeroDeDocumento') && (
-              <p className="mt-1.5 text-sm text-danger">{problemaDe('numeroDeDocumento')}</p>
-            )}
-          </div>
-
-          <Campo etiqueta="Domicilio" problema={problemaDe('domicilio')}>
-            <input
-              className={`${CAMPO} h-13`}
-              value={datos.domicilio}
-              onChange={(evento) => setDatos({ ...datos, domicilio: evento.target.value })}
-              autoComplete="street-address"
-            />
-          </Campo>
-
-          <Campo
-            etiqueta="Teléfono de contacto / emergencias"
-            problema={problemaDe('telefonoDeContacto')}
+          <DatosPersonales
+            datos={datos}
+            onCambiar={setDatos}
+            problemaDe={problemaDe}
+            hoy={hoy}
+            // La sugerencia vuelve a mandar cuando cambia la edad: corregir la
+            // fecha después de haber elegido a mano suele ser arreglar un
+            // tipeo, y dejar la unidad vieja ahí es dejar el error puesto.
+            alCambiarLaFecha={() => setUnidadElegida(null)}
           >
-            <input
-              type="tel"
-              className={`${CAMPO} h-13`}
-              value={datos.telefonoDeContacto}
-              onChange={(evento) => setDatos({ ...datos, telefonoDeContacto: evento.target.value })}
-              autoComplete="tel"
-            />
-          </Campo>
+            {!esAdherente && (
+              <Unidades
+                unidades={unidades}
+                sugerida={sugerida}
+                elegida={unidadElegida}
+                onElegir={setUnidadElegida}
+                problema={problemaDe('unidad')}
+              />
+            )}
+          </DatosPersonales>
 
           <div>
             <span className="text-sm font-semibold">Categoría</span>
@@ -429,51 +161,8 @@ export function AltaDePersona(props: { grupoId: string }) {
               Opcional. Se pueden cargar después desde el plantel.
             </p>
             <div className="mt-2">
-              {TIPOS_DE_CARGO.map((tipo) => {
-                const elegido = cargoElegido(tipo.id)
-                return (
-                  <div key={tipo.id} className="flex min-h-11 flex-wrap items-center gap-3">
-                    <label className="flex items-center gap-3 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(elegido)}
-                        onChange={() =>
-                          setCargos(
-                            elegido
-                              ? cargos.filter((uno) => uno.cargo !== tipo.id)
-                              : [...cargos, { cargo: tipo.id, hasta: null }],
-                          )
-                        }
-                        className="size-5 shrink-0 accent-black"
-                      />
-                      {tipo.nombre}
-                    </label>
-                    {elegido && (
-                      <label className="flex items-center gap-2 text-label text-ink-muted">
-                        hasta
-                        <input
-                          type="date"
-                          className="rounded-lg border border-line-strong bg-surface-2 px-2 py-1.5 text-label tabular-nums"
-                          value={elegido.hasta ?? ''}
-                          onChange={(evento) =>
-                            setCargos(
-                              cargos.map((uno) =>
-                                uno.cargo === tipo.id
-                                  ? { ...uno, hasta: evento.target.value || null }
-                                  : uno,
-                              ),
-                            )
-                          }
-                        />
-                      </label>
-                    )}
-                  </div>
-                )
-              })}
+              <Cargos elegidos={cargos} onCambiar={setCargos} problema={problemaDe('cargos')} />
             </div>
-            {problemaDe('cargos') && (
-              <p className="mt-1.5 text-sm text-danger">{problemaDe('cargos')}</p>
-            )}
           </fieldset>
         </div>
 
