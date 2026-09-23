@@ -1,17 +1,33 @@
 import { type PermisosQuery, useActor, useGrupo, usePermisos } from '@gps/api'
 import type { Actor } from '@gps/core'
+import { aFechaDeCalendario } from '@gps/core/fechas'
 import {
+  type CategoriaDeSalida,
+  categoriaDeSalida,
   type FirmanteRequerido,
   firmantesRequeridos,
   puedeAdministrarPermisosDelGrupo,
   resumenDeParticipantes,
 } from '@gps/salidas/dominio'
 import { Link, useLocalSearchParams } from 'expo-router'
+import { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
-import { Accion, Cargando, Chip, Falla, Titulo, Vacio } from '../../../../src/ui'
+import { Accion, Cargando, Chip, Falla, Filtros, Titulo, Vacio } from '../../../../src/ui'
 import { estadoDelPermiso, miFirmaPendiente } from './[permisoId]'
 
 type Permiso = PermisosQuery['permisos'][number]
+
+const FILTROS = [
+  { id: 'actuales', etiqueta: 'Próximas y en curso' },
+  { id: 'finalizadas', etiqueta: 'Finalizadas' },
+  { id: 'anuladas', etiqueta: 'Anuladas' },
+] as const
+
+const VACIO: Record<CategoriaDeSalida, string> = {
+  actuales: 'No hay salidas próximas ni en curso.',
+  finalizadas: 'Todavía no hay salidas finalizadas.',
+  anuladas: 'No hay salidas anuladas.',
+}
 
 /** Una salida en la lista: en qué anda y nada más. Todo lo que se toca
  *  —armarla, firmarla, adjuntarle algo— vive en su pantalla, así que la fila
@@ -49,6 +65,7 @@ function Fila(props: {
 /** Las salidas del grupo. La acción va arriba de la lista y abre la pantalla
  *  del alta: nunca un formulario colgado abajo. */
 export default function Pantalla() {
+  const [filtro, setFiltro] = useState<CategoriaDeSalida>('actuales')
   const { id } = useLocalSearchParams<{ id: string }>()
   const consulta = usePermisos(id)
   const { distrito } = useGrupo(id)
@@ -56,6 +73,8 @@ export default function Pantalla() {
 
   const firmantes = distrito ? firmantesRequeridos(id, distrito.id) : []
   const permisos = consulta.data?.permisos ?? []
+  const hoy = aFechaDeCalendario(new Date())
+  const visibles = permisos.filter((permiso) => categoriaDeSalida(permiso, hoy) === filtro)
 
   return (
     <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-10">
@@ -73,7 +92,11 @@ export default function Pantalla() {
       )}
 
       <View className="mt-5">
-        {permisos.map((permiso) => (
+        <Filtros opciones={FILTROS} valor={filtro} onElegir={setFiltro} />
+      </View>
+
+      <View className="mt-2">
+        {visibles.map((permiso) => (
           <Fila
             key={permiso.id}
             permiso={permiso}
@@ -84,9 +107,7 @@ export default function Pantalla() {
         ))}
       </View>
 
-      {permisos.length === 0 && !consulta.isPending && (
-        <Vacio>El grupo todavía no cargó ninguna salida.</Vacio>
-      )}
+      {visibles.length === 0 && !consulta.isPending && <Vacio>{VACIO[filtro]}</Vacio>}
     </ScrollView>
   )
 }

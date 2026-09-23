@@ -36,10 +36,12 @@ export const permisos = sqliteTable(
     reemplazaA: text('reemplaza_a'),
     ...marcas,
   },
-  // Dos permisos no pueden llevar el mismo numero de expediente. Esta en la
-  // base y no en una regla que haya que acordarse: es lo unico que convierte
-  // "el siguiente al mayor" en una serie sin repetidos.
-  (tabla) => [unique().on(tabla.anioDeExpediente, tabla.numeroDeExpediente)],
+  // Los numeros de expediente no se repiten, y un permiso anulado origina a
+  // lo sumo un reemplazo. SQLite permite varios NULL en ambos UNIQUE.
+  (tabla) => [
+    unique().on(tabla.anioDeExpediente, tabla.numeroDeExpediente),
+    unique().on(tabla.reemplazaA),
+  ],
 )
 
 /** Que unidades del grupo van. La clave compuesta impide elegir dos veces la

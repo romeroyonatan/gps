@@ -17,10 +17,12 @@ import {
   Bajar,
   CAMPO,
   Cargando,
+  CHEVRON,
   Chip,
   ChipDeRama,
   Falla,
   Filtros,
+  Icono,
   Titulo,
   Vacio,
 } from '../ui'
@@ -209,22 +211,31 @@ export function Nomina(props: { grupoId: string }) {
               </h3>
               <ul className="mt-2">
                 {seccion.filas.map((fila) => (
-                  <li
-                    key={fila.id}
-                    className="flex min-h-[72px] items-center gap-3 border-b border-line py-3 last:border-b-0"
-                  >
-                    <span className="w-7 shrink-0 text-right text-label tabular-nums text-ink-faint">
-                      {fila.numero}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold">{fila.nombre}</p>
-                      <p className="mt-0.5 text-xs tabular-nums text-ink-muted">{fila.documento}</p>
-                      <p className="mt-1.5 flex flex-wrap items-center gap-2">
-                        {fila.rama && <ChipDeRama rama={fila.rama} />}
-                        {fila.cargo && <span className="text-xs text-ink-faint">{fila.cargo}</span>}
-                      </p>
-                    </div>
-                    <Afiliacion afiliada={fila.afiliada} periodo={periodo} />
+                  <li key={fila.id} className="border-b border-line last:border-b-0">
+                    {/* La fila entera es el enlace al detalle: es como se
+                        llega a una persona, acá y en el teléfono. */}
+                    <Link
+                      href={`/grupos/${props.grupoId}/personas/${fila.id}`}
+                      className="flex min-h-[72px] items-center gap-3 py-3 hover:bg-surface-2"
+                    >
+                      <span className="w-7 shrink-0 text-right text-label tabular-nums text-ink-faint">
+                        {fila.numero}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold">{fila.nombre}</p>
+                        <p className="mt-0.5 text-xs tabular-nums text-ink-muted">
+                          {fila.documento}
+                        </p>
+                        <p className="mt-1.5 flex flex-wrap items-center gap-2">
+                          {fila.rama && <ChipDeRama rama={fila.rama} />}
+                          {fila.cargo && (
+                            <span className="text-xs text-ink-faint">{fila.cargo}</span>
+                          )}
+                        </p>
+                      </div>
+                      <Afiliacion afiliada={fila.afiliada} periodo={periodo} />
+                      <Icono trazos={CHEVRON} className="size-5 shrink-0 text-ink-faint" />
+                    </Link>
                   </li>
                 ))}
               </ul>

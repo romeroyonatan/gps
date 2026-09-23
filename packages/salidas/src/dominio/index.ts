@@ -13,7 +13,12 @@ export type {
   Permiso,
 } from './modelos'
 export { ESTADOS } from './modelos'
-export { type PermisoDelPanel, repartirSalidas } from './panel'
+export {
+  type CategoriaDeSalida,
+  categoriaDeSalida,
+  type PermisoDelPanel,
+  repartirSalidas,
+} from './panel'
 export { cuantos, resumenDeParticipantes } from './participantes'
 export {
   candidatos,

@@ -24,8 +24,8 @@ export async function armarPdfDelPermiso(
   permisoId: string,
 ): Promise<Uint8Array> {
   const permiso = borradores.permisoDe(permisoId)
-  if (permiso.estado === 'borrador') {
-    throw new PermisoNoEditable('Un borrador todavia no tiene PDF: emitilo primero.')
+  if (permiso.pdfId === null) {
+    throw new PermisoNoEditable('Este permiso todavia no tiene PDF: emitilo primero.')
   }
 
   const grupo = await estructura.obtenerGrupo(permiso.grupoId)

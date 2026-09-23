@@ -503,10 +503,13 @@ describe('anular y re-emitir', () => {
     ).rejects.toThrow(FirmaInvalida)
   })
 
-  test('un borrador no se anula', async () => {
+  test('un borrador se anula pero no se re-emite', async () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
-    expect(servicio.anular(alcanceSinLimites(), permiso.id)).rejects.toThrow(PermisoNoEditable)
+    expect((await servicio.anular(alcanceSinLimites(), permiso.id)).estado).toBe('anulado')
+    await expect(servicio.reEmitir(alcanceSinLimites(), permiso.id)).rejects.toThrow(
+      PermisoNoEditable,
+    )
   })
 
   test('re-emitir copia datos, unidades y participantes en un borrador nuevo', async () => {
@@ -526,10 +529,19 @@ describe('anular y re-emitir', () => {
     expect(nuevo.pdfId).toBeNull()
   })
 
-  test('solo se re-emite lo anulado', async () => {
+  test('solo se re-emite lo anulado, una vez', async () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
-    expect(servicio.reEmitir(alcanceSinLimites(), permiso.id)).rejects.toThrow(PermisoNoEditable)
+    await expect(servicio.reEmitir(alcanceSinLimites(), permiso.id)).rejects.toThrow(
+      PermisoNoEditable,
+    )
+
+    await servicio.emitir(alcanceSinLimites(), permiso.id)
+    await servicio.anular(alcanceSinLimites(), permiso.id)
+    await servicio.reEmitir(alcanceSinLimites(), permiso.id)
+    await expect(servicio.reEmitir(alcanceSinLimites(), permiso.id)).rejects.toThrow(
+      'Este permiso ya fue re-emitido.',
+    )
   })
 })
 

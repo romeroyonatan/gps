@@ -327,6 +327,11 @@ type Mutation {
   ): Cargo!
 
   """
+  Pasa a un dirigente a otra unidad de su grupo desde una fecha, conservando el historial.
+  """
+  cambiarDeUnidad(desde: String!, personaId: ID!, unidadId: ID!): Boolean!
+
+  """
   Revoca la sesión de este pedido. El cliente borra su secreto.
   """
   cerrarSesion: Boolean!
@@ -357,6 +362,11 @@ type Mutation {
   """
   declararAfiliacion(grupoId: ID!): Declaracion!
   definirCuotaDeAfiliacion(importe: Int!, periodo: Int!): CuotaDeAfiliacion!
+
+  """
+  Corrige los datos personales de alguien del grupo.
+  """
+  editarPersona(datos: DatosDePersona!, personaId: ID!): Boolean!
   elegirResponsable(permisoId: ID!, personaId: ID!): Permiso!
   elegirUnidades(permisoId: ID!, unidadIds: [ID!]!): Permiso!
   emitirPermiso(permisoId: ID!): Emision!

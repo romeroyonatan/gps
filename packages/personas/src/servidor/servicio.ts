@@ -1,11 +1,11 @@
 import type { Actor, Alcance, Core, RolConAmbito } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Estructura } from '@gps/estructura/dominio'
-import { and, eq, gte, inArray, isNull, lte, or } from 'drizzle-orm'
+import { and, eq, gte, inArray, isNull, lte, ne, or } from 'drizzle-orm'
 import { ambitoDelCargo, nombreDelCargo, type TipoDeCargo } from '../dominio/cargos'
 import { nombreDelTipo, normalizarNumero, type TipoDeDocumento } from '../dominio/documentos'
 import type { IntegranteDeEquipo, TipoDeEquipo } from '../dominio/equipos'
-import type { DatosDePersona } from '../dominio/modelos'
+import type { DatosDePersona, Persona } from '../dominio/modelos'
 import {
   puedeAdministrarEquiposDiocesanos,
   puedeAdministrarPlantelDeGrupo,
@@ -20,6 +20,7 @@ import type {
   PersonaConVinculos,
   Pertenencia,
 } from '../dominio/vinculos'
+import { validarCambioDeUnidad } from '../dominio/vinculos'
 import {
   equipos,
   eventosDeAutoridad,
@@ -92,6 +93,20 @@ export interface ServicioDePersonas extends Personas {
     datos: DatosDePersona,
     ingreso: DatosDeIngreso,
   ): Promise<PersonaConVinculos>
+  /** Corrige los datos personales de alguien del grupo. No toca la
+   *  pertenencia, los cargos ni los equipos: eso son otros hechos. */
+  editarPersona(alcance: Alcance, personaId: string, datos: DatosDePersona): Promise<Persona>
+
+  /** Pasa a un dirigente a otra unidad de su grupo desde una fecha: cierra la
+   *  pertenencia vigente la vispera y abre una nueva. El historial es lo que
+   *  hace que una consulta a una fecha pasada vea la unidad de ese dia. */
+  cambiarDeUnidad(
+    alcance: Alcance,
+    personaId: string,
+    unidadId: string,
+    desde: string,
+  ): Promise<Pertenencia>
+
   /** Las personas con pertenencia vigente en ese grupo, ordenadas por apellido. */
   listarPersonas(alcance: Alcance, grupoId: string): Promise<readonly PersonaConVinculos[]>
 
@@ -127,6 +142,18 @@ export interface ServicioDePersonas extends Personas {
     },
   ): Promise<IntegranteDeEquipo>
   revocarIntegranteDeEquipo(actor: Actor, integranteId: string): Promise<void>
+}
+
+/** La vispera de una fecha de calendario. En UTC a proposito: aaaa-mm-dd no
+ *  tiene hora ni zona, y hacer la cuenta en local haria que un cambio de huso
+ *  corriera el dia. No consulta el reloj: es aritmetica sobre el argumento.
+ *
+ *  Es de este modulo y no de core porque hoy la necesita una sola operacion; si
+ *  aparece un segundo consumidor, se muda a @gps/core/fechas con los demas. */
+function laVispera(fecha: string): string {
+  const dia = new Date(`${fecha}T00:00:00Z`)
+  dia.setUTCDate(dia.getUTCDate() - 1)
+  return dia.toISOString().slice(0, 10)
 }
 
 /** El orden alfabetico lo hace Intl y no un ORDER BY: SQLite compara bytes, asi
@@ -534,6 +561,101 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
       return { ...persona, pertenencia, cargos: cargosDeLaPersona, equipos: [] }
     },
 
+    async editarPersona(alcance, personaId, datos) {
+      const hoy = core.reloj.ahora()
+      // El grupo de la persona es el que decide quien puede corregirla. Sin
+      // pertenencia vigente no hay grupo, y sin grupo no hay nadie autorizado:
+      // el mismo camino que una persona que no existe, y a proposito, porque
+      // distinguirlos contaria si existe.
+      const vigente = core.bd
+        .select({ grupoId: pertenencias.grupoId })
+        .from(pertenencias)
+        .where(and(eq(pertenencias.personaId, personaId), isNull(pertenencias.hasta)))
+        .get()
+      if (!vigente || !puedeAdministrarPlantelDeGrupo(alcance.actor, vigente.grupoId)) {
+        throw new CambioDeAutoridadDenegado()
+      }
+
+      const problemas = validarPersona(datos, hoy)
+      if (problemas.length > 0) throw new DatosInvalidos(problemas)
+
+      const numeroDeDocumento = normalizarNumero(datos.numeroDeDocumento)
+      // El duplicado se busca contra las demas: guardar sin tocar el documento
+      // no puede chocar consigo misma. Igual que en el alta, este SELECT es
+      // para el mensaje; la garantia es el UNIQUE de la tabla.
+      const otra = core.bd
+        .select({ id: personas.id })
+        .from(personas)
+        .where(
+          and(
+            eq(personas.tipoDeDocumento, datos.tipoDeDocumento),
+            eq(personas.numeroDeDocumento, numeroDeDocumento),
+            ne(personas.id, personaId),
+          ),
+        )
+        .get()
+      if (otra) throw new DocumentoDuplicado(datos.tipoDeDocumento, numeroDeDocumento)
+
+      const corregida = {
+        ...datos,
+        numeroDeDocumento,
+        nombres: datos.nombres.trim(),
+        apellidos: datos.apellidos.trim(),
+        domicilio: datos.domicilio.trim(),
+        telefonoDeContacto: datos.telefonoDeContacto.trim(),
+        actualizadoEn: hoy,
+      }
+      const fila = core.bd
+        .update(personas)
+        .set(corregida)
+        .where(eq(personas.id, personaId))
+        .returning()
+        .get()
+      return fila
+    },
+
+    async cambiarDeUnidad(alcance, personaId, unidadId, desde) {
+      const vigente = core.bd
+        .select()
+        .from(pertenencias)
+        .where(and(eq(pertenencias.personaId, personaId), isNull(pertenencias.hasta)))
+        .get()
+      if (!vigente || !puedeAdministrarPlantelDeGrupo(alcance.actor, vigente.grupoId)) {
+        throw new CambioDeAutoridadDenegado()
+      }
+
+      const grupo = await estructura.obtenerGrupo(vigente.grupoId)
+      if (!grupo) throw new GrupoInexistente(vigente.grupoId)
+
+      const hoy = core.reloj.ahora()
+      const problemas = validarCambioDeUnidad(vigente, unidadId, desde, grupo.unidades, hoy)
+      if (problemas.length > 0) throw new DatosInvalidos(problemas)
+
+      const nueva: Pertenencia = {
+        id: core.nuevoId('pertenencia'),
+        personaId,
+        grupoId: vigente.grupoId,
+        categoria: vigente.categoria,
+        unidadId,
+        desde,
+        hasta: null,
+        creadoEn: hoy,
+        actualizadoEn: hoy,
+      }
+      // El orden importa: el indice parcial no admite dos pertenencias con
+      // `hasta IS NULL`, asi que primero se cierra la vieja. La vispera y no el
+      // mismo dia, para que `estaVigente` -que incluye las dos puntas- no vea
+      // dos ese dia.
+      core.bd.transaction((tx) => {
+        tx.update(pertenencias)
+          .set({ hasta: laVispera(desde), actualizadoEn: hoy })
+          .where(eq(pertenencias.id, vigente.id))
+          .run()
+        tx.insert(pertenencias).values(nueva).run()
+      })
+      return nueva
+    },
+
     async miembrosDelGrupo(grupoId, fecha) {
       // Vigente ese dia, con las dos puntas inclusivas: la misma regla que
       // estaVigente. No sirve filtrar por `hasta IS NULL`, que es "hoy".
@@ -691,10 +813,14 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
         .where(and(eq(pertenencias.grupoId, grupoId), isNull(pertenencias.hasta)))
         .all()
 
+      // Los vencidos si, los revocados no: un cargo vencido es historia -la
+      // pantalla decide si lo muestra con estaVigente- pero uno revocado dejo
+      // de existir en el acto, y ninguna pantalla puede distinguirlo porque
+      // `revocadoEn` no viaja. Es el mismo filtro que ya tenian los equipos.
       const filasDeCargos = core.bd
         .select()
         .from(tablaDeCargos)
-        .where(eq(tablaDeCargos.ambitoId, grupoId))
+        .where(and(eq(tablaDeCargos.ambitoId, grupoId), isNull(tablaDeCargos.revocadoEn)))
         .all()
 
       // Los equipos de ese grupo -hoy sólo Secretaría- más los diocesanos de
