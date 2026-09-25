@@ -837,6 +837,22 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
         }))
     },
 
+    async cargosDelGrupoEn(grupoId, fecha) {
+      return core.bd
+        .select({ personaId: tablaDeCargos.personaId, cargo: tablaDeCargos.cargo })
+        .from(tablaDeCargos)
+        .where(
+          and(
+            eq(tablaDeCargos.ambitoId, grupoId),
+            lte(tablaDeCargos.desde, fecha),
+            or(isNull(tablaDeCargos.hasta), gte(tablaDeCargos.hasta, fecha)),
+            isNull(tablaDeCargos.revocadoEn),
+          ),
+        )
+        .orderBy(tablaDeCargos.desde)
+        .all()
+    },
+
     async ocupantesDelCargo(cargo, ambitoId, fecha) {
       // Las dos puntas inclusivas, igual que estaVigente: un mandato que
       // termina el 30 de mayo todavia vale el 30 de mayo. El hasta puede estar

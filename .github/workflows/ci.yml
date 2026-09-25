@@ -91,10 +91,10 @@ jobs:
             curl -sf http://localhost:3002/health > /dev/null && break
             sleep 1
           done
-          destino=$(curl -sf -c /tmp/ci-cookies.txt -D- -o /dev/null \
-            'http://localhost:3002/auth/demo/iniciar?perfil=jefatura' \
-            | grep -i '^location' | tr -d '\r' | cut -d' ' -f2)
-          curl -sf -b /tmp/ci-cookies.txt -c /tmp/ci-cookies.txt -o /dev/null "$destino"
+          # -L sigue la redireccion relativa del demo; -b/-c llevan la cookie
+          # de la transaccion al callback.
+          curl -sfL -b /tmp/ci-cookies.txt -c /tmp/ci-cookies.txt -o /dev/null \
+            'http://localhost:3002/auth/demo/iniciar?perfil=jefatura'
 
           consultar() {
             curl -sf -b /tmp/ci-cookies.txt http://localhost:3002/graphql \

@@ -1,8 +1,13 @@
 import type { Alcance, Core } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Estructura } from '@gps/estructura/dominio'
-import { type Personas, puedeVerPersonasDelGrupo } from '@gps/personas/dominio'
-import { armarLaNomina, COLUMNAS_DE_LA_NOMINA } from '../dominio/nomina'
+import {
+  CATEGORIAS,
+  nombreDelCargo,
+  type Personas,
+  puedeVerPersonasDelGrupo,
+} from '@gps/personas/dominio'
+import { armarLaNomina } from '../dominio/nomina'
 import { periodoDe } from '../dominio/periodos'
 import { armarPdfDeLaNomina } from './pdf'
 import { type Celda, comoXlsx } from './xlsx'
@@ -37,8 +42,8 @@ export function nombreDelArchivo(
   return `nomina-grupo-${grupo.numero}-${fecha}.${extension}`
 }
 
-/** La nómina del grupo en los dos formatos. Los dos salen de la misma función
- *  pura, así que la planilla y el papel dicen lo mismo, fila por fila.
+/** La nómina del grupo en los dos formatos. Los dos usan el mismo orden de
+ *  personas; la planilla agrega datos para trabajar y el PDF se presenta en papel.
  *
  *  Se compone al pedirla y no se guarda: la nómina es el padrón de hoy, y un
  *  archivo guardado sería una segunda verdad que envejece. La foto que sí se
@@ -74,6 +79,7 @@ export function crearConsultasDeLaNomina(
       fecha,
       periodo,
       secciones: armarLaNomina(miembros, ramaDeUnidad, afiliados, periodo),
+      miembros,
     }
   }
 
@@ -87,14 +93,46 @@ export function crearConsultasDeLaNomina(
     },
 
     async xlsxDeLaNomina(alcance: Alcance, grupoId: string) {
-      const { grupo, fecha, periodo, secciones } = await nomina(alcance, grupoId)
-      // Una sola hoja con las tres secciones una debajo de la otra, cada una
-      // con su título: partirla en tres pestañas obligaría a ordenar o filtrar
-      // tres veces, que es justo lo que se hace en una planilla.
-      const filas: Celda[][] = [[...COLUMNAS_DE_LA_NOMINA]]
+      const { grupo, fecha, periodo, secciones, miembros } = await nomina(alcance, grupoId)
+      const miembrosPorId = new Map(miembros.map((miembro) => [miembro.persona.id, miembro]))
+      const cargosPorPersona = new Map<string, string[]>()
+      for (const { personaId, cargo } of await personas.cargosDelGrupoEn(grupoId, fecha)) {
+        const suyos = cargosPorPersona.get(personaId) ?? []
+        suyos.push(nombreDelCargo(cargo))
+        cargosPorPersona.set(personaId, suyos)
+      }
+      const filas: Celda[][] = [
+        [
+          '#',
+          'Apellidos',
+          'Nombres',
+          'Documento',
+          'Rama',
+          'Categoría',
+          'Cargos',
+          'Teléfono',
+          'Domicilio',
+          'Fecha de nacimiento',
+        ],
+      ]
       for (const seccion of secciones) {
-        filas.push([`${seccion.titulo} (${seccion.filas.length})`])
-        for (const fila of seccion.filas) filas.push([fila.numero, ...fila.celdas])
+        for (const fila of seccion.filas) {
+          const miembro = miembrosPorId.get(fila.personaId)
+          if (!miembro) throw new Error(`Falta la persona ${fila.personaId} en la nómina`)
+          const { persona } = miembro
+          filas.push([
+            fila.numero,
+            persona.apellidos,
+            persona.nombres,
+            fila.celdas[1] ?? '',
+            fila.celdas[2] ?? '',
+            CATEGORIAS.find(({ id }) => id === miembro.categoria)?.nombre ?? miembro.categoria,
+            cargosPorPersona.get(persona.id)?.join(' · ') ?? '',
+            persona.telefonoDeContacto,
+            persona.domicilio,
+            persona.fechaDeNacimiento,
+          ])
+        }
       }
       return {
         nombre: nombreDelArchivo(grupo, fecha, 'xlsx'),

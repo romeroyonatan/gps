@@ -22,6 +22,7 @@ const personas: Personas = {
   miembrosActivos: async () => [],
   ocupantesDelCargo: async () => [],
   miembrosDelGrupo: async () => [],
+  cargosDelGrupoEn: async () => [],
 }
 
 function montar() {
