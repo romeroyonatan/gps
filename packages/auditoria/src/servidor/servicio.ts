@@ -116,7 +116,13 @@ export function crearServicioDeAuditoria(
       const nombres = new Map<string, string | null>()
       await Promise.all(
         [
-          ...new Set(pagina.flatMap((fila) => (fila.actorPersonaId ? [fila.actorPersonaId] : []))),
+          ...new Set(
+            pagina.flatMap((fila) =>
+              [fila.actorPersonaId, fila.objetivoPersonaId].filter(
+                (id): id is string => id !== null,
+              ),
+            ),
+          ),
         ].map(async (id) => {
           const persona = await personas.nombreDe(id)
           nombres.set(id, persona ? `${persona.nombres} ${persona.apellidos}` : null)
@@ -131,6 +137,9 @@ export function crearServicioDeAuditoria(
       const eventos: EventoDeAuditoria[] = pagina.map((fila) => ({
         ...fila,
         actorNombre: fila.actorPersonaId ? (nombres.get(fila.actorPersonaId) ?? null) : null,
+        objetivoNombre: fila.objetivoPersonaId
+          ? (nombres.get(fila.objetivoPersonaId) ?? null)
+          : null,
         grupoNombre: fila.grupoId ? (grupos.get(fila.grupoId) ?? null) : null,
         resumen: objeto(fila.resumen),
         cambios: cambios(fila.cambios),

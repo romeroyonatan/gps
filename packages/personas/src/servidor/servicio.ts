@@ -430,7 +430,7 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
             entidadTipo: 'integranteDeEquipo',
             entidadId: integrante.id,
             objetivoPersonaId: datos.personaId,
-            resumen: { tipo: datos.tipo, ambitoTipo: datos.ambitoTipo },
+            resumen: { personaId: datos.personaId },
           },
           tx,
         )
@@ -473,7 +473,7 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
             entidadTipo: 'integranteDeEquipo',
             entidadId: integranteId,
             objetivoPersonaId: fila.personaId,
-            resumen: { tipo: fila.tipo, ambitoTipo: fila.ambitoTipo },
+            resumen: { personaId: fila.personaId },
           },
           tx,
         )
