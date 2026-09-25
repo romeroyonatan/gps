@@ -7,6 +7,7 @@
     ".": "./src/index.ts",
     "./graphql": "./src/builder.ts",
     "./fechas": "./src/fechas.ts",
+    "./xlsx": "./src/xlsx.ts",
     "./roles": "./src/roles.ts"
   },
   "scripts": {

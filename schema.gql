@@ -249,6 +249,7 @@ type EventoDeAuditoria {
   grupoNombre: String
   id: ID!
   modulo: String!
+  objetivoNombre: String
   objetivoPersonaId: ID
   ocurridoEn: String!
   origenInterno: String

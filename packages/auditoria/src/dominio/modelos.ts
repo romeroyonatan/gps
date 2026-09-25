@@ -15,6 +15,7 @@ export interface EventoDeAuditoria {
   readonly entidadTipo: string | null
   readonly entidadId: string | null
   readonly objetivoPersonaId: string | null
+  readonly objetivoNombre: string | null
   readonly resumen: Readonly<Record<string, ValorDeAuditoria>>
   readonly cambios: readonly CambioDeAuditoria[]
 }

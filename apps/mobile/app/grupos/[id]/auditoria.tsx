@@ -1,4 +1,10 @@
-import { useActor, useAuditoria, useDistritos } from '@gps/api'
+import {
+  rutaDeExportacionDeAuditoria,
+  useActor,
+  useAuditoria,
+  useDistritos,
+  useTransporte,
+} from '@gps/api'
 import {
   etiquetaDeAccion,
   etiquetaDeModulo,
@@ -8,9 +14,12 @@ import {
   opcionesDelFiltro,
   quienActuo,
 } from '@gps/auditoria/dominio'
-import { useLocalSearchParams } from 'expo-router'
+import { File, Paths } from 'expo-file-system'
+import { Link, useLocalSearchParams } from 'expo-router'
+import * as Sharing from 'expo-sharing'
 import { useState } from 'react'
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { secretoDeSesion } from '../../../src/sesion'
 import {
   BotonSecundario,
   CAMPO,
@@ -39,7 +48,18 @@ const hora = new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: '
 function Fila(props: { evento: Evento; conGrupo: boolean }) {
   const { evento } = props
   const [abierta, setAbierta] = useState(false)
-  const hayDetalle = evento.resumen.length > 0 || evento.cambios.length > 0
+  const permisoId =
+    evento.entidadTipo === 'permiso'
+      ? evento.entidadId
+      : evento.modulo === 'salidas'
+        ? evento.resumen.find((dato) => dato.clave === 'permisoId')?.valor
+        : null
+  const permiso = permisoId && evento.grupoId
+  const equipo = evento.accion.startsWith('equipo.') && evento.objetivoPersonaId
+  const invitacion = evento.accion.startsWith('invitacion.')
+  const hayDetalle = Boolean(
+    permiso || evento.objetivoPersonaId || evento.resumen.length || evento.cambios.length,
+  )
 
   return (
     <View className="border-b border-line">
@@ -71,6 +91,19 @@ function Fila(props: { evento: Evento; conGrupo: boolean }) {
       </Pressable>
       {abierta && (
         <View className="mb-3 gap-1.5 rounded-lg bg-surface-3 p-3">
+          {evento.objetivoPersonaId && (
+            <Text className="text-sm text-ink">
+              <Text className="font-semibold">{invitacion ? 'Destinatario ' : 'Persona '}</Text>
+              {evento.objetivoNombre ?? evento.objetivoPersonaId}
+            </Text>
+          )}
+          {permiso && (
+            <Link href={`/grupos/${evento.grupoId}/salidas/${permisoId}`} asChild>
+              <Pressable accessibilityRole="link" className="min-h-11 justify-center">
+                <Text className="text-sm font-semibold text-ink underline">Ver permiso →</Text>
+              </Pressable>
+            </Link>
+          )}
           {evento.cambios.map((cambio) => (
             <View key={`c-${cambio.campo}`}>
               <Text className="text-sm font-semibold text-ink">{cambio.campo}</Text>
@@ -79,12 +112,20 @@ function Fila(props: { evento: Evento; conGrupo: boolean }) {
               </Text>
             </View>
           ))}
-          {evento.resumen.map((dato) => (
-            <View key={`r-${dato.clave}`} className="flex-row gap-2">
-              <Text className="text-sm font-semibold text-ink">{dato.clave}</Text>
-              <Text className="min-w-0 flex-1 text-sm text-ink-muted">{dato.valor}</Text>
-            </View>
-          ))}
+          {evento.resumen
+            .filter(
+              (dato) =>
+                !(
+                  (equipo && dato.clave === 'personaId') ||
+                  (permiso && dato.clave === 'permisoId')
+                ),
+            )
+            .map((dato) => (
+              <View key={`r-${dato.clave}`} className="flex-row gap-2">
+                <Text className="text-sm font-semibold text-ink">{dato.clave}</Text>
+                <Text className="min-w-0 flex-1 text-sm text-ink-muted">{dato.valor}</Text>
+              </View>
+            ))}
         </View>
       )}
     </View>
@@ -98,6 +139,7 @@ export default function Pantalla() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const actor = useActor()
   const distritos = useDistritos()
+  const { origen } = useTransporte()
   const [grupoId, setGrupoId] = useState(id)
   const [desde, setDesde] = useState('')
   const [hasta, setHasta] = useState('')
@@ -105,16 +147,47 @@ export default function Pantalla() {
   const [modulo, setModulo] = useState('')
   const [accion, setAccion] = useState('')
   const [busqueda, setBusqueda] = useState('')
+  const [exportando, setExportando] = useState(false)
+  const [errorAlExportar, setErrorAlExportar] = useState('')
 
   const permitidos = actor ? gruposAuditables(actor) : []
-  const consulta = useAuditoria({
+  const filtros = {
     desde: limiteDelDia(desde, false),
     hasta: limiteDelDia(hasta, true),
     grupoId: grupoId || undefined,
     actorPersonaId: actorPersonaId || undefined,
     modulo: modulo || undefined,
     accion: accion || undefined,
-  })
+  }
+  const consulta = useAuditoria(filtros)
+
+  async function exportar() {
+    setExportando(true)
+    setErrorAlExportar('')
+    try {
+      const secreto = await secretoDeSesion()
+      if (!secreto) throw new Error('Necesitás iniciar sesión.')
+      const archivo = await File.downloadFileAsync(
+        `${origen}${rutaDeExportacionDeAuditoria(filtros)}`,
+        new File(Paths.cache, 'auditoria.xlsx'),
+        { headers: { authorization: `Bearer ${secreto}` }, idempotent: true },
+      )
+      try {
+        await Sharing.shareAsync(archivo.uri, {
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          dialogTitle: 'Guardar auditoría',
+        })
+      } finally {
+        archivo.delete()
+      }
+    } catch (error) {
+      setErrorAlExportar(
+        error instanceof Error ? error.message : 'No se pudo exportar la auditoría.',
+      )
+    } finally {
+      setExportando(false)
+    }
+  }
 
   if (permitidos !== null && !permitidos.includes(id)) {
     return (
@@ -175,6 +248,12 @@ export default function Pantalla() {
       <Titulo acompaña="Quién cambió qué y cuándo, del más reciente al más antiguo.">
         Auditoría
       </Titulo>
+      <View className="mt-4">
+        <BotonSecundario onPress={exportar} disabled={exportando}>
+          {exportando ? 'Preparando Excel…' : 'Exportar Excel'}
+        </BotonSecundario>
+        {errorAlExportar && <Falla>{errorAlExportar}</Falla>}
+      </View>
 
       <View className="mt-5 gap-4">
         {idsDeGrupo.length > 0 && (

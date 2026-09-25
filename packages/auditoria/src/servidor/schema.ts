@@ -41,6 +41,7 @@ export function registrarSchema(builder: Builder): void {
       entidadTipo: t.exposeString('entidadTipo', { nullable: true }),
       entidadId: t.exposeID('entidadId', { nullable: true }),
       objetivoPersonaId: t.exposeID('objetivoPersonaId', { nullable: true }),
+      objetivoNombre: t.exposeString('objetivoNombre', { nullable: true }),
       resumen: t.field({
         type: [DetalleRef],
         resolve: (evento) =>
