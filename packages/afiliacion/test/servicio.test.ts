@@ -70,6 +70,9 @@ function personasFalsas(miembros: readonly Miembro[]): Personas {
     async miembrosDelGrupo() {
       throw new Error('afiliacion no deberia llamar a miembrosDelGrupo')
     },
+    async cargosDelGrupoEn() {
+      throw new Error('afiliacion no deberia llamar a cargosDelGrupoEn')
+    },
     async miembrosActivos(fecha) {
       return miembros
         .filter((uno) => uno.desde <= fecha && (uno.hasta === undefined || fecha <= uno.hasta))

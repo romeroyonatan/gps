@@ -18,6 +18,7 @@ export const COLUMNAS_DE_LA_NOMINA = [
 ] as const
 
 export interface FilaDeLaNomina {
+  readonly personaId: string
   /** Corrido entre las tres secciones, como se presenta en el distrito: la
    *  numeración cuenta personas del grupo, no de cada categoría. */
   readonly numero: number
@@ -71,6 +72,7 @@ export function armarLaNomina(
         // pertenecen a ninguna y la columna les queda vacía.
         const rama = miembro.unidadId ? ramaDeUnidad.get(miembro.unidadId) : undefined
         return {
+          personaId: miembro.persona.id,
           numero,
           celdas: [
             nombreCompleto(miembro.persona),

@@ -110,10 +110,13 @@ export function rutaDeInicioDeLogin(
     secreto: url.searchParams.get('secreto') ?? undefined,
   }
 
+  // El demo vuelve a esta misma app: una ruta relativa conserva el host
+  // del navegador cuando Orca la publica detrás de su proxy.
+  const destinoDemo = proveedor === 'demo' ? new URL(inicio.url) : null
   return new Response(null, {
     status: 302,
     headers: {
-      location: inicio.url,
+      location: destinoDemo ? `${destinoDemo.pathname}${destinoDemo.search}` : inicio.url,
       'set-cookie': ponerCookie(
         COOKIE_DE_TRANSACCION,
         JSON.stringify(pendiente),

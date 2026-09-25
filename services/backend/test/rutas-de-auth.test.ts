@@ -49,6 +49,20 @@ describe('iniciar el login', () => {
     expect(cookie).toContain('HttpOnly')
   })
 
+  test('demo vuelve al mismo host aunque el backend esté detrás de un proxy', () => {
+    const auth = {
+      iniciarLogin: () => ({
+        url: 'http://localhost:63253/auth/demo/callback?perfil=demo&code=demo&state=s',
+        transaccion: 'tx',
+      }),
+    }
+    const respuesta = rutaDeInicioDeLogin(contextoCon(auth), pedidoDeInicio('?perfil=demo', 'demo'))
+    expect(respuesta.headers.get('location')).toBe(
+      '/auth/demo/callback?perfil=demo&code=demo&state=s',
+    )
+    expect(respuesta.headers.get('set-cookie')).toContain('gps_login=')
+  })
+
   test('un proveedor que no existe es 404', () => {
     const pedido = pedidoDeInicio('', 'facebook')
     expect(rutaDeInicioDeLogin(contextoCon(iniciando()), pedido).status).toBe(404)

@@ -799,6 +799,34 @@ describe('asignarCargo', () => {
   })
 })
 
+describe('cargosDelGrupoEn', () => {
+  test('trae sólo los cargos vigentes y no revocados de ese grupo', async () => {
+    const servicio = montar()
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, {
+      ...ingreso,
+      cargos: [{ cargo: 'director', hasta: '1972-03-01' }],
+    })
+    await servicio.asignarCargo({
+      personaId: persona.id,
+      cargo: 'jefeScoutDiocesano',
+      ambitoId: null,
+      desde: '1969-03-01',
+    })
+    const revocado = await servicio.asignarCargo({
+      personaId: persona.id,
+      cargo: 'capellan',
+      ambitoId: 'grupo_1',
+      desde: '1969-03-01',
+    })
+    await servicio.revocarCargo(actor('jefeDeGrupo'), revocado.id)
+    expect(await servicio.cargosDelGrupoEn('grupo_1', '1970-06-15')).toEqual([
+      { personaId: persona.id, cargo: 'director' },
+    ])
+    expect(await servicio.cargosDelGrupoEn('grupo_1', '1972-03-02')).toEqual([])
+    expect(await servicio.cargosDelGrupoEn('grupo_2', '1970-06-15')).toEqual([])
+  })
+})
+
 describe('ocupantesDelCargo', () => {
   const montarConDirector = async () => {
     const servicio = montar()
