@@ -14,6 +14,7 @@
   "dependencies": {
     "@gps/afiliacion": "workspace:*",
     "@gps/archivos": "workspace:*",
+    "@gps/auditoria": "workspace:*",
     "@gps/auth": "workspace:*",
     "@gps/core": "workspace:*",
     "@gps/demo": "workspace:*",

@@ -55,6 +55,7 @@ function montar(subject = 'subject-1') {
     reloj: { ahora: () => new Date('1970-01-01T00:00:00Z') },
     bd,
     eventos: crearBusDeEventos(),
+    auditoria: { registrar: () => 'evento_de_auditoria_test' },
     modulos: ['auth'],
     sellador: {
       sellar: (datos: string) => ({ sello: `sellado:${datos}`, claveId: 'prueba' }),

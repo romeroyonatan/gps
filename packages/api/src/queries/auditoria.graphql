@@ -1,0 +1,47 @@
+query Auditoria(
+  $desde: String
+  $hasta: String
+  $grupoId: ID
+  $actorPersonaId: ID
+  $modulo: String
+  $accion: String
+  $cursor: String
+) {
+  auditoria(
+    desde: $desde
+    hasta: $hasta
+    grupoId: $grupoId
+    actorPersonaId: $actorPersonaId
+    modulo: $modulo
+    accion: $accion
+    cursor: $cursor
+  ) {
+    cursorSiguiente
+    eventos {
+      id
+      ocurridoEn
+      actorPersonaId
+      actorNombre
+      origenInterno
+      modulo
+      accion
+      resultado
+      elevado
+      grupoId
+      grupoNombre
+      entidadTipo
+      entidadId
+      objetivoPersonaId
+      objetivoNombre
+      resumen {
+        clave
+        valor
+      }
+      cambios {
+        campo
+        anterior
+        nuevo
+      }
+    }
+  }
+}

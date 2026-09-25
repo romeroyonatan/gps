@@ -5,6 +5,7 @@ import {
   type Bd,
   type Core,
   crearBusDeEventos,
+  type DatosDeAuditoria,
   type Module,
   type Reloj,
 } from '@gps/core'
@@ -29,10 +30,12 @@ const BYTES = new Uint8Array([1, 2, 3, 4, 5])
 function montar(opciones: { reloj?: Reloj; autorizadores?: Record<string, Autorizador> } = {}): {
   servicio: ServicioDeArchivos
   guardados: Map<string, Uint8Array>
+  eventos: DatosDeAuditoria[]
 } {
   const base = new Database(':memory:')
   const bd: Bd = drizzle(base)
   const guardados = new Map<string, Uint8Array>()
+  const eventos: DatosDeAuditoria[] = []
   let contador = 0
 
   const core: Core = {
@@ -41,6 +44,12 @@ function montar(opciones: { reloj?: Reloj; autorizadores?: Record<string, Autori
     reloj: opciones.reloj ?? { ahora: () => HORA },
     bd,
     eventos: crearBusDeEventos(),
+    auditoria: {
+      registrar: (evento) => {
+        eventos.push(evento)
+        return 'evento_de_auditoria_test'
+      },
+    },
     modulos: ['archivos'],
     sellador: {
       sellar: (datos) => ({ sello: `sellado:${datos}`, claveId: 'prueba' }),
@@ -82,6 +91,7 @@ function montar(opciones: { reloj?: Reloj; autorizadores?: Record<string, Autori
       opciones.autorizadores ?? { salidas: async () => true },
     ),
     guardados,
+    eventos,
   }
 }
 
@@ -146,6 +156,15 @@ describe('los tres pasos', () => {
       recursoId: 'permiso_1',
       confirmado: true,
     })
+  })
+
+  test('audita reserva y confirmación sin token ni bytes', async () => {
+    const { servicio, eventos } = montar()
+    const { token } = await subir(servicio)
+    expect(eventos.map((evento) => evento.accion)).toEqual(['solicitarSubida', 'confirmarSubida'])
+    const serializado = JSON.stringify(eventos)
+    expect(serializado).not.toContain(token)
+    expect(serializado).not.toContain('1,2,3,4,5')
   })
 
   test('un token de otra subida no sirve', async () => {

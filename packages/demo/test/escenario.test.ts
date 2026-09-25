@@ -47,6 +47,7 @@ function montarContexto(hora: Date | (() => Date) = HORA, entorno: Entorno = 'de
     reloj: { ahora: () => (typeof hora === 'function' ? hora() : hora) },
     bd,
     eventos: crearBusDeEventos(),
+    auditoria: { registrar: () => 'evento_de_auditoria_test' },
     modulos: ['estructura', 'personas', 'auth', 'afiliacion', 'tesoreria', 'archivos', 'salidas'],
     // Falso pero con el comportamiento que importa: sellar y verificar cierran
     // entre si, y un dato alterado no verifica.

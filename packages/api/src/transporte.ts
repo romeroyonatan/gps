@@ -46,6 +46,7 @@ export interface Transporte {
  *  sesion viaja en una cookie HttpOnly, que el JavaScript de la pagina no
  *  puede leer -es justamente la idea- y el navegador manda sola. */
 export type SecretoDeSesion = () => string | null | Promise<string | null>
+export type IntencionElevada = () => boolean
 
 function origenDe(url: string): string {
   try {
@@ -59,6 +60,7 @@ export function transporteHttp(
   url: string,
   hacerPedido: typeof fetch = fetch,
   secretoDeSesion?: SecretoDeSesion,
+  intencionElevada?: IntencionElevada,
 ): Transporte {
   return {
     // El de la URL de GraphQL: las rutas de archivos las sirve el mismo backend.
@@ -67,11 +69,17 @@ export function transporteHttp(
     origen: origenDe(url),
     async ejecutar(documento, variables) {
       const secreto = await secretoDeSesion?.()
+      const esMutation = documento.definitions.some(
+        (definicion) =>
+          definicion.kind === 'OperationDefinition' && definicion.operation === 'mutation',
+      )
+      const elevada = esMutation && intencionElevada?.()
       const respuesta = await hacerPedido(url, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
           ...(secreto ? { authorization: `Bearer ${secreto}` } : {}),
+          ...(elevada ? { 'x-gps-intencion-elevada': '1' } : {}),
         },
         // Sin esto el navegador no manda la cookie de sesion en un pedido a
         // otro origen, y la web queda anonima contra un backend separado.

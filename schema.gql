@@ -42,6 +42,12 @@ enum AmbitoDeRol {
   grupo
 }
 
+type CambioDeAuditoria {
+  anterior: String!
+  campo: String!
+  nuevo: String!
+}
+
 """
 Un cargo de una persona en su grupo, con su periodo.
 """
@@ -155,6 +161,11 @@ type Declaracion {
   periodo: Int!
 }
 
+type DetalleDeAuditoria {
+  clave: String!
+  valor: String!
+}
+
 """
 Un distrito de la diocesis, con sus grupos.
 """
@@ -224,6 +235,26 @@ enum EstadoDePermiso {
   borrador
   emitido
   firmado
+}
+
+type EventoDeAuditoria {
+  accion: String!
+  actorNombre: String
+  actorPersonaId: ID
+  cambios: [CambioDeAuditoria!]!
+  elevado: Boolean!
+  entidadId: ID
+  entidadTipo: String
+  grupoId: ID
+  grupoNombre: String
+  id: ID!
+  modulo: String!
+  objetivoNombre: String
+  objetivoPersonaId: ID
+  ocurridoEn: String!
+  origenInterno: String
+  resultado: String!
+  resumen: [DetalleDeAuditoria!]!
 }
 
 """
@@ -452,6 +483,11 @@ type Mutation {
   ): SubidaPedida!
 }
 
+type PaginaDeAuditoria {
+  cursorSiguiente: String
+  eventos: [EventoDeAuditoria!]!
+}
+
 type Participante {
   marca: String!
   personaId: ID!
@@ -603,6 +639,16 @@ type Query {
   Los ids, de entre los preguntados, que ya tienen afiliación ese período.
   """
   afiliadosEn(periodo: Int!, personaIds: [ID!]!): [ID!]!
+  auditoria(
+    accion: String
+    actorPersonaId: ID
+    cursor: String
+    desde: String
+    grupoId: ID
+    hasta: String
+    limite: Int
+    modulo: String
+  ): PaginaDeAuditoria!
   cuentasDeGrupos: [CuentaDeGrupo!]!
   cuotasDeAfiliacion: [CuotaDeAfiliacion!]!
 

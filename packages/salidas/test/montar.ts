@@ -7,6 +7,7 @@ import {
   type Bd,
   type Core,
   crearBusDeEventos,
+  type DatosDeAuditoria,
   type Module,
   type Reloj,
   type RolConAmbito,
@@ -112,6 +113,7 @@ export function montar(opciones: { reloj?: Reloj; mundo?: Mundo } = {}) {
   const base = new Database(':memory:')
   const bd: Bd = drizzle(base)
   const guardados = new Map<string, Uint8Array>()
+  const eventos: DatosDeAuditoria[] = []
   let contador = 0
 
   const core: Core = {
@@ -120,6 +122,12 @@ export function montar(opciones: { reloj?: Reloj; mundo?: Mundo } = {}) {
     reloj: opciones.reloj ?? { ahora: () => HORA },
     bd,
     eventos: crearBusDeEventos(),
+    auditoria: {
+      registrar: (evento) => {
+        eventos.push(evento)
+        return 'evento_de_auditoria_test'
+      },
+    },
     modulos: ['archivos', 'salidas'],
     // Sellador falso pero con el comportamiento que importa: cierra consigo
     // mismo y un dato alterado no verifica.
@@ -205,7 +213,7 @@ export function montar(opciones: { reloj?: Reloj; mundo?: Mundo } = {}) {
   }
 
   const servicio: ServicioDeSalidas = crearServicioDeSalidas(core, personas, estructura, archivos)
-  return { servicio, archivos, core, bd, mundo, guardados }
+  return { servicio, archivos, core, bd, mundo, guardados, eventos }
 }
 
 /** Un permiso con las dos unidades, un dirigente y un chico: el caso normal. */

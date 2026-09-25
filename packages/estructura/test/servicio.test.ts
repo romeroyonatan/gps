@@ -43,6 +43,7 @@ function montarConBd(reloj: Reloj = { ahora: () => HORA }): {
     reloj,
     bd,
     eventos: crearBusDeEventos(),
+    auditoria: { registrar: () => 'evento_de_auditoria_test' },
     modulos: ['estructura'],
     // Falso pero con el comportamiento que importa: sellar y verificar cierran
     // entre si, y un dato alterado no verifica.

@@ -1,5 +1,5 @@
 import type { Archivos } from '@gps/archivos/dominio'
-import type { Core } from '@gps/core'
+import type { Actor, Core } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Estructura } from '@gps/estructura/dominio'
 import { nombreDeLaUnidad } from '@gps/estructura/dominio'
@@ -34,7 +34,10 @@ export function crearOperacionesDeEmision(
      *  papel tiene que decir los datos del dia de la emision, y si en dos anios
      *  alguien corrige un apellido, el permiso se sigue leyendo como se leia.
      *  Es el mismo patron que Afiliado. */
-    async emitir(permisoId: string): Promise<{ permiso: Permiso; avisos: readonly Aviso[] }> {
+    async emitir(
+      actor: Actor,
+      permisoId: string,
+    ): Promise<{ permiso: Permiso; avisos: readonly Aviso[] }> {
       const permiso = borradores.exigirBorrador(permisoId)
 
       const elegidos = core.bd
@@ -125,6 +128,19 @@ export function crearOperacionesDeEmision(
           .set({ anioDeExpediente, numeroDeExpediente: siguiente, actualizadoEn: ahora })
           .where(eq(permisos.id, permisoId))
           .run()
+        core.auditoria.registrar(
+          {
+            actorPersonaId: actor.personaId,
+            modulo: 'salidas',
+            accion: 'reservarNumeroDeExpediente',
+            elevado: actor.estaElevado,
+            grupoId: permiso.grupoId,
+            entidadTipo: 'permiso',
+            entidadId: permisoId,
+            resumen: { anio: anioDeExpediente, numero: siguiente },
+          },
+          tx,
+        )
         return siguiente
       })
       const conExpediente = { ...permiso, anioDeExpediente, numeroDeExpediente }
@@ -176,30 +192,61 @@ export function crearOperacionesDeEmision(
           })
           .where(eq(permisos.id, permisoId))
           .run()
+        core.auditoria.registrar(
+          {
+            actorPersonaId: actor.personaId,
+            modulo: 'salidas',
+            accion: 'emitirPermiso',
+            elevado: actor.estaElevado,
+            grupoId: permiso.grupoId,
+            entidadTipo: 'permiso',
+            entidadId: permisoId,
+            resumen: {
+              anioDeExpediente,
+              numeroDeExpediente,
+              participantes: foto.length,
+            },
+          },
+          tx,
+        )
       })
 
       const aviso = avisoDeAnticipacion(aFechaDeCalendario(ahora), permiso.desde)
       return { permiso: borradores.permisoDe(permisoId), avisos: aviso ? [aviso] : [] }
     },
 
-    async anular(permisoId: string): Promise<Permiso> {
+    async anular(actor: Actor, permisoId: string): Promise<Permiso> {
       const permiso = borradores.permisoDe(permisoId)
       if (!puedeTransicionar(permiso.estado, 'anulado')) {
         throw new PermisoNoEditable(`Un permiso ${permiso.estado} no se anula.`)
       }
       const ahora = core.reloj.ahora()
-      core.bd
-        .update(permisos)
-        .set({ estado: 'anulado', actualizadoEn: ahora })
-        .where(eq(permisos.id, permisoId))
-        .run()
+      core.bd.transaction((tx) => {
+        tx.update(permisos)
+          .set({ estado: 'anulado', actualizadoEn: ahora })
+          .where(eq(permisos.id, permisoId))
+          .run()
+        core.auditoria.registrar(
+          {
+            actorPersonaId: actor.personaId,
+            modulo: 'salidas',
+            accion: 'anularPermiso',
+            elevado: actor.estaElevado,
+            grupoId: permiso.grupoId,
+            entidadTipo: 'permiso',
+            entidadId: permisoId,
+            resumen: { estadoAnterior: permiso.estado },
+          },
+          tx,
+        )
+      })
       return borradores.permisoDe(permisoId)
     },
 
     /** Un borrador nuevo con los mismos datos, unidades y participantes. No
      *  revive el anulado: lo que se firmo queda como esta, y lo nuevo es otro
      *  permiso que recuerda de cual salio. */
-    async reEmitir(permisoId: string): Promise<Permiso> {
+    async reEmitir(actor: Actor, permisoId: string): Promise<Permiso> {
       const anulado = borradores.permisoDe(permisoId)
       if (anulado.estado !== 'anulado' || anulado.pdfId === null) {
         throw new PermisoNoEditable('Solo se re-emite un permiso emitido y anulado.')
@@ -250,6 +297,19 @@ export function crearOperacionesDeEmision(
             .values(suyos.map((uno) => ({ ...uno, permisoId: nuevo.id, creadoEn: ahora })))
             .run()
         }
+        core.auditoria.registrar(
+          {
+            actorPersonaId: actor.personaId,
+            modulo: 'salidas',
+            accion: 'reEmitirPermiso',
+            elevado: actor.estaElevado,
+            grupoId: anulado.grupoId,
+            entidadTipo: 'permiso',
+            entidadId: nuevo.id,
+            resumen: { reemplazaA: anulado.id },
+          },
+          tx,
+        )
       })
       return nuevo
     },
@@ -260,7 +320,7 @@ export function crearOperacionesDeEmision(
      *  PDF ni en el hash que sellan las firmas, asi que sacarlo no invalida
      *  nada. Los escaneos de las firmas no son adjuntos y no se tocan por aca:
      *  esos son la prueba de lo que se firmo. */
-    async quitarAdjunto(permisoId: string, adjuntoId: string): Promise<void> {
+    async quitarAdjunto(actor: Actor, permisoId: string, adjuntoId: string): Promise<void> {
       const adjunto = core.bd
         .select()
         .from(adjuntos)
@@ -268,28 +328,59 @@ export function crearOperacionesDeEmision(
         .get()
       if (!adjunto) throw new PermisoNoEditable('Ese adjunto no es de este permiso.')
 
-      core.bd.delete(adjuntos).where(eq(adjuntos.id, adjuntoId)).run()
+      const permiso = borradores.permisoDe(permisoId)
+      core.bd.transaction((tx) => {
+        tx.delete(adjuntos).where(eq(adjuntos.id, adjuntoId)).run()
+        core.auditoria.registrar(
+          {
+            actorPersonaId: actor.personaId,
+            modulo: 'salidas',
+            accion: 'quitarAdjuntoDePermiso',
+            elevado: actor.estaElevado,
+            grupoId: permiso.grupoId,
+            entidadTipo: 'permiso',
+            entidadId: permisoId,
+            cambios: [{ campo: 'adjuntos', anterior: [adjuntoId], nuevo: [] }],
+          },
+          tx,
+        )
+      })
       await archivos.eliminar(adjunto.archivoId, 'salidas', permisoId)
     },
 
     /** Cuelga un archivo ya subido. En cualquier estado: una planificacion
      *  puede llegar despues de firmado, y no toca lo que se firmo. */
-    async adjuntar(permisoId: string, archivoId: string): Promise<void> {
-      borradores.permisoDe(permisoId)
+    async adjuntar(actor: Actor, permisoId: string, archivoId: string): Promise<void> {
+      const permiso = borradores.permisoDe(permisoId)
       if (!(await archivos.esDe(archivoId, 'salidas', permisoId))) {
         throw new PermisoNoEditable('Ese archivo no esta confirmado o no es de este permiso.')
       }
       const ahora = core.reloj.ahora()
-      core.bd
-        .insert(adjuntos)
-        .values({
-          id: core.nuevoId('adjunto'),
-          permisoId,
-          archivoId,
-          creadoEn: ahora,
-          actualizadoEn: ahora,
-        })
-        .run()
+      const adjuntoId = core.nuevoId('adjunto')
+      core.bd.transaction((tx) => {
+        tx.insert(adjuntos)
+          .values({
+            id: adjuntoId,
+            permisoId,
+            archivoId,
+            creadoEn: ahora,
+            actualizadoEn: ahora,
+          })
+          .run()
+        core.auditoria.registrar(
+          {
+            actorPersonaId: actor.personaId,
+            modulo: 'salidas',
+            accion: 'adjuntarAPermiso',
+            elevado: actor.estaElevado,
+            grupoId: permiso.grupoId,
+            entidadTipo: 'permiso',
+            entidadId: permisoId,
+            cambios: [{ campo: 'adjuntos', anterior: [], nuevo: [adjuntoId] }],
+          },
+          tx,
+        )
+      })
     },
   }
 }

@@ -1,5 +1,6 @@
 import { afiliacion } from '@gps/afiliacion/servidor'
 import { archivos } from '@gps/archivos/servidor'
+import { auditoria } from '@gps/auditoria/servidor'
 import { auth } from '@gps/auth/servidor'
 import { estructura } from '@gps/estructura/servidor'
 import { personas } from '@gps/personas/servidor'
@@ -18,4 +19,5 @@ export const modulos = [
   tesoreria,
   archivos,
   salidas,
+  auditoria,
 ]

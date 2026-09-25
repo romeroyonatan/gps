@@ -59,7 +59,26 @@ export function crearOperacionesDePagos(core: Core, estructura: Estructura) {
       creadoEn: ahora,
       actualizadoEn: ahora,
     }
-    core.bd.insert(movimientosDeTesoreria).values(pago).run()
+    core.bd.transaction((tx) => {
+      tx.insert(movimientosDeTesoreria).values(pago).run()
+      core.auditoria.registrar(
+        {
+          actorPersonaId: alcance.actor.personaId,
+          modulo: 'tesoreria',
+          accion: 'registrarPago',
+          elevado: alcance.actor.estaElevado,
+          grupoId: pago.grupoId,
+          entidadTipo: 'movimiento',
+          entidadId: pago.id,
+          resumen: {
+            fecha: pago.fecha,
+            importe: datos.importe,
+            medioDePago: pago.medioDePago,
+          },
+        },
+        tx,
+      )
+    })
     return pago
   }
 
@@ -97,7 +116,22 @@ export function crearOperacionesDePagos(core: Core, estructura: Estructura) {
       creadoEn: ahora,
       actualizadoEn: ahora,
     }
-    core.bd.insert(movimientosDeTesoreria).values(anulacion).run()
+    core.bd.transaction((tx) => {
+      tx.insert(movimientosDeTesoreria).values(anulacion).run()
+      core.auditoria.registrar(
+        {
+          actorPersonaId: alcance.actor.personaId,
+          modulo: 'tesoreria',
+          accion: 'anularPago',
+          elevado: alcance.actor.estaElevado,
+          grupoId: pago.grupoId,
+          entidadTipo: 'movimiento',
+          entidadId: anulacion.id,
+          resumen: { pagoId: pago.id, importe: pago.importe },
+        },
+        tx,
+      )
+    })
     return anulacion
   }
 

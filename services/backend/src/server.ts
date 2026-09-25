@@ -1,9 +1,10 @@
 import type { Almacenamiento, Bd, Config, ConversorDeImagenes, Sellador } from '@gps/core'
 import { createYoga } from 'graphql-yoga'
 import inicio from '../../../apps/web/index.html'
-import { crearInterceptorDeEscriturasElevadas } from './auditoria'
+import { crearInterceptorDeIntentosElevados } from './auditoria'
 import { componer } from './composicion'
 import { crearContexto } from './context'
+import { rutaDeExportacionDeAuditoria } from './exportar-auditoria'
 import { rutaDeArchivos, rutaDeLaNominaDeUnGrupo, rutaDelPdfDeUnPermiso } from './rutas-de-archivos'
 import { rutaDeCallbackDeLogin, rutaDeInicioDeLogin } from './rutas-de-auth'
 
@@ -28,7 +29,7 @@ export async function crearServidor(
     context: contextoPorPedido,
     graphqlEndpoint: '/graphql',
     landingPage: false,
-    plugins: [crearInterceptorDeEscriturasElevadas()],
+    plugins: [crearInterceptorDeIntentosElevados()],
   })
 
   const servidor = Bun.serve({
@@ -47,6 +48,8 @@ export async function crearServidor(
         rutaDeInicioDeLogin(await contextoPorPedido({ request: pedido }), pedido),
       '/auth/:proveedor/callback': async (pedido) =>
         rutaDeCallbackDeLogin(await contextoPorPedido({ request: pedido }), logger, pedido),
+      '/auditoria.xlsx': async (pedido) =>
+        rutaDeExportacionDeAuditoria(await contextoPorPedido({ request: pedido }), logger, pedido),
       '/archivos/:id': async (pedido) =>
         rutaDeArchivos(await contextoPorPedido({ request: pedido }), logger, pedido),
       '/permisos/:id/pdf': async (pedido) =>

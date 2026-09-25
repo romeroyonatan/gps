@@ -14,7 +14,7 @@ copia a mano, y cuando se rompe hay que decirlo.
 | --- | --- |
 | `app/` | Las rutas. Es expo-router: el archivo **es** la dirección. `app/_layout.tsx` es la cáscara —sesión, rol activo, menú de abajo—. |
 | `src/ui.tsx` | **Las piezas de interfaz.** Mirá acá antes de escribir markup. |
-| `src/` (el resto) | La cáscara: ingreso, sesión, rol activo, barras, iconos, colores de rama. |
+| `src/` (el resto) | La cáscara: ingreso, sesión, rol activo, barras, iconos, colores de rama. La barra de abajo tiene cinco destinos —Principal, Nómina, Salidas, Tesorería y Más—; Plantel y Auditoría viven en `app/grupos/[id]/mas.tsx`. |
 | `componentes/` | Lo que es demasiado grande para una pieza y se usa desde una pantalla sola o dos: el alta de persona y el pad de firma. |
 
 ## Las piezas: `src/ui.tsx`
