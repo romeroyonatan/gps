@@ -1106,7 +1106,7 @@ describe('registrarPases', () => {
   const otro = { ...valida, numeroDeDocumento: '30111333' }
 
   test('cierra la vispera y abre la nueva, para todo el lote', async () => {
-    const servicio = montar()
+    const { servicio, eventos } = montarConBd()
     const uno = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
     const dos = await servicio.crearPersona(alcanceSinLimites(), otro, ingreso)
 
@@ -1116,6 +1116,20 @@ describe('registrarPases', () => {
     ])
 
     expect(nuevas.map((pertenencia) => pertenencia.unidadId)).toEqual(['unidad_sco', 'unidad_sco'])
+    expect(eventos.filter((evento) => evento.accion === 'registrarPases')).toEqual(
+      nuevas.map((nueva) => ({
+        actorPersonaId: 'actor',
+        modulo: 'personas',
+        accion: 'registrarPases',
+        elevado: false,
+        grupoId: 'grupo_1',
+        entidadTipo: 'pertenencia',
+        entidadId: nueva.id,
+        objetivoPersonaId: nueva.personaId,
+        resumen: { fecha },
+        cambios: [{ campo: 'unidadId', anterior: 'unidad_lob', nuevo: 'unidad_sco' }],
+      })),
+    )
     const lista = await servicio.listarPersonas(alcanceSinLimites(), 'grupo_1')
     expect(lista.map((persona) => persona.pertenencia.unidadId)).toEqual([
       'unidad_sco',

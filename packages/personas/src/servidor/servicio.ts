@@ -790,6 +790,26 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
             .where(eq(pertenencias.id, vigente.id))
             .run()
           tx.insert(pertenencias).values(nueva).run()
+          core.auditoria.registrar(
+            {
+              actorPersonaId: alcance.actor.personaId,
+              modulo: 'personas',
+              accion: 'registrarPases',
+              elevado: alcance.actor.estaElevado,
+              grupoId,
+              entidadTipo: 'pertenencia',
+              entidadId: nueva.id,
+              objetivoPersonaId: nueva.personaId,
+              resumen: { fecha },
+              cambios: [
+                { campo: 'unidadId', anterior: vigente.unidadId, nuevo: nueva.unidadId },
+                ...(vigente.categoria === nueva.categoria
+                  ? []
+                  : [{ campo: 'categoria', anterior: vigente.categoria, nuevo: nueva.categoria }]),
+              ],
+            },
+            tx,
+          )
         }
       })
       return nuevas
