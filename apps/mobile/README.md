@@ -37,6 +37,7 @@ de propósito general.
 | `BotonSecundario` | La otra acción: con borde. Varias por pantalla, ninguna principal. |
 | `Accion` | El enlace negro que abre el formulario de una lista. |
 | `AccionAlMargen` | Lo infrecuente y lo que no se deshace: chiquito y al final. |
+| `Casilla` | Lo que se marca y se desmarca de una lista: las unidades de una salida, quiénes pasan de rama. React Native no tiene `<input type=checkbox>`, así que el cuadrito se dibuja a mano y se toca la fila entera. |
 | `Filtros` | Recortes de una misma lista. Es además **la única forma de elegir** en React Native, que no tiene `<select>`: con `valor` como lista, se combinan. |
 | `Campo` | Un control con su etiqueta arriba y su problema debajo. |
 | `Chip` | La píldora de estado, con su texto siempre escrito y el color como refuerzo. Tonos: `ok`, `warn`, `info`, `neutro`. |

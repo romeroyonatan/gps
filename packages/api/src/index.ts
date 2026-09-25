@@ -34,6 +34,7 @@ export {
   useIntegrarEquipo,
   useJefesDeGrupos,
   usePersonasDelGrupo,
+  useRegistrarPases,
   useRevocarCargo,
   useRevocarIntegranteDeEquipo,
 } from './personas'

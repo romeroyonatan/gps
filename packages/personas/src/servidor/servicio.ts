@@ -6,6 +6,7 @@ import { ambitoDelCargo, nombreDelCargo, type TipoDeCargo } from '../dominio/car
 import { nombreDelTipo, normalizarNumero, type TipoDeDocumento } from '../dominio/documentos'
 import type { IntegranteDeEquipo, TipoDeEquipo } from '../dominio/equipos'
 import type { DatosDePersona, Persona } from '../dominio/modelos'
+import { type Pase, validarPase } from '../dominio/pases'
 import {
   puedeAdministrarEquiposDiocesanos,
   puedeAdministrarPlantelDeGrupo,
@@ -106,6 +107,18 @@ export interface ServicioDePersonas extends Personas {
     unidadId: string,
     desde: string,
   ): Promise<Pertenencia>
+
+  /** La ceremonia de pases: varios beneficiarios de un grupo cambian de unidad
+   *  el mismo dia. Es el mismo tramo que `cambiarDeUnidad` -cerrar la vigente
+   *  la vispera y abrir la nueva-, con dos diferencias: va en lote y todo en
+   *  una transaccion, y la categoria puede cambiar, porque el rover que pasa a
+   *  dirigente queda activo. */
+  registrarPases(
+    alcance: Alcance,
+    grupoId: string,
+    fecha: string,
+    pases: readonly Pase[],
+  ): Promise<readonly Pertenencia[]>
 
   /** Las personas con pertenencia vigente en ese grupo, ordenadas por apellido. */
   listarPersonas(alcance: Alcance, grupoId: string): Promise<readonly PersonaConVinculos[]>
@@ -654,6 +667,70 @@ export function crearServicioDePersonas(core: Core, estructura: Estructura): Ser
         tx.insert(pertenencias).values(nueva).run()
       })
       return nueva
+    },
+
+    async registrarPases(alcance, grupoId, fecha, pases) {
+      if (!puedeAdministrarPlantelDeGrupo(alcance.actor, grupoId)) {
+        throw new CambioDeAutoridadDenegado()
+      }
+      if (pases.length === 0) return []
+
+      const grupo = await estructura.obtenerGrupo(grupoId)
+      if (!grupo) throw new GrupoInexistente(grupoId)
+
+      const hoy = core.reloj.ahora()
+      const vigentes = new Map(
+        core.bd
+          .select()
+          .from(pertenencias)
+          .where(and(eq(pertenencias.grupoId, grupoId), isNull(pertenencias.hasta)))
+          .all()
+          .map((fila) => [fila.personaId, fila]),
+      )
+
+      // Se valida todo el lote antes de escribir nada: la ceremonia pasa
+      // entera o no pasa. Una validacion por persona dentro de la transaccion
+      // dejaria la mitad hecha si la tercera falla.
+      const nuevas: Pertenencia[] = []
+      const problemas: Problema[] = []
+      for (const pase of pases) {
+        const vigente = vigentes.get(pase.personaId)
+        if (!vigente) {
+          problemas.push({
+            campo: 'unidad',
+            mensaje: 'Alguien de la lista ya no pertenece al grupo: volvé a cargar la pantalla.',
+          })
+          continue
+        }
+        problemas.push(...validarPase(pase, vigente, fecha, grupo.unidades, hoy))
+        nuevas.push({
+          id: core.nuevoId('pertenencia'),
+          personaId: pase.personaId,
+          grupoId,
+          categoria: pase.categoria,
+          unidadId: pase.unidadDestinoId,
+          desde: fecha,
+          hasta: null,
+          creadoEn: hoy,
+          actualizadoEn: hoy,
+        })
+      }
+      if (problemas.length > 0) throw new DatosInvalidos(problemas)
+
+      // Mismo orden que en cambiarDeUnidad, y por la misma razon: el indice
+      // parcial no admite dos pertenencias abiertas de la misma persona.
+      core.bd.transaction((tx) => {
+        for (const nueva of nuevas) {
+          const vigente = vigentes.get(nueva.personaId)
+          if (!vigente) continue
+          tx.update(pertenencias)
+            .set({ hasta: laVispera(fecha), actualizadoEn: hoy })
+            .where(eq(pertenencias.id, vigente.id))
+            .run()
+          tx.insert(pertenencias).values(nueva).run()
+        }
+      })
+      return nuevas
     },
 
     async miembrosDelGrupo(grupoId, fecha) {

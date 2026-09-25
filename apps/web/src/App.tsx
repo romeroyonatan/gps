@@ -32,6 +32,7 @@ import { ModoElevado } from './pantallas/ModoElevado'
 import { Nomina } from './pantallas/Nomina'
 import { NuevaCuota } from './pantallas/NuevaCuota'
 import { NuevaSalida } from './pantallas/NuevaSalida'
+import { Pases } from './pantallas/Pases'
 import { CambioDeRama, EditarPersona, Persona } from './pantallas/Persona'
 import { Plantel } from './pantallas/Plantel'
 import { RegistrarPago } from './pantallas/RegistrarPago'
@@ -237,6 +238,7 @@ function Rutas() {
       <Route path="/grupos/:id/personas/:personaId">
         {(params) => <Persona grupoId={params.id} personaId={params.personaId} />}
       </Route>
+      <Route path="/grupos/:id/pases">{(params) => <Pases grupoId={params.id} />}</Route>
       <Route path="/grupos/:id/alta">{(params) => <AltaDePersona grupoId={params.id} />}</Route>
       <Route path="/grupos/:id/salidas/nueva">
         {(params) => <NuevaSalida grupoId={params.id} />}

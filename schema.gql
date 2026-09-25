@@ -421,6 +421,11 @@ type Mutation {
   ): MovimientoDeTesoreria!
 
   """
+  Registra la ceremonia de pases de un grupo: varios beneficiarios cambian de unidad el mismo día.
+  """
+  registrarPases(fecha: String!, grupoId: ID!, pases: [Pase!]!): Boolean!
+
+  """
   Saca a alguien de un cargo. El acceso se pierde en el pedido siguiente.
   """
   revocarCargo(cargoId: ID!): Boolean!
@@ -459,6 +464,16 @@ type ParticipanteEmitido {
   numeroDeDocumento: String!
   personaId: ID!
   unidad: String!
+}
+
+"""
+El pase de una persona en la ceremonia: de qué unidad sale, a cuál va y con qué categoría queda.
+"""
+input Pase {
+  categoria: Categoria!
+  personaId: ID!
+  unidadDeOrigenId: ID!
+  unidadDestinoId: ID!
 }
 
 """

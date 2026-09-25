@@ -221,11 +221,17 @@ export function Persona(props: { grupoId: string; personaId: string }) {
                   Cambiar de rama
                 </a>
               )}
-              {puede && !puedeCambiarDeUnidad(persona.pertenencia) && (
-                <Nota>
-                  El pase de rama de un beneficiario es una ceremonia, y todavía no tiene pantalla.
-                </Nota>
-              )}
+              {puede &&
+                !puedeCambiarDeUnidad(persona.pertenencia) &&
+                persona.pertenencia.categoria === 'beneficiario' && (
+                  <Nota>
+                    El pase de rama de un beneficiario es una ceremonia: se registra desde la{' '}
+                    <a href={`/grupos/${props.grupoId}/pases`} className="underline">
+                      Ceremonia de pases
+                    </a>
+                    , con toda su camada junta.
+                  </Nota>
+                )}
             </Seccion>
 
             <Seccion titulo="Cargos y equipos" cuantos={cargos.length + equipos.length}>

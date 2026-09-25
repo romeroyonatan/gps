@@ -1,8 +1,16 @@
 ## Context
 
 `pertenencias` (en `personas`) guarda persona, grupo, categoría, unidad, `desde` y `hasta`,
-con un índice parcial que garantiza una sola vigente por persona (`hasta IS NULL`). No hay
-ninguna operación que la modifique después del alta. Los consumidores —`miembrosActivos`,
+con un índice parcial que garantiza una sola vigente por persona (`hasta IS NULL`).
+
+`cambiarDeUnidad` ya mueve de unidad a un **dirigente**: en una transacción cierra la
+pertenencia vigente con `laVispera(desde)` —primero, porque el índice parcial no admite dos
+abiertas— y abre otra con la misma categoría. `validarCambioDeUnidad` exige fecha real, no
+futura y posterior al `desde` vigente, y `puedeCambiarDeUnidad` pide categoría activo: los
+beneficiarios están excluidos a propósito, porque su cambio es la ceremonia. La pantalla
+`CambioDeRama` (`/grupos/:id/personas/:personaId/rama`) es su entrada.
+
+Los consumidores —`miembrosActivos`,
 `miembrosDelGrupo`, `grupoVigenteDe`, `funcionesVigentes`— ya preguntan por la pertenencia
 vigente en una fecha, y nada guarda una referencia al id de una pertenencia: los cargos
 apuntan al grupo por `ambitoId`, y salidas y afiliación guardan fotografías.
@@ -24,16 +32,26 @@ las pantallas y el servidor.
 - Pasar dirigentes o adherentes, cambiar de grupo, o dar de baja.
 - Subunidades, patrullas y progresiones: change `trayectoria`.
 - Cargar la historia anterior al sistema: las pertenencias previas no se inventan.
+- Publicar un evento del pase: `PasesRegistrados` lo agrega el change `trayectoria`, que es
+  el primero que lo escucha, para cerrar la patrulla de quien pasa.
 
 ## Decisions
 
-**El pase es un tramo, no una edición.** Cerrar la vigente (`hasta` = día anterior al pase)
-y abrir otra desde el día del pase, en vez de pisar `unidadId`. Pisar es más corto, pero haría
+**El pase reusa el tramo de `cambiarDeUnidad`, no inventa otro.** Cerrar la vigente con
+`laVispera(fecha)` y abrir otra desde la fecha del pase es lo que esa operación ya hace y lo
+que su comentario ya explica: el orden importa por el índice parcial, y la víspera evita que
+`estaVigente` —que incluye las dos puntas— vea dos el mismo día. Pisar `unidadId` haría
 mentir a `miembrosDelGrupo(grupo, fecha)` para cualquier fecha anterior al pase, y perdería
-justo la historia que `trayectoria` va a necesitar. El índice parcial sigue valiendo sin
-tocar: en la transacción, primero se cierra y después se abre. El `hasta` del tramo cerrado
-queda en el pasado, así que "una pertenencia nunca tiene `hasta` futuro" se conserva, y por
+justo la historia que `trayectoria` va a necesitar. Como el `hasta` del tramo cerrado queda
+en el pasado, se conserva el invariante "una pertenencia nunca tiene `hasta` futuro", y por
 eso la fecha del pase no puede ser futura.
+
+**El pase puede cambiar la categoría; `cambiarDeUnidad` no.** Aquél conserva la del
+dirigente que se muda de unidad. El rover que pasa a dirigente arranca una pertenencia
+`activo`, así que la categoría es parte del pase y viaja por fila. Es la diferencia que
+justifica una operación aparte en vez de aflojar `puedeCambiarDeUnidad`, que seguiría
+diciendo "sólo los dirigentes cambian de unidad por acá" —y es cierto: los beneficiarios
+cambian por la ceremonia—.
 
 Consecuencia aceptada: la fecha de ingreso al grupo deja de ser el `desde` de la vigente y
 pasa a ser el del primer tramo de la racha en ese grupo. Hoy ninguna pantalla muestra
@@ -44,7 +62,9 @@ pasa a ser el del primer tramo de la racha en ese grupo. Hoy ninguna pantalla mu
   y el propuesto (mismo sexo, si hay exactamente uno).
 - `candidatosAlPase(miembros, unidadesElegidas, fecha)` devuelve por unidad los que cumplen
   y los cercanos (12 meses).
-- `validarPase(...)` devuelve `Problema[]`, igual que `validarIngreso`.
+- `validarPase(...)` devuelve `Problema[]`, hermana de `validarCambioDeUnidad`: comparten las
+  tres reglas de fecha, y se diferencian en que ésta pide beneficiario y destino del
+  catálogo. Lo compartido se extrae; la regla de categoría no, que es lo que las distingue.
 
 Van en `personas` y no en `estructura` porque necesitan personas y edades; `estructura` no
 conoce a `personas`. La rama siguiente sale del orden de `RAMAS`, que ya es el de edad; no
@@ -58,8 +78,10 @@ edad: la spec dice que se propone y no se rechaza.
 **Una mutation, una transacción.** `registrarPases(grupoId, fecha, pases: [{ personaId,
 unidadDeOrigenId, unidadDestinoId, categoria }])`. Se manda la unidad de origen para
 detectar la pantalla desactualizada (alguien ya lo pasó desde otro teléfono) en vez de
-cerrar lo que haya. Todo en `core.bd.transaction`, como `crearPersona`. La política es
-`puedeAdministrarPlantelDeGrupo`, la misma que el alta. Devuelve las pertenencias nuevas.
+cerrar lo que haya. La transacción es una sola para todo el lote, no una llamada a
+`cambiarDeUnidad` por persona: ésa abre la suya y dejaría medio pase hecho si la tercera
+falla. La política es `puedeAdministrarPlantelDeGrupo`, la misma que `cambiarDeUnidad` y que
+el alta. Devuelve las pertenencias nuevas.
 
 **Pasar a dirigente da acceso.** La nueva pertenencia `activo` hace que `funcionesVigentes`
 devuelva el rol `dirigente` en el pedido siguiente. Es el mismo efecto que el alta de un

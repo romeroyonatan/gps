@@ -1,10 +1,10 @@
 ## Why
 
-Los chicos crecen y cambian de rama todos los años, pero hoy la unidad de una persona no se
-puede cambiar: `pertenencia.unidadId` se fija en el alta y no hay operación que la mueva. Un
-lobato que pasó a la tropa sigue figurando en la Manada, y la nómina de una salida de la
-tropa no lo ofrece. Es lo más frecuente que le pasa al padrón y el sistema no lo puede
-registrar.
+Los chicos crecen y cambian de rama todos los años, y eso el sistema todavía no lo registra.
+`cambiarDeUnidad` existe, pero es sólo para dirigentes: `puedeCambiarDeUnidad` pide categoría
+activo, y los beneficiarios quedaron deliberadamente afuera porque su cambio de unidad no es
+individual, es la ceremonia de pases. Mientras tanto, un lobato que pasó a la tropa sigue
+figurando en la Manada, y la nómina de una salida de la tropa no lo ofrece.
 
 ## What Changes
 
@@ -18,8 +18,9 @@ registrar.
 - Desde el Clan se puede pasar a la Tropa de adultos (sigue beneficiario) o a dirigente en
   cualquier unidad abierta del grupo (pasa a activo).
 - El pase cierra la pertenencia vigente el día anterior al pase y abre otra en la unidad
-  destino, con la categoría que corresponda, desde el día del pase. Todos los pases de la
-  ceremonia se confirman juntos o ninguno.
+  destino, desde el día del pase: el mismo mecanismo que ya usa `cambiarDeUnidad` para los
+  dirigentes. A diferencia de aquél, acá la categoría puede cambiar, porque el rover que pasa
+  a dirigente queda activo. Todos los pases de la ceremonia se confirman juntos o ninguno.
 - La ceremonia no se guarda: lo que queda son las pertenencias nuevas.
 - La regla de la spec `unidades` que prohibía sugerir una unidad a partir de datos de la
   persona pasa a decir que el sistema propone y los dirigentes deciden, sin rechazar nunca
@@ -38,8 +39,9 @@ registrar.
 
 ## Impact
 
-- `packages/personas`: dominio (candidatos y destinos del pase, validación), servicio
-  (operación en una transacción), esquema GraphQL (mutation nueva).
+- `packages/personas`: dominio (candidatos y destinos del pase, validación hermana de
+  `validarCambioDeUnidad`), servicio (operación en lote sobre la misma transacción que ya usa
+  `cambiarDeUnidad`), esquema GraphQL (mutation nueva).
 - `packages/api`: hook y codegen de la mutation.
 - `apps/web` y `apps/mobile`: pantalla de ceremonia de pases y su acceso desde la Nómina.
 - `schema.gql`.

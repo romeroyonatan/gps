@@ -12,6 +12,8 @@ import {
   type IntegrarEquipoMutationVariables,
   JefesDeGruposDocument,
   PersonasDocument,
+  RegistrarPasesDocument,
+  type RegistrarPasesMutationVariables,
   RevocarCargoDocument,
   RevocarIntegranteDeEquipoDocument,
 } from './generated/graphql'
@@ -75,6 +77,18 @@ export function useCambiarDeUnidad() {
   return useMutation({
     mutationFn: (variables: CambiarDeUnidadMutationVariables) =>
       transporte.ejecutar(CambiarDeUnidadDocument, variables),
+    onSuccess: () => clienteDeQueries.invalidateQueries({ queryKey: ['personas'] }),
+  })
+}
+
+/** La ceremonia de pases mueve a varios de unidad, asi que invalida lo mismo
+ *  que el cambio de uno: la nomina del grupo. */
+export function useRegistrarPases() {
+  const transporte = useTransporte()
+  const clienteDeQueries = useQueryClient()
+  return useMutation({
+    mutationFn: (variables: RegistrarPasesMutationVariables) =>
+      transporte.ejecutar(RegistrarPasesDocument, variables),
     onSuccess: () => clienteDeQueries.invalidateQueries({ queryKey: ['personas'] }),
   })
 }

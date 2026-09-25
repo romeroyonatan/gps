@@ -248,14 +248,14 @@ describe('sembrarEscenario', () => {
 })
 
 describe('sembrarEscenario: personas', () => {
-  test('siembra las doce personas del grupo 42, el que tiene las seis ramas', async () => {
+  test('siembra las catorce personas del grupo 42, el que tiene las seis ramas', async () => {
     const contexto = montarContexto()
     await sembrarEscenario(contexto, HORA)
     const distritos = await contexto.estructura.listarDistritos(alcanceSinLimites())
     const grupo42 = distritos.flatMap((d) => d.grupos).find((g) => g.numero === 42)
     expect(
       await contexto.personas.listarPersonas(alcanceSinLimites(), grupo42?.id ?? ''),
-    ).toHaveLength(12)
+    ).toHaveLength(14)
   })
 
   test('las edades cubren el rango entero, de castores a adulto mayor', async () => {

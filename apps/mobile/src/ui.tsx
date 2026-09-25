@@ -270,6 +270,30 @@ export function Filtros<T extends string>(props: {
   )
 }
 
+/** Lo que se marca y se desmarca de una lista: las unidades que van a una
+ *  salida, quiénes pasan de rama. React Native no tiene `<input type=checkbox>`,
+ *  así que el cuadrito se dibuja a mano; el área tocable es la fila entera y no
+ *  el cuadrito, que a dedo no se acierta. */
+export function Casilla(props: { marcada: boolean; onCambiar: () => void; children: ReactNode }) {
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: props.marcada }}
+      onPress={props.onCambiar}
+      className="min-h-12 flex-row items-center gap-2.5 py-1.5"
+    >
+      <View
+        className={`h-5 w-5 items-center justify-center rounded border ${
+          props.marcada ? 'border-accent bg-accent' : 'border-line-strong'
+        }`}
+      >
+        {props.marcada && <Text className="text-xs text-accent-ink">✓</Text>}
+      </View>
+      <View className="flex-1">{props.children}</View>
+    </Pressable>
+  )
+}
+
 /* ── Formularios ────────────────────────────────────────────────────────── */
 
 /** Un control con su etiqueta arriba y, si lo hay, el problema debajo. El

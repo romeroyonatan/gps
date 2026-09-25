@@ -6,6 +6,7 @@ import { CATEGORIAS, type Categoria } from '../dominio/categorias'
 import { TIPOS_DE_DOCUMENTO } from '../dominio/documentos'
 import { type IntegranteDeEquipo, TIPOS_DE_EQUIPO, type TipoDeEquipo } from '../dominio/equipos'
 import type { DatosDePersona } from '../dominio/modelos'
+import type { Pase } from '../dominio/pases'
 import type {
   Cargo,
   DatosDeCargo,
@@ -281,6 +282,49 @@ export function registrarSchema(builder: Builder): void {
             String(args.personaId),
             String(args.unidadId),
             args.desde,
+          )
+          return true
+        }),
+    }),
+  )
+
+  const PaseRef = builder.inputRef<Pase>('Pase').implement({
+    description:
+      'El pase de una persona en la ceremonia: de qué unidad sale, a cuál va y con qué categoría queda.',
+    fields: (t) => ({
+      personaId: t.id({ required: true }),
+      // La unidad de origen viaja para que el servidor rechace una pantalla
+      // desactualizada en vez de cerrar lo que haya.
+      unidadDeOrigenId: t.id({ required: true }),
+      unidadDestinoId: t.id({ required: true }),
+      categoria: t.field({ type: CategoriaRef, required: true }),
+    }),
+  })
+
+  builder.mutationField('registrarPases', (t) =>
+    t.boolean({
+      description:
+        'Registra la ceremonia de pases de un grupo: varios beneficiarios cambian de unidad el mismo día.',
+      args: {
+        grupoId: t.arg.id({ required: true }),
+        fecha: t.arg.string({ required: true }),
+        pases: t.arg({ type: [PaseRef], required: true }),
+      },
+      resolve: async (_padre, args, contexto) =>
+        await traduciendo(async () => {
+          // Igual que en crearPersona: Pothos entrega la lista sin el
+          // `readonly` del dominio, asi que cada pase se arma campo por campo.
+          const pases = args.pases.map((pase) => ({
+            personaId: String(pase.personaId),
+            unidadDeOrigenId: String(pase.unidadDeOrigenId),
+            unidadDestinoId: String(pase.unidadDestinoId),
+            categoria: pase.categoria,
+          }))
+          await contexto.personas.registrarPases(
+            alcanceDe(contexto),
+            String(args.grupoId),
+            args.fecha,
+            pases,
           )
           return true
         }),

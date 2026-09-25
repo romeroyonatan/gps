@@ -1,5 +1,5 @@
 import { periodoDe } from '@gps/afiliacion/dominio'
-import { useAfiliadosEn, useGrupo, usePersonasDelGrupo } from '@gps/api'
+import { useActor, useAfiliadosEn, useGrupo, usePersonasDelGrupo } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import { etiquetaDeEdades, ramaDelCatalogo } from '@gps/estructura/dominio'
 import {
@@ -8,10 +8,20 @@ import {
   nombreCompleto,
   nombreDelCargo,
   nombreDelTipo,
+  puedeAdministrarPlantelDeGrupo,
 } from '@gps/personas/dominio'
-import { Link, useLocalSearchParams } from 'expo-router'
+import { Link, router, useLocalSearchParams } from 'expo-router'
 import { Pressable, ScrollView, Text, View } from 'react-native'
-import { Accion, Cargando, Chevron, Chip, Falla, Titulo, Vacio } from '../../../src/ui'
+import {
+  Accion,
+  BotonSecundario,
+  Cargando,
+  Chevron,
+  Chip,
+  Falla,
+  Titulo,
+  Vacio,
+} from '../../../src/ui'
 
 type Persona = NonNullable<ReturnType<typeof usePersonasDelGrupo>['data']>['personas'][number]
 
@@ -98,6 +108,7 @@ function Unidad(props: {
  *  distintas —"¿qué tengo que hacer hoy?" y "¿quiénes son?"— y ahora son dos
  *  pestañas. */
 export default function Pantalla() {
+  const actor = useActor()
   const { id } = useLocalSearchParams<{ id: string }>()
   const arbol = useGrupo(id)
   const lista = usePersonasDelGrupo(id)
@@ -110,6 +121,9 @@ export default function Pantalla() {
     personas.map((persona) => persona.id),
   )
   const afiliados = new Set(consulta.data?.afiliadosEn ?? [])
+  // La misma política pura que aplica el servidor: no se ofrece lo que después
+  // se va a rechazar.
+  const puedeAdministrar = actor !== null && puedeAdministrarPlantelDeGrupo(actor, id)
 
   const { grupo } = arbol
 
@@ -126,8 +140,17 @@ export default function Pantalla() {
         <>
           {/* La acción arriba de la lista, como pide la guía: nunca un
               formulario colgado abajo. */}
-          <View className="mt-5">
+          <View className="mt-5 gap-2">
             <Accion href={`/grupos/${id}/alta`}>Alta de persona</Accion>
+            {/* La ceremonia se carga desde acá porque es esta misma lista vista
+                de otra forma: quiénes cambian de unidad este año. Con la forma
+                del botón secundario: la acción de esta pantalla es el alta, y
+                dos negras al lado no dicen cuál es cuál. */}
+            {puedeAdministrar && (
+              <BotonSecundario onPress={() => router.push(`/grupos/${id}/pases`)}>
+                Ceremonia de pases
+              </BotonSecundario>
+            )}
           </View>
 
           {/* Ya vienen ordenadas por el servidor: por catalogo y, dentro de una

@@ -166,6 +166,36 @@ const PERSONAS: readonly {
     rama: 'lobatos',
     desde: '2024-03-02',
   },
+  // Los dos casos de la ceremonia de pases, en la misma Manada: uno que ya
+  // tiene la edad de la Tropa y uno al que le falta menos de un anio. Las
+  // fechas son fijas, como el resto del escenario: van a envejecer, pero el
+  // que cumple la edad sigue cumpliendola y el de al lado lo alcanza.
+  {
+    datos: {
+      tipoDeDocumento: 'dni',
+      numeroDeDocumento: '52.008.371',
+      nombres: 'Renata',
+      apellidos: 'Cabrera',
+      fechaDeNacimiento: '2016-05-10',
+    },
+    numeroDeGrupo: 42,
+    categoria: 'beneficiario',
+    rama: 'lobatos',
+    desde: '2023-03-06',
+  },
+  {
+    datos: {
+      tipoDeDocumento: 'dni',
+      numeroDeDocumento: '52.640.925',
+      nombres: 'Bruno',
+      apellidos: 'Cattaneo',
+      fechaDeNacimiento: '2017-01-15',
+    },
+    numeroDeGrupo: 42,
+    categoria: 'beneficiario',
+    rama: 'lobatos',
+    desde: '2024-03-02',
+  },
   {
     datos: {
       tipoDeDocumento: 'dni',

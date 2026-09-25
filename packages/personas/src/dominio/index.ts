@@ -14,6 +14,14 @@ export type { Equipo, IntegranteDeEquipo, TipoDeEquipo } from './equipos'
 export { TIPOS_DE_EQUIPO } from './equipos'
 export type { DatosDePersona, Persona } from './modelos'
 export { calcularEdad, nombreCompleto } from './modelos'
+export type {
+  CandidatoAlPase,
+  CandidatosDeLaUnidad,
+  DestinoDelPase,
+  Pase,
+  UnidadDelPase,
+} from './pases'
+export { candidatosAlPase, destinoPropuesto, destinosDelPase, validarPase } from './pases'
 export {
   accesoAlModulo,
   puedeAdministrarEquiposDiocesanos,
