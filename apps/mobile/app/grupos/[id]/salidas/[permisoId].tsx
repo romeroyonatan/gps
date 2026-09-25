@@ -44,6 +44,7 @@ import {
   Boton,
   BotonSecundario,
   Cargando,
+  Casilla,
   Chip,
   Falla,
   Titulo,
@@ -83,21 +84,6 @@ export function estadoDelPermiso(permiso: Permiso, esperaMiFirma: boolean) {
     tono: 'info',
     texto: faltan === 1 ? 'Falta 1 firma' : `Faltan ${faltan} firmas`,
   } as const
-}
-
-function Casilla(props: { marcada: boolean; onCambiar: () => void; children: React.ReactNode }) {
-  return (
-    <Pressable onPress={props.onCambiar} className="min-h-12 flex-row items-center gap-2.5 py-1.5">
-      <View
-        className={`h-5 w-5 items-center justify-center rounded border ${
-          props.marcada ? 'border-accent bg-accent' : 'border-line-strong'
-        }`}
-      >
-        {props.marcada && <Text className="text-xs text-accent-ink">✓</Text>}
-      </View>
-      <View className="flex-1">{props.children}</View>
-    </Pressable>
-  )
 }
 
 /** Elegir unidades y quien va. Solo mientras es borrador. */

@@ -152,11 +152,15 @@ export function Seccion(props: {
 
 /** La acción de una pantalla de lista que abre la pantalla de su formulario:
  *  arriba de la lista, negra, y nunca un formulario colgado abajo. */
-export function Accion(props: { href: string; children: ReactNode }) {
+export function Accion(props: { href: string; children: ReactNode; ancho?: boolean }) {
   return (
     <Link
       href={props.href}
-      className="inline-flex min-h-11 items-center justify-center rounded-lg bg-accent px-3.5 text-sm font-semibold text-accent-ink hover:bg-accent-strong"
+      className={`inline-flex min-h-11 items-center justify-center rounded-lg bg-accent px-3.5 text-sm font-semibold text-accent-ink hover:bg-accent-strong ${
+        // A ancho de teléfono los botones de una fila se apilan y ocupan todo,
+        // como en la app; de `sm:` para arriba vuelven al ancho del texto.
+        props.ancho ? 'w-full sm:w-auto' : ''
+      }`}
     >
       {props.children}
     </Link>
@@ -166,12 +170,24 @@ export function Accion(props: { href: string; children: ReactNode }) {
 /** Un archivo que arma el servidor y baja el navegador: PDF, XLSX, escaneo.
  *  Es un `<a>` y no un botón a propósito —así se puede guardar o compartir con
  *  el menú de siempre—, con la forma del botón secundario. */
-export function Bajar(props: { href: string; children: ReactNode; nuevaPestaña?: boolean }) {
+export function Bajar(props: {
+  href: string
+  children: ReactNode
+  nuevaPestaña?: boolean
+  /** Sólo de `sm:` para arriba. Es para la pantalla que en el teléfono ofrece
+   *  los formatos en una hoja y en escritorio los pone en la fila, donde sobra
+   *  ancho: la misma acción con dos formas, no dos acciones. */
+  soloEnAncho?: boolean
+}) {
   return (
     <a
       href={props.href}
       {...(props.nuevaPestaña ? { target: '_blank', rel: 'noreferrer' } : {})}
-      className={BOTON_SECUNDARIO}
+      // `max-sm:hidden` y no `hidden sm:inline-flex`: BOTON_SECUNDARIO ya trae
+      // `inline-flex`, y entre dos utilidades de la misma especificidad gana la
+      // que Tailwind emite última, que es la del display. La variante, en
+      // cambio, va después de todas.
+      className={`${BOTON_SECUNDARIO} ${props.soloEnAncho ? 'max-sm:hidden' : ''}`}
     >
       {props.children}
     </a>

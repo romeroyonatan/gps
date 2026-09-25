@@ -298,10 +298,14 @@ Los datos personales **sí** se corrigen, desde la pantalla de detalle de una pe
 (`/grupos/:id/personas/:personaId`): el documento incluido, y un documento que ya tiene
 otra persona se rechaza. Un dirigente también se pasa de unidad desde ahí, y el pase
 cierra la pertenencia vigente la víspera y abre otra, así que una consulta a una fecha
-pasada ve la unidad de ese día. El pase de un beneficiario no: es una ceremonia y llega
-con esa pantalla. Lo que sigue sin haber es baja de personas, cambio de categoría,
-cambio de grupo, edición de un cargo ya cargado, y forma de buscar a alguien sin saber su
-grupo (la única consulta es `personas(grupoId: ID!)`). Los cargos **sí**
+pasada ve la unidad de ese día. El de un beneficiario no se hace de a uno: es una
+ceremonia, y va por `/grupos/:id/pases`, que elige unidades, propone por edad con
+`candidatosAlPase` —los que cumplen el `hasta` de su rama tildados, los que lo cumplen
+dentro del año ofrecidos— y registra todo el lote en una transacción. Del Clan se pasa a
+Adultos o a dirigente en cualquier unidad, que es lo único que cambia la categoría.
+Lo que sigue sin haber es baja de personas, cambio de categoría fuera de ese pase, cambio
+de grupo, edición de un cargo ya cargado, y forma de buscar a alguien sin saber su grupo
+(la única consulta es `personas(grupoId: ID!)`). Los cargos **sí**
 tienen ámbito: `grupo`, `distrito` y `diocesis`, con comisionado de distrito y jefe
 scout diocesano. Un cargo distrital no aparece en ninguna pantalla todavía:
 `listarPersonas` filtra los cargos por el grupo, así que el comisionado sólo se ve como
@@ -341,7 +345,19 @@ declarar, pero `listarPersonas` de un grupo cerrado sigue devolviendo gente.
 
 También queda una deuda de paridad: mobile carga la salida con su dirección pero todavía
 no permite elegir al dirigente responsable, que sí se elige en la pantalla `Salida` de web.
-Una salida creada desde el teléfono se termina de armar en la web.
+Una salida creada desde el teléfono se termina de armar en la web. Y **desde mobile no se
+puede exportar**: la nómina en PDF y en XLSX sólo se baja desde la web, porque en el
+teléfono bajar un archivo es traerlo con la sesión y abrir la hoja de compartir, que todavía
+no está.
+
+En la Nómina de web, esos dos formatos cambian de forma con el ancho: en escritorio son dos
+botones más en la fila de acciones, y a ancho de teléfono se reemplazan por un solo
+"Exportar" que abre una hoja desde abajo —velo con desenfoque, una fila de 64px por formato
+con su para qué—, porque apilar cinco botones dejaría la lista abajo de todo. Es la misma
+forma que usa el conmutador de rol de la cabecera (`CambioDeRol.tsx`); todavía vive en su
+pantalla, y cuando aparezca la segunda se muda a `ui.tsx` como `Hoja`. Ojo con esconderla
+con `hidden sm:inline-flex`: `BOTON_SECUNDARIO` ya trae `inline-flex` y gana por orden de
+emisión, así que lo que oculta de verdad es la variante `max-sm:hidden`.
 
 La base es SQLite por Drizzle y llega a los módulos por `Core.bd`; las migraciones las
 declara cada módulo y las aplica `aplicarMigraciones` al arrancar. Sigue sin haber
