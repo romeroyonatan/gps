@@ -1,18 +1,10 @@
-import { PDFDocument, type PDFFont, type PDFPage, rgb, StandardFonts } from 'pdf-lib'
+import { documentoDeterminista, recortar, texto } from '@gps/core/pdf'
+import { type PDFFont, type PDFPage, rgb } from 'pdf-lib'
 import { COLUMNAS_DE_LA_NOMINA, type SeccionDeLaNomina } from '../dominio/nomina'
 
 const MARGEN = 50
 const ANCHO = 595 // A4 en puntos
 const ALTO = 842
-
-/** Un instante fijo para los metadatos, por la misma razón que en el permiso de
- *  salida: pdf-lib pone la hora del sistema en CreationDate y ModDate, y con eso
- *  la misma nómina daría bytes distintos cada vez. La fecha real de la nómina va
- *  impresa adentro, que es donde se lee.
- *
- *  No sale de core.reloj: no es un hecho del negocio, es un campo que hay que
- *  fijar para que el archivo sea reproducible. */
-const SIN_FECHA = new Date(0)
 
 /** Los anchos en puntos, en el orden de COLUMNAS_DE_LA_NOMINA. El nombre se
  *  lleva lo que sobra: es lo que más varía y lo que se busca al leer.
@@ -27,27 +19,6 @@ const ALTO_DE_FILA = 14
 /** Un título, su encabezado y al menos dos filas: menos que eso no vale la pena
  *  empezar la sección al pie de una hoja. */
 const ALTO_MINIMO_DE_SECCION = 14 + ALTO_DE_FILA * 3
-
-function texto(
-  pagina: PDFPage,
-  contenido: string,
-  x: number,
-  y: number,
-  fuente: PDFFont,
-  tamano = 10,
-) {
-  pagina.drawText(contenido, { x, y, size: tamano, font: fuente, color: rgb(0, 0, 0) })
-}
-
-/** El texto que entra en `ancho`, con puntos suspensivos si no entra entero. */
-function recortar(contenido: string, ancho: number, fuente: PDFFont, tamano: number): string {
-  if (fuente.widthOfTextAtSize(contenido, tamano) <= ancho) return contenido
-  let recortado = contenido
-  while (recortado.length > 1 && fuente.widthOfTextAtSize(`${recortado}…`, tamano) > ancho) {
-    recortado = recortado.slice(0, -1)
-  }
-  return `${recortado}…`
-}
 
 /** La línea de títulos, con la raya debajo. Devuelve dónde sigue el texto. */
 function encabezadoDeTabla(pagina: PDFPage, y: number, negrita: PDFFont): number {
@@ -108,14 +79,7 @@ export async function armarPdfDeLaNomina(datos: {
   periodo: number
   secciones: readonly SeccionDeLaNomina[]
 }): Promise<Uint8Array> {
-  const documento = await PDFDocument.create()
-  documento.setCreationDate(SIN_FECHA)
-  documento.setModificationDate(SIN_FECHA)
-  documento.setProducer('GPS')
-  documento.setCreator('GPS')
-
-  const normal = await documento.embedFont(StandardFonts.Helvetica)
-  const negrita = await documento.embedFont(StandardFonts.HelveticaBold)
+  const { documento, normal, negrita } = await documentoDeterminista()
 
   let pagina = documento.addPage([ANCHO, ALTO])
   let y = ALTO - MARGEN

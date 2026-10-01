@@ -1,15 +1,25 @@
 import { type MedioDePago, useActor, useRegistrarPago, useTesoreria } from '@gps/api'
+import { aFechaDeCalendario, esFechaDeCalendario } from '@gps/core/fechas'
 import {
   enPesos,
-  fechaValida,
   importeEnPesosValido,
   imputacionDelPago,
   puedeRegistrarPagos,
 } from '@gps/tesoreria/dominio'
 import { router, useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
-import { Boton, CAMPO, Campo, Falla, Filtros, Nota, Titulo, Volver } from '../../../../src/ui'
+import { Pressable, Text, TextInput, View } from 'react-native'
+import {
+  Boton,
+  CAMPO,
+  Campo,
+  Falla,
+  Filtros,
+  Marco,
+  Nota,
+  Titulo,
+  Volver,
+} from '../../../../src/ui'
 
 const MEDIOS = [
   { id: 'transferencia', etiqueta: 'Transferencia' },
@@ -23,7 +33,7 @@ const RESPALDO = {
   otro: { etiqueta: 'Referencia', pista: 'Opcional' },
 } as const satisfies Record<MedioDePago, { etiqueta: string; pista: string }>
 
-const hoy = () => new Date().toLocaleDateString('en-CA')
+const hoy = () => aFechaDeCalendario(new Date())
 
 /** Asentar un pago recibido por fuera de GPS. Sólo Tesorería diocesana: la
  *  jefatura lee su cuenta pero no la escribe. */
@@ -43,25 +53,20 @@ export default function Pantalla() {
   const saldo = cuenta?.saldo ?? 0
   const monto = Number(importe.replace(/\D/g, ''))
   const imputacion = imputacionDelPago(saldo, monto)
-  const puede = importeEnPesosValido(monto) && fechaValida(fecha)
+  const puede = importeEnPesosValido(monto) && esFechaDeCalendario(fecha)
   const respaldo = RESPALDO[medio]
 
   if (actor !== null && !puedeRegistrarPagos(actor)) {
     return (
-      <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-10">
+      <Marco>
         <Volver href={volver}>Cuenta del grupo</Volver>
         <Nota>Los pagos los asienta la Tesorería diocesana.</Nota>
-      </ScrollView>
+      </Marco>
     )
   }
 
   return (
-    <ScrollView
-      className="flex-1 bg-surface"
-      contentContainerClassName="px-4 pb-10"
-      keyboardShouldPersistTaps="handled"
-      automaticallyAdjustKeyboardInsets
-    >
+    <Marco keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
       <Volver href={volver}>Cuenta del grupo</Volver>
       <Titulo acompaña="El grupo paga por fuera de GPS. Acá se asienta lo recibido y se imputa a la deuda.">
         Registrar pago
@@ -109,7 +114,9 @@ export default function Pantalla() {
 
         <Campo
           etiqueta="Fecha del pago"
-          problema={fecha !== '' && !fechaValida(fecha) ? 'La fecha va en aaaa-mm-dd.' : undefined}
+          problema={
+            fecha !== '' && !esFechaDeCalendario(fecha) ? 'La fecha va en aaaa-mm-dd.' : undefined
+          }
         >
           <TextInput
             accessibilityLabel="Fecha del pago"
@@ -178,6 +185,6 @@ export default function Pantalla() {
           {registrar.isPending ? 'Asentando…' : 'Asentar pago'}
         </Boton>
       </View>
-    </ScrollView>
+    </Marco>
   )
 }

@@ -25,7 +25,6 @@ export interface ServicioDeEstructura extends Estructura {
     sexo: SexoDeUnidad
     nombre: string
   }): Promise<Unidad>
-  cerrarUnidad(unidadId: string): Promise<void>
   cerrarGrupo(grupoId: string): Promise<void>
   /** El arbol de la diocesis: distritos, grupos y unidades abiertas.
    *
@@ -180,15 +179,6 @@ export function crearServicioDeEstructura(core: Core): ServicioDeEstructura {
       }
       core.bd.insert(unidades).values(unidad).run()
       return unidad
-    },
-
-    async cerrarUnidad(unidadId) {
-      const ahora = core.reloj.ahora()
-      core.bd
-        .update(unidades)
-        .set({ cerradaEn: ahora, actualizadoEn: ahora })
-        .where(eq(unidades.id, unidadId))
-        .run()
     },
 
     async cerrarGrupo(grupoId) {

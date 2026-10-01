@@ -39,7 +39,6 @@
         "expo-sharing": "~57.0.5",
         "expo-splash-screen": "~57.0.8",
         "expo-status-bar": "~57.0.1",
-        "expo-symbols": "~57.0.2",
         "expo-web-browser": "~57.0.2",
         "nativewind": "^4.2.6",
         "react": "19.2.3",
@@ -84,7 +83,6 @@
         "@types/bun": "latest",
         "@types/react": "^19.2.0",
         "@types/react-dom": "^19.2.0",
-        "bun-plugin-tailwind": "^0.1.2",
         "tailwindcss": "^4.3.3",
         "typescript": "^5.7.0",
       },
@@ -185,6 +183,7 @@
         "@pothos/core": "^4.13.1",
         "drizzle-orm": "^0.45.2",
         "graphql": "^16.9.0",
+        "pdf-lib": "^1.17.1",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -309,7 +308,6 @@
       },
       "devDependencies": {
         "@types/bun": "latest",
-        "bun-plugin-tailwind": "^0.1.2",
         "typescript": "^5.7.0",
       },
     },

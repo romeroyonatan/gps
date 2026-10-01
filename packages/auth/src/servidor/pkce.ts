@@ -13,14 +13,8 @@ export function nuevoVerificador(core: Core): string {
  *  el mismo algoritmo-, así que alcanza con reempaquetar esos bytes en
  *  base64url en vez de pedirle a Core un método más para esto. */
 export function desafioDe(core: Core, verificador: string): string {
-  const hex = core.hash(verificador)
-  const bytes = new Uint8Array(hex.length / 2)
-  for (let i = 0; i < bytes.length; i++) bytes[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16)
-  return base64Url(bytes)
-}
-
-function base64Url(bytes: Uint8Array): string {
-  let binario = ''
-  for (const byte of bytes) binario += String.fromCharCode(byte)
-  return btoa(binario).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
+  return Uint8Array.fromHex(core.hash(verificador)).toBase64({
+    alphabet: 'base64url',
+    omitPadding: true,
+  })
 }

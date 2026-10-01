@@ -31,17 +31,10 @@ export function aplicarMigraciones(core: Core, modulos: readonly Module<any, any
       modulo TEXT NOT NULL,
       nombre TEXT NOT NULL,
       aplicada_en INTEGER NOT NULL,
-      contenido TEXT,
+      contenido TEXT NOT NULL,
       PRIMARY KEY (modulo, nombre)
     )`),
   )
-
-  // Compatibilidad con bases creadas antes de registrar el contenido. Guardarlo
-  // permite detectar que alguien edito una migracion que ya fue aplicada.
-  const columnas = core.bd.all<{ name: string }>(sql.raw('PRAGMA table_info(migraciones)'))
-  if (!columnas.some((columna) => columna.name === 'contenido')) {
-    core.bd.run(sql.raw('ALTER TABLE migraciones ADD COLUMN contenido TEXT'))
-  }
 
   const huerfanasExistentes = core.bd.all(sql.raw('PRAGMA foreign_key_check'))
   if (huerfanasExistentes.length > 0) {
@@ -61,20 +54,14 @@ export function aplicarMigraciones(core: Core, modulos: readonly Module<any, any
   try {
     for (const modulo of modulos) {
       for (const migracion of modulo.migraciones ?? []) {
-        const aplicada = core.bd.values<[string | null]>(
+        // Guardar el contenido permite detectar que alguien edito una
+        // migracion que ya fue aplicada.
+        const aplicada = core.bd.values<[string]>(
           sql`SELECT contenido FROM migraciones
               WHERE modulo = ${modulo.name} AND nombre = ${migracion.nombre}`,
         )[0]
         if (aplicada) {
-          const [contenido] = aplicada
-          // La primera corrida con este runner completa las filas historicas;
-          // desde entonces cualquier cambio en el SQL hace fallar el arranque.
-          if (contenido === null) {
-            core.bd.run(
-              sql`UPDATE migraciones SET contenido = ${migracion.sql}
-                  WHERE modulo = ${modulo.name} AND nombre = ${migracion.nombre}`,
-            )
-          } else if (contenido !== migracion.sql) {
+          if (aplicada[0] !== migracion.sql) {
             throw new Error(
               `La migracion "${modulo.name}/${migracion.nombre}" fue modificada despues de aplicarse.`,
             )

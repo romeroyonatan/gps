@@ -41,7 +41,6 @@ describe('crearCore', () => {
     const uno = core()
     expect(uno.nuevoSecreto(16)).toMatch(/^[0-9a-f]{32}$/)
     expect(uno.nuevoSecreto()).not.toBe(uno.nuevoSecreto())
-    expect(() => uno.nuevoSecreto(0)).toThrow('entero positivo')
   })
 
   test('expone la base que le pasaron', () => {

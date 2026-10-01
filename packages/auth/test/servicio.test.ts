@@ -6,6 +6,7 @@ import type { Personas } from '@gps/personas/dominio'
 import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migraciones } from '../src/servidor/migraciones'
+import type { ProveedorOidc } from '../src/servidor/oidc'
 import { crearServicioDeAuth } from '../src/servidor/servicio'
 
 /** auth sólo le pregunta el nombre de un grupo, para mostrar el ámbito de un
@@ -23,6 +24,11 @@ const personas: Personas = {
   ocupantesDelCargo: async () => [],
   miembrosDelGrupo: async () => [],
   cargosDelGrupoEn: async () => [],
+}
+
+const proveedorFalso: ProveedorOidc = {
+  iniciar: () => ({ url: '', state: 'state-real', nonce: 'nonce', codeVerifier: 'verifier' }),
+  intercambiarCodigo: async () => ({ subject: 'subject_1' }),
 }
 
 function montar() {
@@ -65,17 +71,27 @@ function montar() {
   )
   return {
     bd,
-    servicio: crearServicioDeAuth(core, personas, estructuraFalsa, {}),
+    servicio: crearServicioDeAuth(core, personas, estructuraFalsa, { google: proveedorFalso }),
     avanzarA: (fecha: string) => {
       ahora = new Date(fecha)
     },
   }
 }
 
+/** Abre una sesión por el camino real: login con el proveedor falso. */
+async function abrirSesion(servicio: ReturnType<typeof crearServicioDeAuth>) {
+  const inicio = servicio.iniciarLogin('google', 'web', 'https://gps.test/callback')
+  return servicio.completarLogin({
+    transaccion: inicio.transaccion,
+    stateRecibido: 'state-real',
+    code: 'c',
+  })
+}
+
 describe('sesiones', () => {
   test('persiste sólo el hash y resuelve una sesión opaca vigente', async () => {
     const { bd, servicio } = montar()
-    const creada = await servicio.crearSesionParaIdentidad('identidad_1')
+    const creada = await abrirSesion(servicio)
 
     expect(creada).toEqual({ secreto: 'secreto_1', sesionId: 'sesion_2' })
     expect(
@@ -92,12 +108,12 @@ describe('sesiones', () => {
 
   test('una sesión revocada o vencida deja de autenticar', async () => {
     const casoRevocado = montar()
-    const revocada = await casoRevocado.servicio.crearSesionParaIdentidad('identidad_1')
+    const revocada = await abrirSesion(casoRevocado.servicio)
     await casoRevocado.servicio.revocarSesion(revocada.sesionId)
     expect(await casoRevocado.servicio.resolverSesion(revocada.secreto)).toBeNull()
 
     const casoVencido = montar()
-    const vencida = await casoVencido.servicio.crearSesionParaIdentidad('identidad_1')
+    const vencida = await abrirSesion(casoVencido.servicio)
     casoVencido.avanzarA('1970-02-01T00:00:00Z')
     expect(await casoVencido.servicio.resolverSesion(vencida.secreto)).toBeNull()
   })

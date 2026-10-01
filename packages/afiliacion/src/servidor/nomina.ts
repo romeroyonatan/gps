@@ -34,11 +34,7 @@ export class GrupoInexistente extends Error {
 
 /** El nombre del archivo, que es lo que queda en la carpeta de descargas de
  *  quien lo baja: sin esto se llama como el id del grupo. */
-export function nombreDelArchivo(
-  grupo: { numero: number },
-  fecha: string,
-  extension: string,
-): string {
+function nombreDelArchivo(grupo: { numero: number }, fecha: string, extension: string): string {
   return `nomina-grupo-${grupo.numero}-${fecha}.${extension}`
 }
 

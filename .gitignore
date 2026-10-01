@@ -18,3 +18,6 @@ apps/mobile/android/
 *.db
 *.db-shm
 *.db-wal
+
+# los archivos subidos en desarrollo (ARCHIVOS_DIR por omisión)
+/archivos/

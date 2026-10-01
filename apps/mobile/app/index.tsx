@@ -4,7 +4,7 @@ import type { Unidad } from '@gps/estructura/dominio'
 import { puedeVerPersonasDelGrupo } from '@gps/personas/dominio'
 import { Link } from 'expo-router'
 import { useState } from 'react'
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { Pressable, Text, TextInput, View } from 'react-native'
 import {
   BotonSecundario,
   CAMPO,
@@ -12,6 +12,7 @@ import {
   Chevron,
   ChipDeRama,
   Falla,
+  Marco,
   Titulo,
   Vacio,
 } from '../src/ui'
@@ -116,12 +117,7 @@ export default function Pantalla() {
     filtro !== '' && filtrados.every((distrito) => distrito.encontrados.length === 0)
 
   return (
-    <ScrollView
-      className="flex-1 bg-surface"
-      contentContainerClassName="px-4 pb-10"
-      keyboardShouldPersistTaps="handled"
-      automaticallyAdjustKeyboardInsets
-    >
+    <Marco keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
       {/* En el teléfono el directorio es la portada, así que se lleva el
             enlace a Tesorería: no hay barra lateral donde ponerlo. */}
       <Titulo enlace={{ texto: 'Tesorería', href: '/tesoreria' }}>Estructura</Titulo>
@@ -223,6 +219,6 @@ export default function Pantalla() {
           {version.data.version.modulos.join(', ')}
         </Text>
       )}
-    </ScrollView>
+    </Marco>
   )
 }

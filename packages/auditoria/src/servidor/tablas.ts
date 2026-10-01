@@ -1,3 +1,4 @@
+import type { CambioDeAuditoria, ValorDeAuditoria } from '@gps/core'
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 export const eventosDeAuditoria = sqliteTable(
@@ -15,8 +16,10 @@ export const eventosDeAuditoria = sqliteTable(
     entidadTipo: text('entidad_tipo'),
     entidadId: text('entidad_id'),
     objetivoPersonaId: text('objetivo_persona_id'),
-    resumen: text('resumen').notNull(),
-    cambios: text('cambios').notNull(),
+    resumen: text('resumen', { mode: 'json' })
+      .$type<Readonly<Record<string, ValorDeAuditoria>>>()
+      .notNull(),
+    cambios: text('cambios', { mode: 'json' }).$type<readonly CambioDeAuditoria[]>().notNull(),
   },
   (tabla) => [
     index('auditoria_por_fecha').on(tabla.ocurridoEn, tabla.id),

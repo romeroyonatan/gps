@@ -1,4 +1,5 @@
-import type { Alcance, CambioDeAuditoria, Core, ValorDeAuditoria } from '@gps/core'
+import type { Alcance, Core } from '@gps/core'
+import { ErrorDeNegocio } from '@gps/core/errores'
 import type { Estructura } from '@gps/estructura/dominio'
 import type { Personas } from '@gps/personas/dominio'
 import { and, desc, eq, gte, inArray, lt, lte, or, type SQL } from 'drizzle-orm'
@@ -10,26 +11,13 @@ import {
 } from '../dominio'
 import { eventosDeAuditoria } from './tablas'
 
-export class AuditoriaDenegada extends Error {
-  override name = 'AuditoriaDenegada'
+export class AuditoriaDenegada extends ErrorDeNegocio {
+  constructor(mensaje: string) {
+    super(mensaje, 'SIN_PERMISO')
+  }
 }
 
-interface Fila {
-  id: string
-  ocurridoEn: Date
-  actorPersonaId: string | null
-  origenInterno: string | null
-  modulo: string
-  accion: string
-  resultado: 'exitoso' | 'rechazado'
-  elevado: boolean
-  grupoId: string | null
-  entidadTipo: string | null
-  entidadId: string | null
-  objetivoPersonaId: string | null
-  resumen: string
-  cambios: string
-}
+type Fila = typeof eventosDeAuditoria.$inferSelect
 
 export interface ServicioDeAuditoria {
   listar(alcance: Alcance, filtros?: FiltrosDeAuditoria): Promise<PaginaDeAuditoria>
@@ -44,24 +32,6 @@ function leerCursor(cursor: string): { fecha: Date; id: string } | null {
   const tiempo = Number(cursor.slice(0, separador))
   if (separador < 1 || !Number.isFinite(tiempo)) return null
   return { fecha: new Date(tiempo), id: cursor.slice(separador + 1) }
-}
-
-function objeto(texto: string): Readonly<Record<string, ValorDeAuditoria>> {
-  try {
-    const valor = JSON.parse(texto)
-    return valor && typeof valor === 'object' && !Array.isArray(valor) ? valor : {}
-  } catch {
-    return {}
-  }
-}
-
-function cambios(texto: string): readonly CambioDeAuditoria[] {
-  try {
-    const valor = JSON.parse(texto)
-    return Array.isArray(valor) ? valor : []
-  } catch {
-    return []
-  }
 }
 
 export function crearServicioDeAuditoria(
@@ -110,7 +80,7 @@ export function crearServicioDeAuditoria(
         .where(condiciones.length ? and(...condiciones) : undefined)
         .orderBy(desc(eventosDeAuditoria.ocurridoEn), desc(eventosDeAuditoria.id))
         .limit(limite + 1)
-        .all() as Fila[]
+        .all()
       const hayMas = filas.length > limite
       const pagina = filas.slice(0, limite)
       const nombres = new Map<string, string | null>()
@@ -141,8 +111,6 @@ export function crearServicioDeAuditoria(
           ? (nombres.get(fila.objetivoPersonaId) ?? null)
           : null,
         grupoNombre: fila.grupoId ? (grupos.get(fila.grupoId) ?? null) : null,
-        resumen: objeto(fila.resumen),
-        cambios: cambios(fila.cambios),
       }))
       return {
         eventos,

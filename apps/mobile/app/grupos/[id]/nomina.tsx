@@ -11,7 +11,7 @@ import {
   puedeAdministrarPlantelDeGrupo,
 } from '@gps/personas/dominio'
 import { Link, router, useLocalSearchParams } from 'expo-router'
-import { Pressable, ScrollView, Text, View } from 'react-native'
+import { Pressable, Text, View } from 'react-native'
 import {
   Accion,
   BotonSecundario,
@@ -19,6 +19,7 @@ import {
   Chevron,
   Chip,
   Falla,
+  Marco,
   Titulo,
   Vacio,
 } from '../../../src/ui'
@@ -128,7 +129,7 @@ export default function Pantalla() {
   const { grupo } = arbol
 
   return (
-    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-6">
+    <Marco contentContainerClassName="px-4 pb-6">
       <Titulo>Nómina</Titulo>
 
       {(arbol.isPending || lista.isPending) && <Cargando>Consultando el grupo…</Cargando>}
@@ -191,6 +192,6 @@ export default function Pantalla() {
           />
         </>
       )}
-    </ScrollView>
+    </Marco>
   )
 }

@@ -1,8 +1,9 @@
 import { useReporteDeCobranza, useTesoreria } from '@gps/api'
-import { periodosDelReporte, variacion } from '@gps/tesoreria/dominio'
+import { aFechaDeCalendario } from '@gps/core/fechas'
+import { enPesos, periodosDelReporte, variacion } from '@gps/tesoreria/dominio'
 import { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
-import { Cargando, Falla, Pantalla, pesos, Titulo, Vacio, Volver } from '../../componentes/ui'
+import { Cargando, Falla, FILA, Marco, PIE_DE_TABLA, Titulo, Vacio, Volver } from '../../src/ui'
 
 const entero = new Intl.NumberFormat('es-AR')
 const porciento = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 })
@@ -20,15 +21,14 @@ function FilaDeEvolucion(props: {
   comoPlata?: boolean
 }) {
   const { absoluta, porcentaje } = variacion(props.antes, props.ahora)
-  const formatear = (numero: number) =>
-    props.comoPlata ? pesos.format(numero) : entero.format(numero)
+  const formatear = (numero: number) => (props.comoPlata ? enPesos(numero) : entero.format(numero))
   const delta =
     props.comoPlata && porcentaje !== null
       ? conSigno(porcentaje, `${porciento.format(Math.abs(porcentaje))} %`)
       : conSigno(absoluta, formatear(Math.abs(absoluta)))
 
   return (
-    <View className="min-h-14 flex-row items-center justify-between gap-3 border-b border-line py-2">
+    <View className={`${FILA} justify-between`}>
       <Text numberOfLines={1} className="shrink text-base font-semibold text-ink">
         {props.concepto}
       </Text>
@@ -44,12 +44,12 @@ function FilaDeEvolucion(props: {
   )
 }
 
-export default function Pantalla_() {
+export default function Pantalla() {
   // Las cuotas ya están en cache: es la misma consulta que usa la pantalla de
   // Deuda, así que elegir período no dispara un pedido nuevo.
   const tesoreria = useTesoreria()
   const mirables = periodosDelReporte(
-    new Date().toLocaleDateString('en-CA'),
+    aFechaDeCalendario(new Date()),
     (tesoreria.data?.cuotasDeAfiliacion ?? []).map((cuota) => cuota.periodo),
   )
   const [elegido, setElegido] = useState<number | null>(null)
@@ -58,7 +58,7 @@ export default function Pantalla_() {
   const reporte = consulta.data?.reporteDeCobranza
 
   return (
-    <Pantalla>
+    <Marco>
       <Volver href="/tesoreria">Tesorería</Volver>
       <Titulo acompaña="Cómo viene la cobranza de la temporada, por distrito y contra el período anterior.">
         Reportes
@@ -70,8 +70,8 @@ export default function Pantalla_() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        className="mt-5 -mx-5"
-        contentContainerClassName="px-5 gap-2"
+        className="mt-5 -mx-4"
+        contentContainerClassName="px-4 gap-2"
       >
         {mirables.map((uno) => {
           const activo = uno === periodo
@@ -135,16 +135,14 @@ export default function Pantalla_() {
                 <View className="flex-row justify-between gap-3">
                   <View className="gap-0.5">
                     <Text className="text-label text-ink-muted">Cobrado</Text>
-                    <Text className="text-base font-semibold text-ok">
-                      {pesos.format(fila.cobrado)}
-                    </Text>
+                    <Text className="text-base font-semibold text-ok">{enPesos(fila.cobrado)}</Text>
                   </View>
                   <View className="items-end gap-0.5">
                     <Text className="text-label text-ink-muted">Deuda</Text>
                     <Text
                       className={`text-base font-semibold ${fila.deuda > 0 ? 'text-danger' : 'text-ink-muted'}`}
                     >
-                      {pesos.format(fila.deuda)}
+                      {enPesos(fila.deuda)}
                     </Text>
                   </View>
                 </View>
@@ -154,13 +152,13 @@ export default function Pantalla_() {
 
           {reporte.porDistrito.length === 0 && <Vacio>Todavía no hay ningún distrito.</Vacio>}
 
-          <View className="mt-4 flex-row justify-between gap-3 rounded-lg bg-surface-3 p-3">
+          <View className={PIE_DE_TABLA}>
             <Text className="shrink text-sm text-ink-muted">
               {reporte.totales.distritos} distritos · {reporte.totales.grupos} grupos ·{' '}
               {reporte.totales.declararon} declararon
             </Text>
             <Text className="shrink-0 text-sm font-bold text-ink">
-              {pesos.format(reporte.totales.deuda)}
+              {enPesos(reporte.totales.deuda)}
             </Text>
           </View>
 
@@ -202,6 +200,6 @@ export default function Pantalla_() {
           </Text>
         </>
       )}
-    </Pantalla>
+    </Marco>
   )
 }

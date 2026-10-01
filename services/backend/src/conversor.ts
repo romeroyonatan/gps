@@ -1,4 +1,3 @@
-/// <reference path="./heic.d.ts" />
 import type { ConversorDeImagenes } from '@gps/core'
 import convert from 'heic-convert'
 

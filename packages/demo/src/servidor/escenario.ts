@@ -10,7 +10,7 @@ import '@gps/auth/servidor'
 import { YaDeclaroHoy } from '@gps/afiliacion/servidor'
 import { type Alcance, alcanceSinLimites, type Context } from '@gps/core'
 import { aFechaDeCalendario } from '@gps/core/fechas'
-import { RAMAS, type Rama, type SexoDeUnidad } from '@gps/estructura/dominio'
+import { type Rama, ramaDelCatalogo, type SexoDeUnidad } from '@gps/estructura/dominio'
 import {
   ambitoDelCargo,
   type Categoria,
@@ -427,12 +427,6 @@ const PERSONAS: readonly {
  *  Este archivo conoce a todos los modulos que quiera representar, que es lo
  *  que el resto de la arquitectura evita. La diferencia es que agregar un
  *  modulo no obliga a tocarlo: el sistema funciona igual sin que lo mencione. */
-/** El tipo de unidad de la rama alcanza como nombre cuando el grupo tiene una
- *  sola: "Manada", "Clan". Los grupos con dos de la misma rama los escriben. */
-function nombrePorDefecto(rama: Rama): string {
-  return RAMAS.find((entrada) => entrada.id === rama)?.unidad ?? rama
-}
-
 export async function sembrarEscenario(ctx: Context, ahora: Date): Promise<void> {
   for (const datos of DIOCESIS) {
     const distrito = await ctx.estructura.crearDistrito({
@@ -448,9 +442,15 @@ export async function sembrarEscenario(ctx: Context, ahora: Date): Promise<void>
       })
 
       for (const unidad of datosDelGrupo.ramas) {
+        // El tipo de unidad alcanza como nombre cuando el grupo tiene una sola:
+        // "Manada", "Clan". Los grupos con dos de la misma rama los escriben.
         const datosDeLaUnidad =
           typeof unidad === 'string'
-            ? { rama: unidad, sexo: 'mixta' as const, nombre: nombrePorDefecto(unidad) }
+            ? {
+                rama: unidad,
+                sexo: 'mixta' as const,
+                nombre: ramaDelCatalogo(unidad)?.unidad ?? unidad,
+              }
             : unidad
         await ctx.estructura.abrirUnidad({ grupoId: grupo.id, ...datosDeLaUnidad })
       }

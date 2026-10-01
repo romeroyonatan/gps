@@ -28,8 +28,10 @@ function destinoActual(): string {
   return `${window.location.pathname}${window.location.search}`
 }
 
-function enlaceDeIngreso(proveedor: string, extra = ''): string {
-  return `/auth/${proveedor}/iniciar?destino=${encodeURIComponent(destinoActual())}${extra}`
+function enlaceDeIngreso(proveedor: string, perfil?: string): string {
+  const params = new URLSearchParams({ destino: destinoActual() })
+  if (perfil) params.set('perfil', perfil)
+  return `/auth/${proveedor}/iniciar?${params}`
 }
 
 /** La marca del proveedor es una letra en un cuadrado, no un logo: no se
@@ -126,7 +128,7 @@ export function Ingreso(props: { entorno: string }) {
               entra directo al conmutador de rol de la cabecera: es el camino
               que muestra el producto entero sin pedir cinco logins. */}
         {props.entorno === 'demo' && (
-          <Proveedor href={enlaceDeIngreso('demo', '&perfil=demo')} letra="D">
+          <Proveedor href={enlaceDeIngreso('demo', 'demo')} letra="D">
             Iniciar sesión demo
           </Proveedor>
         )}
@@ -143,7 +145,7 @@ export function Ingreso(props: { entorno: string }) {
             {PERFILES_DEMO.map((perfil) => (
               <a
                 key={perfil.subject}
-                href={enlaceDeIngreso('demo', `&perfil=${perfil.subject}`)}
+                href={enlaceDeIngreso('demo', perfil.subject)}
                 className="rounded-lg border border-line-strong px-4 py-3 hover:bg-surface-3"
               >
                 <span className="block text-sm font-semibold">{perfil.nombre}</span>
@@ -210,6 +212,7 @@ export function ElegirRol(props: {
 /** El enlace que eleva al administrador: es otro viaje completo por el
  *  proveedor, no un botón que prenda una bandera. */
 export function enlaceDeElevacion(proveedor: string, perfil?: string): string {
-  const demo = perfil ? `&perfil=${encodeURIComponent(perfil)}` : ''
-  return `/auth/${proveedor}/iniciar?intencion=elevar&destino=${encodeURIComponent(destinoActual())}${demo}`
+  const params = new URLSearchParams({ intencion: 'elevar', destino: destinoActual() })
+  if (perfil) params.set('perfil', perfil)
+  return `/auth/${proveedor}/iniciar?${params}`
 }

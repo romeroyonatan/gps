@@ -1,4 +1,5 @@
 import type { Alcance, Core } from '@gps/core'
+import { ErrorDeNegocio } from '@gps/core/errores'
 import { and, eq } from 'drizzle-orm'
 import {
   esTipoAdmitido,
@@ -12,20 +13,10 @@ import { archivos } from './tablas'
 
 /** Lo que se pidio subir no se puede aceptar: el tipo no esta admitido, el
  *  tamaño se pasa, o falta el dueño. */
-export class SubidaInvalida extends Error {
-  constructor(motivo: string) {
-    super(motivo)
-    this.name = 'SubidaInvalida'
-  }
-}
+export class SubidaInvalida extends ErrorDeNegocio {}
 
 /** El token de subida no sirve: no corresponde a ese archivo, o vencio. */
-export class SubidaNoAutorizada extends Error {
-  constructor(motivo: string) {
-    super(motivo)
-    this.name = 'SubidaNoAutorizada'
-  }
-}
+export class SubidaNoAutorizada extends ErrorDeNegocio {}
 
 /** Nadie puede decir si esta descarga esta permitida: el modulo dueño del
  *  archivo no registro un autorizador. Es deliberadamente un error y no un
@@ -41,11 +32,6 @@ export class SinAutorizador extends Error {
  *  pide y manda los bytes. */
 const VENCIMIENTO_MS = 15 * 60 * 1000
 
-/** Lo que cada modulo dueño tiene que contestar para que sus archivos se puedan
- *  descargar. `archivos` no conoce ninguna regla de permisos: pregunta.
- *
- *  Recibe `actor` aunque hoy sea siempre null: cuando exista auth, la firma no
- *  cambia y cada dueño decide con quien esta preguntando. */
 /** Lo que el modulo dueño de un recurso contesta antes de que se entreguen sus
  *  bytes. Recibe el alcance del pedido -null si no hay sesion- porque la
  *  descarga tiene que filtrar igual que la consulta GraphQL: una URL no

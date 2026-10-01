@@ -37,7 +37,6 @@ export { FirmaInvalida } from './firmas'
 
 export interface ServicioDeSalidas {
   crearPermiso(alcance: Alcance, grupoId: string, datos: DatosDelPermiso): Promise<Permiso>
-  editarPermiso(alcance: Alcance, permisoId: string, datos: DatosDelPermiso): Promise<Permiso>
   elegirUnidades(alcance: Alcance, permisoId: string, unidadIds: readonly string[]): Promise<void>
   /** Sin alcance: es un campo del Permiso que ya se autorizo al leerlo. */
   unidadesElegidas(permisoId: string): readonly string[]
@@ -149,7 +148,6 @@ export function crearServicioDeSalidas(
       }
       return borradores.crearPermiso(alcance.actor, grupoId, datos)
     },
-    editarPermiso: administrando(borradores.editarPermiso),
     elegirUnidades: administrando(borradores.elegirUnidades),
     unidadesElegidas: borradores.unidadesElegidas,
     agregarParticipante: administrando(borradores.agregarParticipante),

@@ -1,9 +1,7 @@
 import { alcanceDe } from '@gps/core'
 import { type Builder, enumCompartido } from '@gps/core/graphql'
 import { TIPOS_DE_DOCUMENTO } from '@gps/personas/dominio'
-import { GraphQLError } from 'graphql'
 import type { Afiliado, Declaracion } from '../dominio/modelos'
-import { NadaQueDeclarar, YaDeclaroHoy } from './servicio'
 
 export function registrarSchema(builder: Builder): void {
   // enumCompartido y no builder.enumType: personas declara el mismo enum. La
@@ -98,28 +96,8 @@ export function registrarSchema(builder: Builder): void {
       type: DeclaracionRef,
       description: 'Declaración extraordinaria: fotografía al grupo con la fecha de hoy.',
       args: { grupoId: t.arg.id({ required: true }) },
-      resolve: async (_padre, args, contexto) => {
-        try {
-          return await contexto.afiliacion.declararExtraordinaria(
-            alcanceDe(contexto),
-            String(args.grupoId),
-          )
-        } catch (error) {
-          // Yoga enmascara todo lo que no sea un GraphQLError: sin esta
-          // traduccion, la pantalla recibe "Unexpected error." en vez del
-          // motivo. Traducir en el resolver y no en el servicio es lo que
-          // mantiene al servicio sin conocer el framework.
-          if (error instanceof NadaQueDeclarar) {
-            throw new GraphQLError(error.message, { extensions: { code: 'NADA_QUE_DECLARAR' } })
-          }
-          // Sin esta, el UNIQUE(fecha, grupo_id) sube como SQLiteError crudo y
-          // el dirigente que apreto dos veces lee "Unexpected error.".
-          if (error instanceof YaDeclaroHoy) {
-            throw new GraphQLError(error.message, { extensions: { code: 'YA_DECLARO_HOY' } })
-          }
-          throw error
-        }
-      },
+      resolve: (_padre, args, contexto) =>
+        contexto.afiliacion.declararExtraordinaria(alcanceDe(contexto), String(args.grupoId)),
     }),
   )
 }

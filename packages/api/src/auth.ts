@@ -6,9 +6,8 @@ import {
   InvitacionDocument,
   InvitarDocument,
   PersonaActualDocument,
-  RevocarInvitacionDocument,
 } from './generated/graphql'
-import { useTransporte } from './proveedor'
+import { useMutacion, useTransporte } from './proveedor'
 
 /** Quién tiene la sesión abierta. `null` cuando el pedido es anónimo, que no
  *  es un error: es la respuesta que hace que la app muestre el login.
@@ -114,21 +113,4 @@ export function useRefrescarSesion(): () => Promise<void> {
   }, [clienteDeQueries])
 }
 
-export function useInvitar() {
-  const transporte = useTransporte()
-  return useMutation({
-    mutationFn: (variables: {
-      personaId: string
-      tipo: 'activacion' | 'recuperacion'
-      proveedorAReemplazar?: 'google' | 'apple' | 'demo'
-    }) => transporte.ejecutar(InvitarDocument, variables),
-  })
-}
-
-export function useRevocarInvitacion() {
-  const transporte = useTransporte()
-  return useMutation({
-    mutationFn: (variables: { invitacionId: string }) =>
-      transporte.ejecutar(RevocarInvitacionDocument, variables),
-  })
-}
+export const useInvitar = () => useMutacion(InvitarDocument)

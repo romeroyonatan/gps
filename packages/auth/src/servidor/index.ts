@@ -43,7 +43,6 @@ export type { ServicioDeAuth, VistaDeInvitacion } from './servicio'
 export {
   AutoridadInsuficiente,
   ElevacionDenegada,
-  IdentidadInvalida,
   IdentidadNoVinculada,
   InvitacionInvalida,
   ProveedorYaVinculado,

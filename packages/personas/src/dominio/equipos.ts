@@ -10,13 +10,6 @@ export const TIPOS_DE_EQUIPO = [
 
 export type TipoDeEquipo = (typeof TIPOS_DE_EQUIPO)[number]['id']
 
-export interface Equipo extends Marcas {
-  readonly id: string
-  readonly tipo: TipoDeEquipo
-  readonly ambitoTipo: 'grupo' | 'diocesis'
-  readonly ambitoId: string | null
-}
-
 export interface IntegranteDeEquipo extends Marcas {
   readonly id: string
   readonly equipoId: string

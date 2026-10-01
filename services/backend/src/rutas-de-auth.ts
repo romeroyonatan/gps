@@ -12,19 +12,12 @@ import type { Context, Logger } from '@gps/core'
  *  son las dos mitades de esa vuelta -arrancar y volver- y todo lo que hay que
  *  conservar en el medio viaja sellado en una cookie, no en el servidor.
  *
- *  `intencion` distingue para qué es el login, porque las cuatro variantes
+ *  `intencion` distingue para qué es el login, porque las cinco variantes
  *  comparten exactamente el mismo viaje y sólo difieren en qué se hace con el
  *  `subject` al volver: abrir sesión, vincular un segundo proveedor, elevar la
- *  sesión, o consumir un enlace de invitación. */
-type Intencion = 'login' | 'vincular' | 'elevar' | 'activacion' | 'recuperacion'
-
-const INTENCIONES: readonly Intencion[] = [
-  'login',
-  'vincular',
-  'elevar',
-  'activacion',
-  'recuperacion',
-]
+ *  sesión, o consumir un enlace de activación o de recuperación. */
+const INTENCIONES = ['login', 'vincular', 'elevar', 'activacion', 'recuperacion'] as const
+type Intencion = (typeof INTENCIONES)[number]
 
 const COOKIE_DE_SESION = 'gps_session'
 const COOKIE_DE_TRANSACCION = 'gps_login'
@@ -41,27 +34,19 @@ interface Pendiente {
 }
 
 function cookie(pedido: Request, nombre: string): string | null {
-  const crudas = pedido.headers.get('cookie')
-  if (!crudas) return null
-  for (const parte of crudas.split(';')) {
-    const [clave, ...valor] = parte.trim().split('=')
-    if (clave === nombre) return decodeURIComponent(valor.join('=')) || null
-  }
-  return null
+  return new Bun.CookieMap(pedido.headers.get('cookie') ?? '').get(nombre) || null
 }
 
 function ponerCookie(nombre: string, valor: string, segundos: number, seguro: boolean): string {
-  const atributos = [
-    `${nombre}=${encodeURIComponent(valor)}`,
-    'Path=/',
-    'HttpOnly',
-    'SameSite=Lax',
-    `Max-Age=${segundos}`,
-  ]
   // Secure rompe el desarrollo en http://localhost, asi que lo decide el
   // entorno y no una constante.
-  if (seguro) atributos.push('Secure')
-  return atributos.join('; ')
+  return new Bun.Cookie(nombre, valor, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: segundos,
+    secure: seguro,
+  }).serialize()
 }
 
 function esIntencion(valor: string | null): valor is Intencion {

@@ -1,6 +1,7 @@
 import type { Archivos } from '@gps/archivos/dominio'
 import { sePuedeAnexar } from '@gps/archivos/dominio'
 import type { Actor, Core } from '@gps/core'
+import { ErrorDeNegocio } from '@gps/core/errores'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Estructura } from '@gps/estructura/dominio'
 import { nombreDelCargo, type Personas, type TipoDeCargo } from '@gps/personas/dominio'
@@ -14,12 +15,7 @@ import { firmas, permisos } from './tablas'
 
 /** No se puede registrar esa firma: el permiso no esta emitido, el cargo ya
  *  firmo, nadie lo ocupa, o el dibujo esta vacio. */
-export class FirmaInvalida extends Error {
-  constructor(motivo: string) {
-    super(motivo)
-    this.name = 'FirmaInvalida'
-  }
-}
+export class FirmaInvalida extends ErrorDeNegocio {}
 
 /** Una firma pendiente o puesta, tal como la muestra la pantalla. */
 export interface EstadoDeFirma {

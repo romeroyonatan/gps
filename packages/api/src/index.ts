@@ -9,24 +9,17 @@ export {
   useInvitar,
   usePersonaActual,
   useRefrescarSesion,
-  useRevocarInvitacion,
 } from './auth'
-export type { AlmacenDelCache, ParticionDelCache } from './cache'
+export type { ParticionDelCache } from './cache'
 export { almacenPorPersona, useParticionDelCache } from './cache'
 export type { Distrito, Grupo } from './estructura'
 export { useDistritos, useGrupo } from './estructura'
 export type {
   AmbitoDeRol,
-  CrearPersonaMutationVariables,
-  DeclaracionesQuery,
-  DistritosQuery,
   MedioDePago,
   PermisosQuery,
-  PersonaActualQuery,
-  PersonasQuery,
   Rol,
   TipoDeCargo,
-  VersionQuery,
 } from './generated/graphql'
 export {
   useAsignarCargo,
@@ -65,6 +58,5 @@ export {
   useReporteDeCobranza,
   useTesoreria,
 } from './tesoreria'
-export type { SecretoDeSesion, Transporte } from './transporte'
 export { ErrorDeApi, transporteHttp } from './transporte'
 export { useVersion } from './version'

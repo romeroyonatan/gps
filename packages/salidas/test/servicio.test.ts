@@ -54,16 +54,6 @@ describe('crear y editar un borrador', () => {
       PermisoNoEditable,
     )
   })
-
-  test('editar un borrador cambia los datos', async () => {
-    const { servicio } = montar()
-    const permiso = await servicio.crearPermiso(alcanceSinLimites(), GRUPO_ID, datos)
-    const editado = await servicio.editarPermiso(alcanceSinLimites(), permiso.id, {
-      ...datos,
-      lugar: 'Otro lado',
-    })
-    expect(editado.lugar).toBe('Otro lado')
-  })
 })
 
 describe('número de expediente', () => {
@@ -224,9 +214,6 @@ describe('emitir', () => {
     const { servicio } = montar()
     const permiso = await permisoConGente(servicio)
     await servicio.emitir(alcanceSinLimites(), permiso.id)
-    expect(servicio.editarPermiso(alcanceSinLimites(), permiso.id, datos)).rejects.toThrow(
-      PermisoNoEditable,
-    )
     expect(
       servicio.agregarParticipante(alcanceSinLimites(), permiso.id, 'persona_cocinera'),
     ).rejects.toThrow(PermisoNoEditable)

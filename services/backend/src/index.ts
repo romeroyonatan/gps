@@ -69,14 +69,6 @@ export function leerClavesDeSello(
   return { claves, activa: elegida }
 }
 
-/** Donde se guardan los bytes de los archivos subidos. Mismo criterio que la
- *  ruta de la base: en demo no se puede configurar, asi que un build de
- *  demostracion no puede escribir sobre archivos de verdad. */
-export function leerDirectorioDeArchivos(entorno: Entorno, valor: string | undefined): string {
-  if (entorno === 'demo') return ''
-  return valor ?? './archivos'
-}
-
 export function leerPuerto(valor: string | undefined): number {
   if (valor === undefined) return 3000
   const puerto = Number(valor)
@@ -144,27 +136,30 @@ export function leerConfig(): Config {
   }
 }
 
-if (import.meta.main) {
-  const config = leerConfig()
-  const bd = crearBd(leerRutaDeBd(config.entorno, process.env.BD))
+/** Las piezas que el backend arma desde el entorno y le pasa a `componer`.
+ *  Las comparten el servidor y `bun run admin`. */
+export function piezasDelEntorno(config: Config) {
   const claves = leerClavesDeSello(
     config.entorno,
     process.env.CLAVES_DE_SELLO,
     process.env.CLAVE_DE_SELLO_ACTIVA,
   )
-  // En demo los archivos viven en memoria, igual que su base: un build de
-  // demostracion no deja nada en el disco de nadie.
-  const { servidor, contexto } = await crearServidor(
-    config,
-    bd,
+  return [
+    crearBd(leerRutaDeBd(config.entorno, process.env.BD)),
     crearSellador(claves.claves, claves.activa),
+    // En demo los archivos viven en memoria, igual que su base: un build de
+    // demostracion no deja nada en el disco de nadie, y el directorio no se
+    // puede configurar.
     config.entorno === 'demo'
       ? crearAlmacenamientoEnMemoria()
-      : crearAlmacenamientoEnDisco(
-          leerDirectorioDeArchivos(config.entorno, process.env.DIRECTORIO_DE_ARCHIVOS),
-        ),
+      : crearAlmacenamientoEnDisco(process.env.DIRECTORIO_DE_ARCHIVOS ?? './archivos'),
     crearConversorDeImagenes(),
-  )
+  ] as const
+}
+
+if (import.meta.main) {
+  const config = leerConfig()
+  const { servidor, contexto, logger } = await crearServidor(config, ...piezasDelEntorno(config))
 
   // Las declaraciones ordinarias de afiliacion. Lo que corre a diario no es la
   // declaracion -que pasa dos veces al anio- sino la pregunta: un proceso no
@@ -185,13 +180,9 @@ if (import.meta.main) {
     // fallo transitorio de la base a las 3am no tiene que tumbar un proceso que
     // lleva meses en pie. Una promesa rechazada sin catch lo tumbaria.
     contexto.afiliacion.declararPendientes().catch((error) => {
-      console.error(
-        JSON.stringify({
-          nivel: 'error',
-          mensaje: 'Fallo el barrido de declaraciones ordinarias',
-          error: error instanceof Error ? error.message : String(error),
-        }),
-      )
+      logger.error('Fallo el barrido de declaraciones ordinarias', {
+        error: error instanceof Error ? error.message : String(error),
+      })
     })
   }, UN_DIA)
 

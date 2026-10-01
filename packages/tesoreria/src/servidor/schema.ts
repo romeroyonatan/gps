@@ -1,6 +1,5 @@
 import { alcanceDe } from '@gps/core'
 import type { Builder } from '@gps/core/graphql'
-import { GraphQLError } from 'graphql'
 import {
   type CobranzaDelDistrito,
   type CuentaDeGrupo,
@@ -16,7 +15,6 @@ import {
   type TipoDeMovimiento,
   type TotalesDelPeriodo,
 } from '../dominio'
-import { CuotaUtilizada, DatosDePagoInvalidos, OperacionDenegada, PagoNoAnulable } from './servicio'
 
 export function registrarSchema(builder: Builder): void {
   const MedioDePagoRef = builder.enumType('MedioDePago', {
@@ -204,32 +202,16 @@ export function registrarSchema(builder: Builder): void {
     }),
   )
 
-  const traducir = (error: unknown): never => {
-    if (
-      error instanceof DatosDePagoInvalidos ||
-      error instanceof CuotaUtilizada ||
-      error instanceof PagoNoAnulable ||
-      error instanceof OperacionDenegada
-    ) {
-      throw new GraphQLError(error.message, { extensions: { code: error.name } })
-    }
-    throw error
-  }
-
   builder.mutationField('definirCuotaDeAfiliacion', (t) =>
     t.field({
       type: CuotaRef,
       args: { periodo: t.arg.int({ required: true }), importe: t.arg.int({ required: true }) },
       resolve: async (_padre, args, contexto) => {
-        try {
-          return await contexto.tesoreria.definirCuota(
-            alcanceDe(contexto),
-            args.periodo,
-            args.importe,
-          )
-        } catch (error) {
-          return traducir(error)
-        }
+        return await contexto.tesoreria.definirCuota(
+          alcanceDe(contexto),
+          args.periodo,
+          args.importe,
+        )
       },
     }),
   )
@@ -245,18 +227,14 @@ export function registrarSchema(builder: Builder): void {
         observacion: t.arg.string(),
       },
       resolve: async (_padre, args, contexto) => {
-        try {
-          return await contexto.tesoreria.registrarPago(alcanceDe(contexto), {
-            grupoId: String(args.grupoId),
-            fecha: args.fecha,
-            importe: args.importe,
-            medioDePago: args.medioDePago,
-            referencia: args.referencia,
-            observacion: args.observacion,
-          })
-        } catch (error) {
-          return traducir(error)
-        }
+        return await contexto.tesoreria.registrarPago(alcanceDe(contexto), {
+          grupoId: String(args.grupoId),
+          fecha: args.fecha,
+          importe: args.importe,
+          medioDePago: args.medioDePago,
+          referencia: args.referencia,
+          observacion: args.observacion,
+        })
       },
     }),
   )
@@ -265,11 +243,7 @@ export function registrarSchema(builder: Builder): void {
       type: MovimientoRef,
       args: { pagoId: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) => {
-        try {
-          return await contexto.tesoreria.anularPago(alcanceDe(contexto), String(args.pagoId))
-        } catch (error) {
-          return traducir(error)
-        }
+        return await contexto.tesoreria.anularPago(alcanceDe(contexto), String(args.pagoId))
       },
     }),
   )

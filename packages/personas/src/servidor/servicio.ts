@@ -1,4 +1,5 @@
 import type { Actor, Alcance, Core, RolConAmbito } from '@gps/core'
+import { ErrorDeNegocio } from '@gps/core/errores'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Estructura } from '@gps/estructura/dominio'
 import { and, eq, gte, inArray, isNull, lte, ne, or } from 'drizzle-orm'
@@ -31,30 +32,29 @@ import {
 } from './tablas'
 
 /** Los datos del alta no pasan las reglas de /dominio. Lleva los problemas
- *  adentro para que el resolver los pueda publicar campo por campo. */
-export class DatosInvalidos extends Error {
+ *  adentro para que el formulario los marque campo por campo. */
+export class DatosInvalidos extends ErrorDeNegocio {
   readonly problemas: readonly Problema[]
 
   constructor(problemas: readonly Problema[]) {
-    super(problemas.map((problema) => problema.mensaje).join(' '))
-    this.name = 'DatosInvalidos'
+    super(problemas.map((problema) => problema.mensaje).join(' '), 'DATOS_INVALIDOS', {
+      problemas,
+    })
     this.problemas = problemas
   }
 }
 
 /** Ya hay una persona con ese documento. */
-export class DocumentoDuplicado extends Error {
+export class DocumentoDuplicado extends ErrorDeNegocio {
   constructor(tipo: TipoDeDocumento, numero: string) {
-    super(`Ya hay una persona cargada con ${nombreDelTipo(tipo)} ${numero}.`)
-    this.name = 'DocumentoDuplicado'
+    super(`Ya hay una persona cargada con ${nombreDelTipo(tipo)} ${numero}.`, 'DOCUMENTO_DUPLICADO')
   }
 }
 
 /** El grupo del ingreso no existe, o esta cerrado. */
-export class GrupoInexistente extends Error {
+export class GrupoInexistente extends ErrorDeNegocio {
   constructor(grupoId: string) {
-    super('El grupo al que se quiere inscribir no existe o está cerrado.')
-    this.name = 'GrupoInexistente'
+    super('El grupo al que se quiere inscribir no existe o está cerrado.', 'GRUPO_INEXISTENTE')
     this.grupoId = grupoId
   }
   readonly grupoId: string
@@ -69,17 +69,13 @@ export class CargoInvalido extends Error {
   }
 }
 
-export class CambioDeAutoridadDenegado extends Error {
+export class CambioDeAutoridadDenegado extends ErrorDeNegocio {
   constructor() {
     super('No podés administrar autoridades de ese ámbito.')
-    this.name = 'CambioDeAutoridadDenegado'
   }
 }
 
-/** Lo que este modulo hace, que es mas que lo que publica: ver Personas en
- *  /dominio/publico.ts. `extends` es lo que hace que la implementacion no pueda
- *  quedar corta sin que TypeScript se entere. */
-export interface DatosDeAsignacionDeCargo {
+interface DatosDeAsignacionDeCargo {
   readonly personaId: string
   readonly cargo: TipoDeCargo
   readonly ambitoId: string | null
@@ -87,6 +83,9 @@ export interface DatosDeAsignacionDeCargo {
   readonly hasta?: string | null
 }
 
+/** Lo que este modulo hace, que es mas que lo que publica: ver Personas en
+ *  /dominio/publico.ts. `extends` es lo que hace que la implementacion no pueda
+ *  quedar corta sin que TypeScript se entere. */
 export interface ServicioDePersonas extends Personas {
   crearPersona(
     alcance: Alcance,

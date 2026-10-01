@@ -1,13 +1,11 @@
 import { AMBITOS, type AmbitoDeRol, alcanceDe, ROLES, type Rol } from '@gps/core'
 import { type Builder, enumCompartido } from '@gps/core/graphql'
-import { GraphQLError } from 'graphql'
 import {
   PROVEEDORES,
   type ProveedorDeIdentidad,
   TIPOS_DE_INVITACION,
   type TipoDeInvitacion,
 } from '../dominio/modelos'
-import { AutoridadInsuficiente, InvitacionInvalida } from './servicio'
 
 /** Lo que el cliente necesita saber de quien tiene la sesión abierta. Los
  *  cargos y equipos vigentes viajan acá porque las pantallas los usan para
@@ -223,19 +221,15 @@ export function registrarSchema(builder: Builder): void {
       },
       resolve: async (_padre, args, contexto) => {
         const alcance = alcanceDe(contexto)
-        try {
-          const emitida = await contexto.auth.emitirInvitacion(alcance.actor, {
-            tipo: args.tipo,
-            personaId: String(args.personaId),
-            proveedorAReemplazar: args.proveedorAReemplazar ?? undefined,
-          })
-          return {
-            invitacionId: emitida.invitacionId,
-            secreto: emitida.secreto,
-            url: enlaceDe(contexto.config.auth?.origenPublico ?? '', args.tipo, emitida.secreto),
-          }
-        } catch (error) {
-          return traducir(error)
+        const emitida = await contexto.auth.emitirInvitacion(alcance.actor, {
+          tipo: args.tipo,
+          personaId: String(args.personaId),
+          proveedorAReemplazar: args.proveedorAReemplazar ?? undefined,
+        })
+        return {
+          invitacionId: emitida.invitacionId,
+          secreto: emitida.secreto,
+          url: enlaceDe(contexto.config.auth?.origenPublico ?? '', args.tipo, emitida.secreto),
         }
       },
     }),
@@ -246,15 +240,8 @@ export function registrarSchema(builder: Builder): void {
       description: 'Anula un enlace que todavía no se consumió.',
       args: { invitacionId: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) => {
-        try {
-          await contexto.auth.revocarInvitacion(
-            alcanceDe(contexto).actor,
-            String(args.invitacionId),
-          )
-          return true
-        } catch (error) {
-          return traducir(error)
-        }
+        await contexto.auth.revocarInvitacion(alcanceDe(contexto).actor, String(args.invitacionId))
+        return true
       },
     }),
   )
@@ -265,11 +252,4 @@ export function registrarSchema(builder: Builder): void {
  *  arranca el login del proveedor. */
 function enlaceDe(origen: string, tipo: 'activacion' | 'recuperacion', secreto: string): string {
   return `${origen}/${tipo}/${secreto}`
-}
-
-const traducir = (error: unknown): never => {
-  if (error instanceof AutoridadInsuficiente || error instanceof InvitacionInvalida) {
-    throw new GraphQLError(error.message, { extensions: { code: error.name } })
-  }
-  throw error
 }

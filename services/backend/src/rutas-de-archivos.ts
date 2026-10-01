@@ -76,7 +76,7 @@ export async function rutaDeLaNominaDeUnGrupo(
  *  esto solo lo pasa para adentro.
  *
  *  Los errores se traducen a codigos HTTP aca y no en el servicio, igual que
- *  los resolvers traducen a GraphQLError: es lo que mantiene al modulo sin
+ *  `maskError` en server.ts traduce a GraphQL: es lo que mantiene al modulo sin
  *  conocer el transporte. */
 export async function rutaDeArchivos(
   contexto: Context,

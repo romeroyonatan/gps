@@ -10,6 +10,7 @@ export function urlDeIngreso(
   plataforma: 'ios' | 'android',
   perfil?: string,
 ): string {
-  const extra = perfil ? `&perfil=${encodeURIComponent(perfil)}` : ''
-  return `${origen}/auth/${encodeURIComponent(proveedor)}/iniciar?plataforma=${plataforma}${extra}`
+  const params = new URLSearchParams({ plataforma })
+  if (perfil) params.set('perfil', perfil)
+  return `${origen}/auth/${encodeURIComponent(proveedor)}/iniciar?${params}`
 }

@@ -12,7 +12,7 @@ import { enPesos } from '@gps/tesoreria/dominio'
 import { Link } from 'expo-router'
 import { cssInterop } from 'nativewind'
 import type { ReactNode } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, ScrollView, type ScrollViewProps, Text, View } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
 import { CHEVRON } from './iconos'
 import { COLOR_DE_RAMA } from './ramas'
@@ -29,6 +29,26 @@ export const CAMPO =
  *  `<Fila>` porque lo que va adentro cambia en cada pantalla. Las de 72px, con
  *  dos líneas de dato, las escribe cada pantalla. */
 export const FILA = 'min-h-14 flex-row items-center gap-3 border-b border-line py-2'
+
+/** El pie de una lista con total: a la izquierda cuántos son, a la derecha la
+ *  plata. Mismo nombre que en web, donde cierra la `TABLA`. */
+export const PIE_DE_TABLA = 'mt-4 flex-row justify-between gap-3 rounded-lg bg-surface-3 p-3'
+
+/* ── Marco ──────────────────────────────────────────────────────────────── */
+
+/** El marco de toda pantalla: fondo de página, scroll y el mismo aire a los
+ *  costados. No se llama `Pantalla` porque así se llama el `default export` de
+ *  cada ruta. Lo demás —teclado, `refreshControl`— pasa derecho al
+ *  `ScrollView`; `contentContainerClassName` reemplaza al de por omisión. */
+export function Marco({ contentContainerClassName = 'px-4 pb-10', ...props }: ScrollViewProps) {
+  return (
+    <ScrollView
+      className="flex-1 bg-surface"
+      contentContainerClassName={contentContainerClassName}
+      {...props}
+    />
+  )
+}
 
 /* ── Iconos ─────────────────────────────────────────────────────────────── */
 

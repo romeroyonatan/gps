@@ -1,4 +1,5 @@
 import type { Actor, Core } from '@gps/core'
+import { ErrorDeNegocio } from '@gps/core/errores'
 import type { Estructura } from '@gps/estructura/dominio'
 import type { Personas } from '@gps/personas/dominio'
 import { and, eq, inArray } from 'drizzle-orm'
@@ -14,25 +15,20 @@ import {
 import { participantes, permisos, unidadesDelPermiso } from './tablas'
 
 /** Los datos del permiso no pasan las reglas de /dominio. Lleva los problemas
- *  adentro para que el resolver los pueda publicar campo por campo, igual que
+ *  adentro para que el formulario los marque campo por campo, igual que
  *  DatosInvalidos en personas. */
-export class PermisoInvalido extends Error {
-  readonly problemas: readonly Problema[]
-
+export class PermisoInvalido extends ErrorDeNegocio {
   constructor(problemas: readonly Problema[]) {
-    super(problemas.map((problema) => problema.mensaje).join(' '))
-    this.name = 'PermisoInvalido'
-    this.problemas = problemas
+    // Por campo, para que el formulario marque el input que falla y no un
+    // cartel generico arriba.
+    super(problemas.map((problema) => problema.mensaje).join(' '), 'PermisoInvalido', {
+      problemas,
+    })
   }
 }
 
 /** El permiso no existe, o esta en un estado que no admite lo que se pidio. */
-export class PermisoNoEditable extends Error {
-  constructor(motivo: string) {
-    super(motivo)
-    this.name = 'PermisoNoEditable'
-  }
-}
+export class PermisoNoEditable extends ErrorDeNegocio {}
 
 export interface DatosDelPermiso {
   readonly lugar: string
@@ -166,50 +162,6 @@ export function crearOperacionesDeBorrador(core: Core, personas: Personas, estru
         )
       })
       return permiso
-    },
-
-    async editarPermiso(actor: Actor, permisoId: string, datos: DatosDelPermiso): Promise<Permiso> {
-      const anterior = exigirBorrador(permisoId)
-      const problemas = validarDatos(datos)
-      if (problemas.length > 0) throw new PermisoInvalido(problemas)
-
-      const ahora = core.reloj.ahora()
-      const nuevos = {
-        lugar: datos.lugar.trim(),
-        direccion: datos.direccion.trim(),
-        localidad: datos.localidad.trim(),
-        provincia: datos.provincia.trim(),
-        telefono: datos.telefono.trim(),
-        desde: datos.desde,
-        hasta: datos.hasta,
-        comoSeViaja: datos.comoSeViaja?.trim() || null,
-      }
-      core.bd.transaction((tx) => {
-        tx.update(permisos)
-          .set({ ...nuevos, actualizadoEn: ahora })
-          .where(eq(permisos.id, permisoId))
-          .run()
-        core.auditoria.registrar(
-          {
-            actorPersonaId: actor.personaId,
-            modulo: 'salidas',
-            accion: 'editarPermiso',
-            elevado: actor.estaElevado,
-            grupoId: anterior.grupoId,
-            entidadTipo: 'permiso',
-            entidadId: permisoId,
-            cambios: Object.entries(nuevos)
-              .filter(([campo, nuevo]) => anterior[campo as keyof Permiso] !== nuevo)
-              .map(([campo, nuevo]) => ({
-                campo,
-                anterior: anterior[campo as keyof Permiso] as string | null,
-                nuevo,
-              })),
-          },
-          tx,
-        )
-      })
-      return permisoDe(permisoId)
     },
 
     /** Reemplaza las unidades que van y anota a toda la gente de las que se

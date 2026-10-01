@@ -1,6 +1,6 @@
 import { useReporteDeCobranza, useTesoreria } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
-import { periodosDelReporte, variacion } from '@gps/tesoreria/dominio'
+import { enPesos, periodosDelReporte, variacion } from '@gps/tesoreria/dominio'
 import { useState } from 'react'
 import {
   CAMPO,
@@ -9,7 +9,6 @@ import {
   Falla,
   Nota,
   PIE_DE_TABLA,
-  pesos,
   TABLA,
   Titulo,
   Vacio,
@@ -32,8 +31,7 @@ function FilaDeEvolucion(props: {
   comoPlata?: boolean
 }) {
   const { absoluta, porcentaje } = variacion(props.antes, props.ahora)
-  const formatear = (numero: number) =>
-    props.comoPlata ? pesos.format(numero) : entero.format(numero)
+  const formatear = (numero: number) => (props.comoPlata ? enPesos(numero) : entero.format(numero))
   const delta =
     props.comoPlata && porcentaje !== null
       ? conSigno(porcentaje, `${porciento.format(Math.abs(porcentaje))} %`)
@@ -159,13 +157,13 @@ export function Reportes() {
                   </span>
                   <span className="hidden text-right tabular-nums md:block">{fila.declararon}</span>
                   <span className="hidden text-right tabular-nums md:block">
-                    {pesos.format(fila.facturado)}
+                    {enPesos(fila.facturado)}
                   </span>
 
                   <span className="flex flex-col gap-0.5 md:block md:text-right">
                     <span className="text-label text-ink-muted md:hidden">Cobrado</span>
                     <span className="font-semibold tabular-nums text-ok md:font-normal">
-                      {pesos.format(fila.cobrado)}
+                      {enPesos(fila.cobrado)}
                     </span>
                   </span>
                   <span className="flex flex-col items-end gap-0.5 md:block md:text-right">
@@ -173,7 +171,7 @@ export function Reportes() {
                     <span
                       className={`font-semibold tabular-nums ${fila.deuda > 0 ? 'text-danger' : 'text-ink-muted'}`}
                     >
-                      {pesos.format(fila.deuda)}
+                      {enPesos(fila.deuda)}
                     </span>
                   </span>
                 </li>
@@ -191,9 +189,7 @@ export function Reportes() {
                 {reporte.totales.distritos} distritos · {reporte.totales.grupos} grupos ·{' '}
                 {reporte.totales.declararon} declararon
               </span>
-              <strong className="tabular-nums">
-                Deuda total {pesos.format(reporte.totales.deuda)}
-              </strong>
+              <strong className="tabular-nums">Deuda total {enPesos(reporte.totales.deuda)}</strong>
             </div>
           </section>
 

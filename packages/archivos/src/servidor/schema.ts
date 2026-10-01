@@ -1,24 +1,5 @@
 import { alcanceDe } from '@gps/core'
 import type { Builder } from '@gps/core/graphql'
-import { GraphQLError } from 'graphql'
-import { SubidaInvalida, SubidaNoAutorizada } from './servicio'
-
-/** Yoga enmascara todo lo que no sea un GraphQLError: sin esta traduccion,
- *  quien sube un archivo recibe "Unexpected error." en vez de "no se pueden
- *  subir archivos de tipo application/x-msdownload".
- *
- *  Traducir en el resolver y no en el servicio es lo que mantiene al servicio
- *  sin conocer el framework, igual que en personas. */
-async function traduciendoErrores<T>(correr: () => Promise<T>): Promise<T> {
-  try {
-    return await correr()
-  } catch (error) {
-    if (error instanceof SubidaInvalida || error instanceof SubidaNoAutorizada) {
-      throw new GraphQLError(error.message, { extensions: { code: error.name } })
-    }
-    throw error
-  }
-}
 
 export function registrarSchema(builder: Builder): void {
   const SubidaRef = builder
@@ -50,17 +31,15 @@ export function registrarSchema(builder: Builder): void {
         recursoId: t.arg.id({ required: true }),
       },
       resolve: async (_padre, args, contexto) =>
-        await traduciendoErrores(() =>
-          contexto.archivos.solicitarSubida(
-            {
-              nombre: args.nombre,
-              tipo: args.tipo,
-              tamano: args.tamano,
-              modulo: args.modulo,
-              recursoId: String(args.recursoId),
-            },
-            alcanceDe(contexto),
-          ),
+        await contexto.archivos.solicitarSubida(
+          {
+            nombre: args.nombre,
+            tipo: args.tipo,
+            tamano: args.tamano,
+            modulo: args.modulo,
+            recursoId: String(args.recursoId),
+          },
+          alcanceDe(contexto),
         ),
     }),
   )
@@ -71,11 +50,7 @@ export function registrarSchema(builder: Builder): void {
       description: 'Ultimo paso: valida lo recibido y deja el archivo usable.',
       args: { id: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) =>
-        (
-          await traduciendoErrores(() =>
-            contexto.archivos.confirmarSubida(String(args.id), alcanceDe(contexto)),
-          )
-        ).id,
+        (await contexto.archivos.confirmarSubida(String(args.id), alcanceDe(contexto))).id,
     }),
   )
 }

@@ -1,4 +1,5 @@
 import { useGenerarDeudasPendientes, useTesoreria } from '@gps/api'
+import { enPesos } from '@gps/tesoreria/dominio'
 import { useState } from 'react'
 import { Link } from 'wouter'
 import {
@@ -11,7 +12,6 @@ import {
   Filtros,
   Pendiente,
   PIE_DE_TABLA,
-  pesos,
   TABLA,
   Titulo,
   Vacio,
@@ -40,9 +40,7 @@ function Total(props: { titulo: string; importe: number; tono: 'danger' | 'ok' }
       className={`flex-1 rounded-lg p-4 ${props.tono === 'danger' ? 'bg-danger-soft' : 'bg-ok-soft'}`}
     >
       <p className={`text-label ${color}`}>{props.titulo}</p>
-      <p className={`mt-1 text-xl font-bold tabular-nums ${color}`}>
-        {pesos.format(props.importe)}
-      </p>
+      <p className={`mt-1 text-xl font-bold tabular-nums ${color}`}>{enPesos(props.importe)}</p>
     </div>
   )
 }
@@ -164,7 +162,7 @@ export function Tesoreria() {
                   <strong
                     className={`text-lg tabular-nums md:text-base ${cuenta.saldo > 0 ? 'text-danger' : cuenta.saldo < 0 ? 'text-ok' : 'text-ink-faint'}`}
                   >
-                    {cuenta.saldo === 0 ? '—' : pesos.format(Math.abs(cuenta.saldo))}
+                    {cuenta.saldo === 0 ? '—' : enPesos(Math.abs(cuenta.saldo))}
                   </strong>
                   <span className="text-label text-ink-faint">
                     {cuenta.saldo > 0 ? 'de deuda' : cuenta.saldo < 0 ? 'a favor' : 'al día'}
@@ -199,9 +197,7 @@ export function Tesoreria() {
             <span className="text-ink-muted">
               {cuentas.length} {cuentas.length === 1 ? 'grupo' : 'grupos'}
             </span>
-            <strong className="tabular-nums">
-              Deuda filtrada {pesos.format(sumar(cuentas, 1))}
-            </strong>
+            <strong className="tabular-nums">Deuda filtrada {enPesos(sumar(cuentas, 1))}</strong>
           </div>
         )}
       </section>

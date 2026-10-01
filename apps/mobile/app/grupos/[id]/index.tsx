@@ -12,7 +12,7 @@ import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Rama } from '@gps/estructura/dominio'
 import { firmantesRequeridos, puedeFirmarEnLaApp, repartirSalidas } from '@gps/salidas/dominio'
 import { Link, router, useLocalSearchParams } from 'expo-router'
-import { Pressable, ScrollView, Text, View } from 'react-native'
+import { Pressable, Text, View } from 'react-native'
 import { COLOR_DE_RAMA } from '../../../src/ramas'
 import {
   Aviso,
@@ -20,6 +20,7 @@ import {
   Cargando,
   ChipDeRama,
   Falla,
+  Marco,
   Saldo,
   Seccion,
   Vacio,
@@ -133,7 +134,7 @@ export default function Pantalla() {
   const cuenta = tesoreria.data?.cuentasDeGrupos.find((una) => una.grupoId === id)
 
   return (
-    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-6">
+    <Marco contentContainerClassName="px-4 pb-6">
       <Volver href="/">Distrito {distrito?.numero}</Volver>
 
       {(arbol.isPending || lista.isPending) && <Cargando>Consultando el grupo…</Cargando>}
@@ -229,6 +230,6 @@ export default function Pantalla() {
           </Seccion>
         </>
       )}
-    </ScrollView>
+    </Marco>
   )
 }

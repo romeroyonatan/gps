@@ -10,8 +10,17 @@ import {
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import { estaVigente, nombreCompleto, puedeAdministrarPlantelDeGrupo } from '@gps/personas/dominio'
 import { useLocalSearchParams } from 'expo-router'
-import { Pressable, ScrollView, Share, Text, View } from 'react-native'
-import { AccionAlMargen, Cargando, Etiqueta, Falla, Nota, Titulo, Volver } from '../../../src/ui'
+import { Pressable, Share, Text, View } from 'react-native'
+import {
+  AccionAlMargen,
+  Cargando,
+  Etiqueta,
+  Falla,
+  Marco,
+  Nota,
+  Titulo,
+  Volver,
+} from '../../../src/ui'
 
 /** Lo que esta pantalla administra: la jefatura del grupo y su Secretaría.
  *  Son los dos vínculos que conceden acceso, que son los que hay que poder
@@ -82,7 +91,7 @@ export default function Pantalla() {
   )
 
   return (
-    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-10">
+    <Marco>
       <Volver href={`/grupos/${id}/mas`}>Más</Volver>
       <Titulo acompaña="Quién administra este grupo. Los cargos y los equipos son lo que da acceso: al sacarlos, se pierde en el pedido siguiente.">
         Plantel
@@ -180,6 +189,6 @@ export default function Pantalla() {
         .map((problema) => (
           <Falla key={problema.message}>{problema.message}</Falla>
         ))}
-    </ScrollView>
+    </Marco>
   )
 }

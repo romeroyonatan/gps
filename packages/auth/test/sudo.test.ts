@@ -91,6 +91,7 @@ function montar() {
   aplicarMigraciones(core, [modulo])
   const servicio = crearServicioDeAuth(core, personas, estructuraFalsa, {
     google: proveedorFalso('subject-admin'),
+    apple: proveedorFalso('subject-otra'),
   })
   bd.run(
     sql`INSERT INTO identidades_externas VALUES
@@ -100,10 +101,23 @@ function montar() {
   return { bd, servicio, eventos }
 }
 
+/** Abre una sesión por el camino real: login con el proveedor falso. */
+async function abrirSesion(
+  servicio: ReturnType<typeof crearServicioDeAuth>,
+  proveedor: 'google' | 'apple' = 'google',
+) {
+  const inicio = servicio.iniciarLogin(proveedor, 'web', 'https://gps.test/callback')
+  return servicio.completarLogin({
+    transaccion: inicio.transaccion,
+    stateRecibido: 'state-real',
+    code: 'c',
+  })
+}
+
 describe('elevarSesion', () => {
   test('reautenticar una identidad ya vinculada eleva la sesión de la administradora', async () => {
     const { servicio, eventos } = montar()
-    const sesion = await servicio.crearSesionParaIdentidad('identidad_admin')
+    const sesion = await abrirSesion(servicio)
     expect((await servicio.resolverSesion(sesion.secreto))?.estaElevada).toBe(false)
 
     const inicio = servicio.iniciarLogin('google', 'web', 'https://gps.test/callback')
@@ -119,7 +133,7 @@ describe('elevarSesion', () => {
 
   test('una sesión ordinaria no elevada no da alcance global', async () => {
     const { servicio } = montar()
-    const sesion = await servicio.crearSesionParaIdentidad('identidad_admin')
+    const sesion = await abrirSesion(servicio)
     const resuelta = await servicio.resolverSesion(sesion.secreto)
     expect(resuelta?.estaElevada).toBe(false)
   })
@@ -128,9 +142,9 @@ describe('elevarSesion', () => {
     const { bd, servicio, eventos } = montar()
     bd.run(
       sql`INSERT INTO identidades_externas VALUES
-          ('identidad_otra', 'persona_otra', 'google', 'subject-otra', NULL, 0, 0)`,
+          ('identidad_otra', 'persona_otra', 'apple', 'subject-otra', NULL, 0, 0)`,
     )
-    const sesionAjena = await servicio.crearSesionParaIdentidad('identidad_otra')
+    const sesionAjena = await abrirSesion(servicio, 'apple')
     const inicio = servicio.iniciarLogin('google', 'web', 'https://gps.test/callback')
     await expect(
       servicio.elevarSesion(sesionAjena.sesionId, {

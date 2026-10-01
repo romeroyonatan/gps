@@ -35,10 +35,6 @@ mutation Invitar(
   }
 }
 
-mutation RevocarInvitacion($invitacionId: ID!) {
-  revocarInvitacion(invitacionId: $invitacionId)
-}
-
 query Invitacion($secreto: ID!) {
   invitacion(secreto: $secreto) {
     estado

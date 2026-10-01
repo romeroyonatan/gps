@@ -36,7 +36,7 @@ import * as DocumentPicker from 'expo-document-picker'
 import * as ImagePicker from 'expo-image-picker'
 import { useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
-import { Alert, Linking, Pressable, ScrollView, Text, View } from 'react-native'
+import { Alert, Linking, Pressable, Text, View } from 'react-native'
 import { PadDeFirma } from '../../../../componentes/PadDeFirma'
 import {
   AccionAlMargen,
@@ -47,6 +47,7 @@ import {
   Casilla,
   Chip,
   Falla,
+  Marco,
   Titulo,
   Vacio,
   Volver,
@@ -520,7 +521,7 @@ export default function Pantalla() {
   const firmantes = distrito ? firmantesRequeridos(id, distrito.id) : []
 
   return (
-    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-10">
+    <Marco>
       <Volver href={`/grupos/${id}/salidas`}>Salidas</Volver>
 
       {consulta.isPending && <Cargando>Consultando la salida…</Cargando>}
@@ -540,6 +541,6 @@ export default function Pantalla() {
           }
         />
       )}
-    </ScrollView>
+    </Marco>
   )
 }

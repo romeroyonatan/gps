@@ -9,6 +9,7 @@
 // aparece una sola vez se queda en su pantalla.
 
 import { type Rama, ramaDelCatalogo } from '@gps/estructura/dominio'
+import { enPesos } from '@gps/tesoreria/dominio'
 import type { ReactNode } from 'react'
 import { Link } from 'wouter'
 import { COLOR_DE_RAMA } from './ramas'
@@ -301,15 +302,6 @@ export function Etiqueta(props: {
 
 /* ── Plata ──────────────────────────────────────────────────────────────── */
 
-/** Los pesos, escritos igual en todas las pantallas. Sin centavos: la cuota se
- *  define en pesos enteros y los centavos son ruido en una lista de quince
- *  grupos. Es el gemelo del de `apps/mobile/componentes/ui.tsx`. */
-export const pesos = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS',
-  maximumFractionDigits: 0,
-})
-
 /** El saldo de la cuenta de un grupo, con su lectura escrita debajo.
  *
  *  El saldo positivo es deuda: así lo guarda tesorería. El signo se escribe y
@@ -319,7 +311,7 @@ export function Saldo(props: { importe: number; className?: string }) {
     <div className={props.className}>
       <p className={`text-2xl font-bold tabular-nums ${props.importe > 0 ? 'text-danger' : ''}`}>
         {props.importe > 0 ? '−' : ''}
-        {pesos.format(Math.abs(props.importe))}
+        {enPesos(Math.abs(props.importe))}
       </p>
       <p className="mt-0.5 text-sm text-ink-muted">
         {props.importe > 0 ? 'De deuda' : props.importe < 0 ? 'A favor del grupo' : 'Sin deuda'}.

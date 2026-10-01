@@ -1,8 +1,8 @@
 import { useActor } from '@gps/api'
 import { puedeAuditarGrupo } from '@gps/auditoria/dominio'
 import { Link, useLocalSearchParams } from 'expo-router'
-import { Pressable, ScrollView, Text, View } from 'react-native'
-import { Chevron, FILA, Titulo } from '../../../src/ui'
+import { Pressable, Text, View } from 'react-native'
+import { Chevron, FILA, Marco, Titulo } from '../../../src/ui'
 
 /** El quinto destino de la barra: lo que no entra en cuatro. Es una pantalla
  *  y no una hoja, igual que en la web. */
@@ -23,7 +23,7 @@ export default function Pantalla() {
   ]
 
   return (
-    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-10">
+    <Marco>
       <Titulo>Más</Titulo>
       <View className="mt-5">
         {entradas.map((entrada) => (
@@ -38,6 +38,6 @@ export default function Pantalla() {
           </Link>
         ))}
       </View>
-    </ScrollView>
+    </Marco>
   )
 }

@@ -1,4 +1,5 @@
 import type { Alcance, Core } from '@gps/core'
+import { ErrorDeNegocio } from '@gps/core/errores'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Estructura } from '@gps/estructura/dominio'
 import type { Personas } from '@gps/personas/dominio'
@@ -31,10 +32,9 @@ export class FechaInvalida extends Error {
 
 /** Se pidio una declaracion extraordinaria de un grupo que no tiene a nadie
  * activo, o que esta cerrado. */
-export class NadaQueDeclarar extends Error {
+export class NadaQueDeclarar extends ErrorDeNegocio {
   constructor(grupoId: string) {
-    super('El grupo no tiene miembros activos para declarar, o está cerrado.')
-    this.name = 'NadaQueDeclarar'
+    super('El grupo no tiene miembros activos para declarar, o está cerrado.', 'NADA_QUE_DECLARAR')
     this.grupoId = grupoId
   }
   readonly grupoId: string
@@ -42,10 +42,11 @@ export class NadaQueDeclarar extends Error {
 
 /** El grupo ya tiene una declaracion con la fecha de hoy. Lo impide tambien el
  * UNIQUE(fecha, grupo_id). */
-export class YaDeclaroHoy extends Error {
+export class YaDeclaroHoy extends ErrorDeNegocio {
   constructor(grupoId: string) {
-    super('Este grupo ya declaró su afiliación hoy.')
-    this.name = 'YaDeclaroHoy'
+    // Sin esta clase, el UNIQUE(fecha, grupo_id) sube como SQLiteError crudo y
+    // el dirigente que apreto dos veces lee "Unexpected error.".
+    super('Este grupo ya declaró su afiliación hoy.', 'YA_DECLARO_HOY')
     this.grupoId = grupoId
   }
   readonly grupoId: string
