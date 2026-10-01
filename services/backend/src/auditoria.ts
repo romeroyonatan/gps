@@ -31,6 +31,7 @@ export const ACCIONES_AUDITADAS = [
   'quitarParticipante',
   'reEmitirPermiso',
   'registrarPago',
+  'registrarPases',
   'revocarCargo',
   'revocarIntegranteDeEquipo',
   'revocarInvitacion',

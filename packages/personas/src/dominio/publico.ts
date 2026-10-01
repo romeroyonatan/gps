@@ -79,4 +79,10 @@ export interface Personas {
    *  quien pregunta, y la regla de que adultos sin unidad entran igual es del
    *  dominio de salidas, no de personas. Aca solo se responde quien esta. */
   miembrosDelGrupo(grupoId: string, fecha: string): Promise<readonly MiembroDelGrupo[]>
+
+  /** Cargos vigentes del grupo en esa fecha; no incluye revocados ni otros ámbitos. */
+  cargosDelGrupoEn(
+    grupoId: string,
+    fecha: string,
+  ): Promise<readonly { personaId: string; cargo: TipoDeCargo }[]>
 }

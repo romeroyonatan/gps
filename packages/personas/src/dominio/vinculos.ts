@@ -97,13 +97,44 @@ export function puedeCambiarDeUnidad(pertenencia: Pick<Pertenencia, 'categoria'>
   return pertenencia.categoria === 'activo'
 }
 
+/** Las reglas de la fecha con que se abre una pertenencia nueva cerrando la
+ *  anterior. Las comparten el cambio de unidad de un dirigente y el pase de un
+ *  beneficiario, que son la misma escritura con distinta decision arriba.
+ *
+ *  Tiene que ser posterior al `desde` de la vigente -si no, la que se cierra
+ *  naceria terminada- y no futura, porque el indice parcial de la tabla se
+ *  apoya en que `hasta IS NULL` y "vigente" sean lo mismo. */
+export function problemasDeLaFechaDelCambio(
+  fecha: string,
+  desdeDeLaVigente: string,
+  hoy: Date,
+): readonly Problema[] {
+  if (!esFechaDeCalendario(fecha)) {
+    return [
+      {
+        campo: 'desde',
+        mensaje: 'La fecha del cambio tiene que ser una fecha real, con formato aaaa-mm-dd.',
+      },
+    ]
+  }
+  if (fecha > aFechaDeCalendario(hoy)) {
+    return [{ campo: 'desde', mensaje: 'La fecha del cambio no puede ser futura.' }]
+  }
+  if (fecha <= desdeDeLaVigente) {
+    return [
+      {
+        campo: 'desde',
+        mensaje: `El cambio tiene que ser posterior al ${desdeDeLaVigente}, que es desde cuándo está en la unidad actual.`,
+      },
+    ]
+  }
+  return []
+}
+
 /** Las reglas del cambio de unidad de un dirigente, con la misma forma que
  *  `validarIngreso`: pura, con las unidades abiertas y el `hoy` por parametro,
- *  y corriendo en los dos lados.
- *
- *  La fecha tiene que ser posterior al `desde` de la pertenencia vigente -si no,
- *  la que se cierra naceria terminada- y no futura, porque el indice parcial de
- *  la tabla se apoya en que `hasta IS NULL` y "vigente" sean lo mismo. */
+ *  y corriendo en los dos lados. Las de la fecha estan en
+ *  `problemasDeLaFechaDelCambio`, que comparte con el pase. */
 export function validarCambioDeUnidad(
   pertenencia: Pick<Pertenencia, 'categoria' | 'unidadId' | 'desde'>,
   unidadId: string,
@@ -124,19 +155,7 @@ export function validarCambioDeUnidad(
     problemas.push({ campo: 'unidad', mensaje: 'El grupo no tiene abierta esa unidad.' })
   }
 
-  if (!esFechaDeCalendario(desde)) {
-    problemas.push({
-      campo: 'desde',
-      mensaje: 'La fecha del cambio tiene que ser una fecha real, con formato aaaa-mm-dd.',
-    })
-  } else if (desde > aFechaDeCalendario(hoy)) {
-    problemas.push({ campo: 'desde', mensaje: 'La fecha del cambio no puede ser futura.' })
-  } else if (desde <= pertenencia.desde) {
-    problemas.push({
-      campo: 'desde',
-      mensaje: `El cambio tiene que ser posterior al ${pertenencia.desde}, que es desde cuándo está en la unidad actual.`,
-    })
-  }
+  problemas.push(...problemasDeLaFechaDelCambio(desde, pertenencia.desde, hoy))
 
   return problemas
 }

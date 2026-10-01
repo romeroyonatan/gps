@@ -1,5 +1,5 @@
 import { periodoDe } from '@gps/afiliacion/dominio'
-import { useAfiliadosEn, useGrupo, usePersonasDelGrupo } from '@gps/api'
+import { useActor, useAfiliadosEn, useGrupo, usePersonasDelGrupo } from '@gps/api'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import { type Rama, ramaDelCatalogo } from '@gps/estructura/dominio'
 import {
@@ -9,12 +9,14 @@ import {
   nombreCompleto,
   nombreDelCargo,
   nombreDelTipo,
+  puedeAdministrarPlantelDeGrupo,
 } from '@gps/personas/dominio'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'wouter'
 import {
   Accion,
   Bajar,
+  BOTON_SECUNDARIO,
   CAMPO,
   Cargando,
   CHEVRON,
@@ -94,14 +96,90 @@ function Afiliacion(props: { afiliada: boolean; periodo: number }) {
   )
 }
 
+/** La hoja de exportar, sólo del teléfono: el velo y el panel que sube desde
+ *  abajo, con un formato por fila. En escritorio no existe -los dos botones
+ *  entran en la fila de acciones- y por eso no tiene variantes de ancho. Misma forma que el conmutador de rol de la cabecera —velo
+ *  con desenfoque, filas de 64px con su nombre y su para qué—, escrita acá y no
+ *  en la guía porque todavía es la única pantalla que la usa. Cuando aparezca
+ *  la segunda, se muda a `ui.tsx` como `Hoja`.
+ *
+ *  Los dos son `<a download>` y no botones: así se pueden guardar o compartir
+ *  con el menú de siempre, igual que `Bajar`. */
+function HojaDeExportar(props: { grupoId: string; onCerrar: () => void }) {
+  // Escape cierra, que es lo que espera cualquiera con teclado. El clic afuera
+  // lo resuelve el velo, que es un botón a pantalla completa.
+  useEffect(() => {
+    const alTeclear = (evento: KeyboardEvent) => {
+      if (evento.key === 'Escape') props.onCerrar()
+    }
+    document.addEventListener('keydown', alTeclear)
+    return () => document.removeEventListener('keydown', alTeclear)
+  }, [props.onCerrar])
+
+  const formatos = [
+    {
+      href: `/grupos/${props.grupoId}/nomina.pdf?descargar`,
+      nombre: 'PDF',
+      para: 'Para imprimir',
+    },
+    {
+      href: `/grupos/${props.grupoId}/nomina.xlsx?descargar`,
+      nombre: 'Planilla XLSX',
+      para: 'Para trabajarla en una hoja de cálculo',
+    },
+  ]
+
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Cerrar"
+        onClick={props.onCerrar}
+        className="fixed inset-0 z-30 cursor-default bg-velo backdrop-blur-sm"
+      />
+      <div // z-40: por encima de la barra de tareas, que es fija y z-20. La hoja
+        // la tapa a propósito, como cualquier hoja de acción.
+        className="fixed inset-x-0 bottom-0 z-40 rounded-t-2xl border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] shadow-md"
+      >
+        <p className="px-5 pb-1 pt-3 text-label text-ink-muted">Bajar la nómina</p>
+        {formatos.map((formato) => (
+          <a
+            key={formato.href}
+            href={formato.href}
+            onClick={props.onCerrar}
+            className="flex min-h-16 w-full items-center gap-3 border-t border-line px-5 text-left hover:bg-surface-2"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block text-base font-semibold">{formato.nombre}</span>
+              <span className="block text-label text-ink-muted">{formato.para}</span>
+            </span>
+            <span aria-hidden="true" className="text-ink-faint">
+              ↓
+            </span>
+          </a>
+        ))}
+        <button
+          type="button"
+          onClick={props.onCerrar}
+          className="flex min-h-14 w-full items-center justify-center border-t border-line px-5 text-sm font-semibold text-ink-muted hover:bg-surface-2"
+        >
+          Cancelar
+        </button>
+      </div>
+    </>
+  )
+}
+
 export function Nomina(props: { grupoId: string }) {
   const arbol = useGrupo(props.grupoId)
+  const actor = useActor()
   const { grupo, distrito } = arbol
   const lista = usePersonasDelGrupo(props.grupoId)
   const [busqueda, setBusqueda] = useState('')
   // 'todas' | 'sin-afiliar' | una rama. Uno solo: son recortes de la misma
   // lista y combinarlos no responde ninguna pregunta que alguien se haga.
   const [filtro, setFiltro] = useState<string>('todas')
+  const [exportando, exportar] = useState(false)
   const hoy = new Date()
 
   const personas = lista.data?.personas ?? []
@@ -111,6 +189,9 @@ export function Nomina(props: { grupoId: string }) {
     personas.map((persona) => persona.id),
   )
   const afiliados = new Set(consulta.data?.afiliadosEn ?? [])
+  // La misma política pura que aplica el servidor: no se ofrece lo que después
+  // se va a rechazar.
+  const puedeAdministrar = actor !== null && puedeAdministrarPlantelDeGrupo(actor, props.grupoId)
 
   if (arbol.isPending || lista.isPending) return <Cargando>Consultando la nómina…</Cargando>
 
@@ -166,14 +247,49 @@ export function Nomina(props: { grupoId: string }) {
         Nómina del grupo {grupo.numero}
       </Titulo>
 
-      <div className="mt-5 flex flex-wrap gap-2">
-        {/* Los dos formatos como dos botones y no un menu: son dos usos
-            distintos -el PDF se presenta en el distrito, la planilla se trabaja
-            en una hoja de calculo- y ninguno es el caso raro del otro. */}
-        <Bajar href={`/grupos/${props.grupoId}/nomina.pdf?descargar`}>Exportar PDF</Bajar>
-        <Bajar href={`/grupos/${props.grupoId}/nomina.xlsx?descargar`}>Exportar XLSX</Bajar>
-        <Accion href={`/grupos/${props.grupoId}/alta`}>Agregar una persona</Accion>
+      {/* A ancho de teléfono los tres van apilados y a ancho completo, como en
+          la app; recién de `sm:` para arriba entran en una fila. Cuatro cajas
+          sueltas en dos filas no decían cuál era la acción de la pantalla. */}
+      <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <Accion href={`/grupos/${props.grupoId}/alta`} ancho>
+          Agregar una persona
+        </Accion>
+        {/* La ceremonia se carga desde acá porque es esta misma lista vista de
+            otra forma: quiénes cambian de unidad este año. Con la forma del
+            botón secundario: la acción de esta pantalla es el alta, y dos
+            negras al lado no dicen cuál es cuál. */}
+        {puedeAdministrar && (
+          <Link
+            href={`/grupos/${props.grupoId}/pases`}
+            className={`${BOTON_SECUNDARIO} w-full sm:w-auto`}
+          >
+            Ceremonia de pases
+          </Link>
+        )}
+        {/* En el teléfono, un solo "Exportar" que abre la hoja: apilar tres
+            botones más deja la lista abajo de todo, y en la hoja cada formato
+            puede decir para qué sirve. En escritorio sobra ancho, así que los
+            dos van derecho a la fila y no hay hoja que abrir. */}
+        <button
+          type="button"
+          onClick={() => exportar(true)}
+          aria-expanded={exportando}
+          className={`${BOTON_SECUNDARIO} w-full sm:hidden`}
+        >
+          Exportar
+          <span aria-hidden="true" className="text-xs">
+            ▾
+          </span>
+        </button>
+        <Bajar href={`/grupos/${props.grupoId}/nomina.pdf?descargar`} soloEnAncho>
+          Exportar PDF
+        </Bajar>
+        <Bajar href={`/grupos/${props.grupoId}/nomina.xlsx?descargar`} soloEnAncho>
+          Exportar XLSX
+        </Bajar>
       </div>
+
+      {exportando && <HojaDeExportar grupoId={props.grupoId} onCerrar={() => exportar(false)} />}
 
       <div className="mt-4 flex flex-col gap-3">
         <input

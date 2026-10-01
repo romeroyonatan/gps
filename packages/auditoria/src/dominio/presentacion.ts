@@ -17,7 +17,11 @@ export function etiquetaDeModulo(modulo: string): string {
  *  `cargo.jefeDeGrupo.asignar`); la pantalla la escribe en palabras sin
  *  perder el orden, así el mismo nombre se reconoce en el filtro y en la fila. */
 export function etiquetaDeAccion(accion: string): string {
-  const texto = accion
+  const texto = (
+    accion.startsWith('equipo.')
+      ? accion.replace(/\.integrar$/, '.agregar').replace(/\.revocar$/, '.quitar')
+      : accion
+  )
     .split('.')
     .map((parte) => parte.replace(/([a-zá-ú])([A-Z])/g, '$1 $2').toLowerCase())
     .join(' · ')

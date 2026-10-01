@@ -23,6 +23,7 @@ const personas: Personas = {
   miembrosActivos: async () => [],
   ocupantesDelCargo: async () => [],
   miembrosDelGrupo: async () => [],
+  cargosDelGrupoEn: async () => [],
 }
 
 const proveedorFalso: ProveedorOidc = {

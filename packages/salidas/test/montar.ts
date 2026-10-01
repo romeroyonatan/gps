@@ -208,6 +208,7 @@ export function montar(opciones: { reloj?: Reloj; mundo?: Mundo } = {}) {
     funcionesVigentes: async () => [],
     miembrosActivos: async () => [],
     miembrosDelGrupo: async (grupoId) => (grupoId === GRUPO_ID ? mundo.miembros : []),
+    cargosDelGrupoEn: async () => [],
     ocupantesDelCargo: async (cargo: TipoDeCargo, ambitoId) =>
       mundo.cargos.get(`${cargo}|${ambitoId}`) ?? [],
   }

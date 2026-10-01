@@ -9,7 +9,8 @@
     "./errores": "./src/errores.ts",
     "./fechas": "./src/fechas.ts",
     "./roles": "./src/roles.ts",
-    "./pdf": "./src/pdf.ts"
+    "./pdf": "./src/pdf.ts",
+    "./xlsx": "./src/xlsx.ts"
   },
   "scripts": {
     "compile": "tsc --noEmit"

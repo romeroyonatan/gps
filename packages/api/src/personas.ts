@@ -7,6 +7,7 @@ import {
   IntegrarEquipoDocument,
   JefesDeGruposDocument,
   PersonasDocument,
+  RegistrarPasesDocument,
   RevocarCargoDocument,
   RevocarIntegranteDeEquipoDocument,
 } from './generated/graphql'
@@ -46,6 +47,10 @@ const PERSONAS = ['personas']
 export const useCrearPersona = () => useMutacion(CrearPersonaDocument, PERSONAS)
 export const useEditarPersona = () => useMutacion(EditarPersonaDocument, PERSONAS)
 export const useCambiarDeUnidad = () => useMutacion(CambiarDeUnidadDocument, PERSONAS)
+
+/** La ceremonia de pases mueve a varios de unidad, asi que invalida lo mismo
+ *  que el cambio de uno: la nomina del grupo. */
+export const useRegistrarPases = () => useMutacion(RegistrarPasesDocument, PERSONAS)
 
 /** Las cuatro operaciones de plantel. Todas invalidan `personas` y
  *  `personaActual`: cambiar un cargo cambia lo que esa persona puede hacer, y

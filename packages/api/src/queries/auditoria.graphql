@@ -32,6 +32,7 @@ query Auditoria(
       entidadTipo
       entidadId
       objetivoPersonaId
+      objetivoNombre
       resumen {
         clave
         valor

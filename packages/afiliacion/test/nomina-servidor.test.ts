@@ -48,6 +48,22 @@ const MIEMBROS: readonly MiembroDelGrupo[] = [
     unidadId: 'u1',
     categoria: 'beneficiario',
   },
+  {
+    persona: {
+      id: 'p2',
+      apellidos: 'Ruiz',
+      nombres: 'Héctor',
+      tipoDeDocumento: 'dni',
+      numeroDeDocumento: '21560483',
+      fechaDeNacimiento: '1950-02-03',
+      domicilio: 'Calle 8',
+      telefonoDeContacto: '11 9999-0000',
+      creadoEn: HORA,
+      actualizadoEn: HORA,
+    },
+    unidadId: null,
+    categoria: 'adherente',
+  },
 ]
 
 function consultas() {
@@ -55,6 +71,12 @@ function consultas() {
   const personas = {
     async miembrosDelGrupo() {
       return MIEMBROS
+    },
+    async cargosDelGrupoEn() {
+      return [
+        { personaId: 'p1', cargo: 'jefeDeGrupo' },
+        { personaId: 'p1', cargo: 'jefeDeRama' },
+      ]
     },
   } as unknown as Personas
   const estructura = {
@@ -93,14 +115,38 @@ describe('la nómina para bajar', () => {
     expect(uno.contenido).toEqual(otro.contenido)
   })
 
-  test('la planilla lleva la cabecera, el título de la sección y la fila', async () => {
+  test('la planilla es una tabla plana con los datos del alta, sin afiliación', async () => {
     const { nombre, contenido } = await consultas().xlsxDeLaNomina(alcanceSinLimites(), 'g1')
     expect(nombre).toBe('nomina-grupo-12-1970-06-01.xlsx')
     const texto = new TextDecoder().decode(contenido)
-    expect(texto).toContain('Apellidos y nombres')
-    expect(texto).toContain('Beneficiarios (1)')
-    expect(texto).toContain('Ferreyra, Catalina')
-    expect(texto).toContain('Afiliación 1970')
+    const filas = [...texto.matchAll(/<row r="\d+">.*?<\/row>/g)].map(([fila]) => fila)
+    expect(filas).toHaveLength(3)
+    for (const columna of [
+      'Apellidos',
+      'Nombres',
+      'Categoría',
+      'Cargos',
+      'Fecha de nacimiento',
+      'Teléfono',
+      'Domicilio',
+    ]) {
+      expect(filas[0]).toContain(columna)
+    }
+    expect(filas[1]).toContain('Ferreyra')
+    expect(filas[1]).toContain('Catalina')
+    expect(filas[1]).not.toContain('Ferreyra, Catalina')
+    expect(filas[1]).toContain('Beneficiario')
+    expect(filas[1]).toContain('Jefe/Jefa de grupo · Jefe/Jefa de rama')
+    expect(filas[1]).toContain('11 5555-1234')
+    expect(filas[1]).toContain('Av. Siempre Viva 742')
+    expect(filas[1]).toContain('1960-12-01')
+    expect(filas[2]).toContain('Ruiz')
+    expect(filas[2]).toContain('Héctor')
+    expect(filas[2]).toContain('Adherente')
+    expect(filas[2]).not.toContain('Jefe/Jefa')
+    expect(filas[2]).toContain('Calle 8')
+    expect(texto).not.toContain('Afiliación')
+    expect(texto).not.toContain('Adherentes (1)')
   })
 
   test('alcanzar el grupo no es ver su padrón', async () => {

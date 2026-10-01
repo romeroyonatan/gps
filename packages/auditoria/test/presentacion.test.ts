@@ -11,6 +11,8 @@ describe('presentación de eventos', () => {
   test('la acción se escribe en palabras', () => {
     expect(etiquetaDeAccion('crearPermiso')).toBe('Crear permiso')
     expect(etiquetaDeAccion('cargo.jefeDeGrupo.asignar')).toBe('Cargo · jefe de grupo · asignar')
+    expect(etiquetaDeAccion('equipo.secretaria.integrar')).toBe('Equipo · secretaria · agregar')
+    expect(etiquetaDeAccion('equipo.secretaria.revocar')).toBe('Equipo · secretaria · quitar')
     expect(etiquetaDeAccion('sudo.escritura')).toBe('Sudo · escritura')
   })
 

@@ -1,4 +1,4 @@
-import { useActor, useAuditoria, useDistritos } from '@gps/api'
+import { rutaDeExportacionDeAuditoria, useActor, useAuditoria, useDistritos } from '@gps/api'
 import {
   etiquetaDeAccion,
   etiquetaDeModulo,
@@ -9,7 +9,9 @@ import {
   quienActuo,
 } from '@gps/auditoria/dominio'
 import { useState } from 'react'
+import { Link } from 'wouter'
 import {
+  Bajar,
   BOTON_SECUNDARIO,
   CAMPO,
   Campo,
@@ -35,7 +37,18 @@ const hora = new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: '
 function Fila(props: { evento: Evento; conGrupo: boolean }) {
   const { evento } = props
   const quien = quienActuo(evento)
-  const hayDetalle = evento.resumen.length > 0 || evento.cambios.length > 0
+  const permisoId =
+    evento.entidadTipo === 'permiso'
+      ? evento.entidadId
+      : evento.modulo === 'salidas'
+        ? evento.resumen.find((dato) => dato.clave === 'permisoId')?.valor
+        : null
+  const permiso = permisoId && evento.grupoId
+  const equipo = evento.accion.startsWith('equipo.') && evento.objetivoPersonaId
+  const invitacion = evento.accion.startsWith('invitacion.')
+  const hayDetalle = Boolean(
+    permiso || evento.objetivoPersonaId || evento.resumen.length || evento.cambios.length,
+  )
 
   return (
     <li className="border-b border-line last:border-b-0">
@@ -65,6 +78,24 @@ function Fila(props: { evento: Evento; conGrupo: boolean }) {
         </summary>
         {hayDetalle && (
           <dl className="mb-3 space-y-1.5 rounded-lg bg-surface-3 p-3 text-sm">
+            {evento.objetivoPersonaId && (
+              <div className="flex gap-2">
+                <dt className="font-semibold">{invitacion ? 'Destinatario' : 'Persona'}</dt>
+                <dd className="text-ink-muted">
+                  {evento.objetivoNombre ?? evento.objetivoPersonaId}
+                </dd>
+              </div>
+            )}
+            {permiso && (
+              <div>
+                <Link
+                  href={`/grupos/${evento.grupoId}/salidas/${permisoId}`}
+                  className="font-semibold underline"
+                >
+                  Ver permiso →
+                </Link>
+              </div>
+            )}
             {evento.cambios.map((cambio) => (
               <div key={`c-${cambio.campo}`}>
                 <dt className="font-semibold">{cambio.campo}</dt>
@@ -73,12 +104,20 @@ function Fila(props: { evento: Evento; conGrupo: boolean }) {
                 </dd>
               </div>
             ))}
-            {evento.resumen.map((dato) => (
-              <div key={`r-${dato.clave}`} className="flex gap-2">
-                <dt className="shrink-0 font-semibold">{dato.clave}</dt>
-                <dd className="min-w-0 break-words text-ink-muted">{dato.valor}</dd>
-              </div>
-            ))}
+            {evento.resumen
+              .filter(
+                (dato) =>
+                  !(
+                    (equipo && dato.clave === 'personaId') ||
+                    (permiso && dato.clave === 'permisoId')
+                  ),
+              )
+              .map((dato) => (
+                <div key={`r-${dato.clave}`} className="flex gap-2">
+                  <dt className="shrink-0 font-semibold">{dato.clave}</dt>
+                  <dd className="min-w-0 break-words text-ink-muted">{dato.valor}</dd>
+                </div>
+              ))}
           </dl>
         )}
       </details>
@@ -100,14 +139,15 @@ export function Auditoria(props: { grupoId?: string }) {
   const [accion, setAccion] = useState('')
 
   const permitidos = actor ? gruposAuditables(actor) : []
-  const consulta = useAuditoria({
+  const filtros = {
     desde: limiteDelDia(desde, false),
     hasta: limiteDelDia(hasta, true),
     grupoId: grupoId || undefined,
     actorPersonaId: actorPersonaId || undefined,
     modulo: modulo || undefined,
     accion: accion || undefined,
-  })
+  }
+  const consulta = useAuditoria(filtros)
 
   // En escritorio se llega directo desde la columna: volver a Más sería volver
   // a una pantalla que ahí no existe.
@@ -165,6 +205,9 @@ export function Auditoria(props: { grupoId?: string }) {
       <Titulo acompaña="Quién cambió qué y cuándo, del más reciente al más antiguo.">
         Auditoría
       </Titulo>
+      <div className="mt-4">
+        <Bajar href={rutaDeExportacionDeAuditoria(filtros)}>Exportar Excel</Bajar>
+      </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3">
         {opcionesDeGrupo.length > 0 && (

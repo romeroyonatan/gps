@@ -799,6 +799,34 @@ describe('asignarCargo', () => {
   })
 })
 
+describe('cargosDelGrupoEn', () => {
+  test('trae sólo los cargos vigentes y no revocados de ese grupo', async () => {
+    const servicio = montar()
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, {
+      ...ingreso,
+      cargos: [{ cargo: 'director', hasta: '1972-03-01' }],
+    })
+    await servicio.asignarCargo({
+      personaId: persona.id,
+      cargo: 'jefeScoutDiocesano',
+      ambitoId: null,
+      desde: '1969-03-01',
+    })
+    const revocado = await servicio.asignarCargo({
+      personaId: persona.id,
+      cargo: 'capellan',
+      ambitoId: 'grupo_1',
+      desde: '1969-03-01',
+    })
+    await servicio.revocarCargo(actor('jefeDeGrupo'), revocado.id)
+    expect(await servicio.cargosDelGrupoEn('grupo_1', '1970-06-15')).toEqual([
+      { personaId: persona.id, cargo: 'director' },
+    ])
+    expect(await servicio.cargosDelGrupoEn('grupo_1', '1972-03-02')).toEqual([])
+    expect(await servicio.cargosDelGrupoEn('grupo_2', '1970-06-15')).toEqual([])
+  })
+})
+
 describe('ocupantesDelCargo', () => {
   const montarConDirector = async () => {
     const servicio = montar()
@@ -1089,6 +1117,132 @@ describe('cambiarDeUnidad', () => {
         persona.id,
         'unidad_sco',
         '1969-12-01',
+      ),
+    ).rejects.toBeInstanceOf(CambioDeAutoridadDenegado)
+  })
+})
+
+describe('registrarPases', () => {
+  const jefatura = alcanceDe(actor('jefeDeGrupo'), ['grupo_1'])
+  const fecha = '1969-12-01'
+  const paseALaTropa = (personaId: string) => ({
+    personaId,
+    unidadDeOrigenId: 'unidad_lob',
+    unidadDestinoId: 'unidad_sco',
+    categoria: 'beneficiario' as const,
+  })
+  const otro = { ...valida, numeroDeDocumento: '30111333' }
+
+  test('cierra la vispera y abre la nueva, para todo el lote', async () => {
+    const { servicio, eventos } = montarConBd()
+    const uno = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
+    const dos = await servicio.crearPersona(alcanceSinLimites(), otro, ingreso)
+
+    const nuevas = await servicio.registrarPases(jefatura, 'grupo_1', fecha, [
+      paseALaTropa(uno.id),
+      paseALaTropa(dos.id),
+    ])
+
+    expect(nuevas.map((pertenencia) => pertenencia.unidadId)).toEqual(['unidad_sco', 'unidad_sco'])
+    expect(eventos.filter((evento) => evento.accion === 'registrarPases')).toEqual(
+      nuevas.map((nueva) => ({
+        actorPersonaId: 'actor',
+        modulo: 'personas',
+        accion: 'registrarPases',
+        elevado: false,
+        grupoId: 'grupo_1',
+        entidadTipo: 'pertenencia',
+        entidadId: nueva.id,
+        objetivoPersonaId: nueva.personaId,
+        resumen: { fecha },
+        cambios: [{ campo: 'unidadId', anterior: 'unidad_lob', nuevo: 'unidad_sco' }],
+      })),
+    )
+    const lista = await servicio.listarPersonas(alcanceSinLimites(), 'grupo_1')
+    expect(lista.map((persona) => persona.pertenencia.unidadId)).toEqual([
+      'unidad_sco',
+      'unidad_sco',
+    ])
+  })
+
+  test('la historia queda: una consulta a una fecha anterior ve la Manada', async () => {
+    const servicio = montar()
+    const uno = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
+    await servicio.registrarPases(jefatura, 'grupo_1', fecha, [paseALaTropa(uno.id)])
+
+    const vispera = await servicio.miembrosDelGrupo('grupo_1', '1969-11-30')
+    expect(vispera.map((miembro) => miembro.unidadId)).toEqual(['unidad_lob'])
+    const elDia = await servicio.miembrosDelGrupo('grupo_1', fecha)
+    expect(elDia.map((miembro) => miembro.unidadId)).toEqual(['unidad_sco'])
+  })
+
+  test('si uno falla no pasa ninguno', async () => {
+    const servicio = montar()
+    const uno = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
+    const dos = await servicio.crearPersona(alcanceSinLimites(), otro, ingreso)
+
+    expect(
+      servicio.registrarPases(jefatura, 'grupo_1', fecha, [
+        paseALaTropa(uno.id),
+        // Ya no esta en la Manada: la pantalla quedo vieja.
+        { ...paseALaTropa(dos.id), unidadDeOrigenId: 'unidad_sco' },
+      ]),
+    ).rejects.toBeInstanceOf(DatosInvalidos)
+
+    const lista = await servicio.listarPersonas(alcanceSinLimites(), 'grupo_1')
+    expect(lista.map((persona) => persona.pertenencia.unidadId)).toEqual([
+      'unidad_lob',
+      'unidad_lob',
+    ])
+  })
+
+  test('un dirigente no pasa por la ceremonia', async () => {
+    const servicio = montar()
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, {
+      ...ingreso,
+      categoria: 'activo',
+    })
+
+    expect(
+      servicio.registrarPases(jefatura, 'grupo_1', fecha, [paseALaTropa(persona.id)]),
+    ).rejects.toBeInstanceOf(DatosInvalidos)
+  })
+
+  test('el rover que pasa a dirigente queda activo y con el rol', async () => {
+    const conClan: GrupoConUnidades = {
+      ...GRUPO,
+      unidades: [...GRUPO.unidades, unidadDe('unidad_rov', 'rovers', 'Clan')],
+    }
+    const servicio = montar({ ahora: () => HORA }, estructuraFalsa([conClan]))
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, {
+      ...ingreso,
+      unidadId: 'unidad_rov',
+    })
+
+    const [nueva] = await servicio.registrarPases(jefatura, 'grupo_1', fecha, [
+      {
+        personaId: persona.id,
+        unidadDeOrigenId: 'unidad_rov',
+        unidadDestinoId: 'unidad_lob',
+        categoria: 'activo',
+      },
+    ])
+
+    expect(nueva?.categoria).toBe('activo')
+    const funciones = await servicio.funcionesVigentes(persona.id, fecha)
+    expect(funciones).toContainEqual({ rol: 'dirigente', ambito: { tipo: 'grupo', id: 'grupo_1' } })
+  })
+
+  test('la jefatura de otro grupo no registra pases', async () => {
+    const servicio = montar()
+    const persona = await servicio.crearPersona(alcanceSinLimites(), valida, ingreso)
+
+    expect(
+      servicio.registrarPases(
+        alcanceDe(actor('jefeDeGrupo', 'grupo_9'), ['grupo_9']),
+        'grupo_1',
+        fecha,
+        [paseALaTropa(persona.id)],
       ),
     ).rejects.toBeInstanceOf(CambioDeAutoridadDenegado)
   })

@@ -28,6 +28,7 @@ const personas: Personas = {
   miembrosActivos: async () => [],
   ocupantesDelCargo: async () => [],
   miembrosDelGrupo: async () => [],
+  cargosDelGrupoEn: async () => [],
 }
 
 /** Devuelve siempre el mismo `subject`: alcanza para probar la orquestación,

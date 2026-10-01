@@ -96,6 +96,34 @@ describe('consulta de auditoría', () => {
     )
   })
 
+  test('muestra a quién se integró al equipo sin confundirlo con quien actuó', async () => {
+    const { bd, servicio } = montar()
+    bd.run(`INSERT INTO eventos_de_auditoria VALUES
+      ('e1', 1, 'actor-1', null, 'personas', 'equipo.secretaria.integrar',
+       'exitoso', 0, 'grupo-1', 'integranteDeEquipo', 'integrante-1', 'persona-2',
+       '{"personaId":"persona-2"}', '[]')`)
+    const pagina = await servicio.listar(alcance())
+    expect(pagina.eventos[0]).toMatchObject({
+      actorNombre: 'Ana Scout',
+      objetivoPersonaId: 'persona-2',
+      objetivoNombre: 'Beto Scout',
+    })
+  })
+
+  test('una invitación conserva el destinatario aunque no tenga grupo', async () => {
+    const { bd, servicio } = montar()
+    bd.run(`INSERT INTO eventos_de_auditoria VALUES
+      ('e1', 1, 'actor-1', null, 'auth', 'invitacion.activacion.emitir',
+       'exitoso', 0, null, null, null, 'persona-2',
+       '{"invitacionId":"invitacion-1"}', '[]')`)
+    const pagina = await servicio.listar(alcance('grupo-1', true))
+    expect(pagina.eventos[0]).toMatchObject({
+      actorNombre: 'Ana Scout',
+      objetivoNombre: 'Beto Scout',
+      resumen: { invitacionId: 'invitacion-1' },
+    })
+  })
+
   test('elevación ve eventos globales y combina filtros', async () => {
     const { bd, servicio } = montar()
     insertar(bd, 'e1', 1, 'grupo-1', 'salidas', 'crear')

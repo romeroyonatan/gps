@@ -79,3 +79,7 @@ mutation EditarPersona($personaId: ID!, $datos: DatosDePersona!) {
 mutation CambiarDeUnidad($personaId: ID!, $unidadId: ID!, $desde: String!) {
   cambiarDeUnidad(personaId: $personaId, unidadId: $unidadId, desde: $desde)
 }
+
+mutation RegistrarPases($grupoId: ID!, $fecha: String!, $pases: [Pase!]!) {
+  registrarPases(grupoId: $grupoId, fecha: $fecha, pases: $pases)
+}
