@@ -7,7 +7,8 @@
     ".": "./src/index.ts",
     "./graphql": "./src/builder.ts",
     "./fechas": "./src/fechas.ts",
-    "./roles": "./src/roles.ts"
+    "./roles": "./src/roles.ts",
+    "./pdf": "./src/pdf.ts"
   },
   "scripts": {
     "compile": "tsc --noEmit"
@@ -15,7 +16,8 @@
   "dependencies": {
     "@pothos/core": "^4.13.1",
     "drizzle-orm": "^0.45.2",
-    "graphql": "^16.9.0"
+    "graphql": "^16.9.0",
+    "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
     "@types/bun": "latest",

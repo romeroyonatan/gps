@@ -1,8 +1,7 @@
 import { useGrupo } from '@gps/api'
 import { router, useLocalSearchParams } from 'expo-router'
-import { ScrollView } from 'react-native'
 import { AltaDePersona } from '../../../componentes/AltaDePersona'
-import { Cargando, Titulo, Vacio, Volver } from '../../../src/ui'
+import { Cargando, Marco, Titulo, Vacio, Volver } from '../../../src/ui'
 
 /** El alta es una tarea que termina, así que tiene pantalla propia y no cuelga
  *  de la nómina: al guardar, vuelve a la lista, que recién cargada es la
@@ -12,12 +11,7 @@ export default function Pantalla() {
   const { grupo, isPending } = useGrupo(id)
 
   return (
-    <ScrollView
-      className="flex-1 bg-surface"
-      contentContainerClassName="px-4 pb-10"
-      keyboardShouldPersistTaps="handled"
-      automaticallyAdjustKeyboardInsets
-    >
+    <Marco keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
       <Volver href={`/grupos/${id}/nomina`}>Nómina</Volver>
       <Titulo acompaña="El alta registra la pertenencia desde una fecha. No afilia: la afiliación se cobra en la próxima declaración.">
         Alta de persona
@@ -33,6 +27,6 @@ export default function Pantalla() {
           alGuardar={() => router.back()}
         />
       )}
-    </ScrollView>
+    </Marco>
   )
 }

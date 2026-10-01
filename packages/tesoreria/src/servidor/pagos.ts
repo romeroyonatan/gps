@@ -1,9 +1,8 @@
 import type { Alcance, Core } from '@gps/core'
-import { aFechaDeCalendario } from '@gps/core/fechas'
+import { aFechaDeCalendario, esFechaDeCalendario } from '@gps/core/fechas'
 import type { Estructura } from '@gps/estructura/dominio'
 import { eq } from 'drizzle-orm'
 import {
-  fechaValida,
   importeEnPesosValido,
   MEDIOS_DE_PAGO,
   type MedioDePago,
@@ -32,7 +31,7 @@ export function crearOperacionesDePagos(core: Core, estructura: Estructura) {
     if (!puedeRegistrarPagos(alcance.actor)) {
       throw new OperacionDenegada('Sólo Tesorería diocesana registra pagos.')
     }
-    if (!importeEnPesosValido(datos.importe) || !fechaValida(datos.fecha)) {
+    if (!importeEnPesosValido(datos.importe) || !esFechaDeCalendario(datos.fecha)) {
       throw new DatosDePagoInvalidos('El importe o la fecha del pago no son válidos.')
     }
     if (!MEDIOS_DE_PAGO.includes(datos.medioDePago)) {

@@ -19,8 +19,9 @@ import { crearCore } from './core'
 import { modulos } from './modules'
 
 /** Raiz de composicion: ordena los modulos, arma el Core, crea los servicios
- *  de cada uno y compone el esquema. Si algo falta, no compila. */
-/** Recibe el sellador y el almacenamiento ya construidos, no las variables de
+ *  de cada uno y compone el esquema. Si algo falta, no compila.
+ *
+ *  Recibe el sellador y el almacenamiento ya construidos, no las variables de
  *  entorno con que se arman: de que forma vienen las claves o donde estan los
  *  bytes es asunto de quien arranca el proceso, y asi el generador de schema y
  *  los tests componen con implementaciones de juguete sin inventar un entorno. */

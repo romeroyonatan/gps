@@ -168,50 +168,6 @@ export function crearOperacionesDeBorrador(core: Core, personas: Personas, estru
       return permiso
     },
 
-    async editarPermiso(actor: Actor, permisoId: string, datos: DatosDelPermiso): Promise<Permiso> {
-      const anterior = exigirBorrador(permisoId)
-      const problemas = validarDatos(datos)
-      if (problemas.length > 0) throw new PermisoInvalido(problemas)
-
-      const ahora = core.reloj.ahora()
-      const nuevos = {
-        lugar: datos.lugar.trim(),
-        direccion: datos.direccion.trim(),
-        localidad: datos.localidad.trim(),
-        provincia: datos.provincia.trim(),
-        telefono: datos.telefono.trim(),
-        desde: datos.desde,
-        hasta: datos.hasta,
-        comoSeViaja: datos.comoSeViaja?.trim() || null,
-      }
-      core.bd.transaction((tx) => {
-        tx.update(permisos)
-          .set({ ...nuevos, actualizadoEn: ahora })
-          .where(eq(permisos.id, permisoId))
-          .run()
-        core.auditoria.registrar(
-          {
-            actorPersonaId: actor.personaId,
-            modulo: 'salidas',
-            accion: 'editarPermiso',
-            elevado: actor.estaElevado,
-            grupoId: anterior.grupoId,
-            entidadTipo: 'permiso',
-            entidadId: permisoId,
-            cambios: Object.entries(nuevos)
-              .filter(([campo, nuevo]) => anterior[campo as keyof Permiso] !== nuevo)
-              .map(([campo, nuevo]) => ({
-                campo,
-                anterior: anterior[campo as keyof Permiso] as string | null,
-                nuevo,
-              })),
-          },
-          tx,
-        )
-      })
-      return permisoDe(permisoId)
-    },
-
     /** Reemplaza las unidades que van y anota a toda la gente de las que se
      *  acaban de elegir. Después se quita sólo a quien no viaja: en un
      *  campamento grande es mucho menos trabajo que marcar a todos de a uno.

@@ -1,7 +1,7 @@
 import { useTesoreria } from '@gps/api'
 import { enPesos } from '@gps/tesoreria/dominio'
-import { ScrollView, Text, View } from 'react-native'
-import { Accion, Cargando, Falla, FILA, Titulo, Vacio, Volver } from '../../../src/ui'
+import { Text, View } from 'react-native'
+import { Accion, Cargando, Falla, FILA, Marco, Titulo, Vacio, Volver } from '../../../src/ui'
 
 /** El historial de cuotas. Definir una es una tarea que termina y tiene su
  *  propia pantalla: acá sólo se mira lo que ya está, con la acción arriba. */
@@ -10,7 +10,7 @@ export default function Pantalla() {
   const cuotas = consulta.data?.cuotasDeAfiliacion ?? []
 
   return (
-    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-10">
+    <Marco>
       <Volver href="/tesoreria">Tesorería</Volver>
       <Titulo acompaña="Cada período comienza en marzo y conserva su importe histórico.">
         Cuotas de afiliación
@@ -39,6 +39,6 @@ export default function Pantalla() {
       {cuotas.length === 0 && !consulta.isPending && (
         <Vacio>Todavía no hay ninguna cuota definida.</Vacio>
       )}
-    </ScrollView>
+    </Marco>
   )
 }

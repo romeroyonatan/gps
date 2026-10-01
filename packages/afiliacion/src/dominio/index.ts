@@ -1,6 +1,6 @@
 export { FECHAS_ORDINARIAS, INICIO_DEL_PERIODO } from './config'
 export type { Afiliado, Declaracion } from './modelos'
-export type { FilaDeLaNomina, SeccionDeLaNomina } from './nomina'
+export type { SeccionDeLaNomina } from './nomina'
 export { armarLaNomina, COLUMNAS_DE_LA_NOMINA } from './nomina'
 export { fechasOrdinariasDelPeriodo, periodoDe } from './periodos'
 export {

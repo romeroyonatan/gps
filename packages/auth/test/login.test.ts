@@ -149,30 +149,6 @@ describe('iniciarLogin / completarLogin', () => {
   })
 })
 
-describe('reemplazarProveedorPropio', () => {
-  test('reemplaza el proveedor sin invitación y preserva a la persona', async () => {
-    const { bd, servicio } = montar('subject-nuevo')
-    bd.run(
-      sql`INSERT INTO identidades_externas VALUES
-          ('identidad_vieja', 'persona_1', 'google', 'subject-viejo', NULL, 0, 0)`,
-    )
-    const inicio = servicio.iniciarLogin('google', 'web', 'https://gps.test/callback')
-    await servicio.reemplazarProveedorPropio('persona_1', 'google', {
-      transaccion: inicio.transaccion,
-      stateRecibido: 'state-real',
-      code: 'c',
-    })
-
-    const identidades = bd.all<{ subject: string; desactivada_en: number | null }>(
-      sql`SELECT subject, desactivada_en FROM identidades_externas WHERE persona_id = 'persona_1' ORDER BY subject`,
-    )
-    expect(identidades).toEqual([
-      { subject: 'subject-nuevo', desactivada_en: null },
-      { subject: 'subject-viejo', desactivada_en: 0 },
-    ])
-  })
-})
-
 describe('vincularProveedor', () => {
   test('agrega un segundo proveedor a una persona ya autenticada', async () => {
     const { bd, servicio } = montar()

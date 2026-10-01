@@ -155,14 +155,6 @@ export function estaVigente(vinculo: { desde: string; hasta: string | null }, ho
   return vinculo.desde <= dia && (vinculo.hasta === null || dia <= vinculo.hasta)
 }
 
-/** Para autorizacion importa tambien una remocion ocurrida dentro del dia. */
-export function estaVigenteParaAcceso(
-  vinculo: { desde: string; hasta: string | null; revocadoEn: Date | null },
-  hoy: Date,
-): boolean {
-  return vinculo.revocadoEn === null && estaVigente(vinculo, hoy)
-}
-
 /** Quién conduce un grupo, para el directorio de la asociación. Es lo mínimo
  *  para nombrarlo: sin documento, sin fecha de nacimiento, sin pertenencia. */
 export interface JefeDeGrupo {

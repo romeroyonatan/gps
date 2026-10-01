@@ -41,38 +41,9 @@ function variablesDe(selector) {
 const variablesOscuras = ({ addUtilities }) =>
   addUtilities({ '.dark:root': variablesDe('\\.dark:root,\\s*\\.dark') })
 
-const colors = {
-  surface: 'var(--surface)',
-  'surface-2': 'var(--surface-2)',
-  'surface-3': 'var(--surface-3)',
-  'surface-4': 'var(--surface-4)',
-  ink: 'var(--ink)',
-  'ink-muted': 'var(--ink-muted)',
-  'ink-faint': 'var(--ink-faint)',
-  'ink-inverse': 'var(--ink-inverse)',
-  velo: 'var(--velo)',
-  line: 'var(--line)',
-  'line-strong': 'var(--line-strong)',
-  accent: 'var(--accent)',
-  'accent-strong': 'var(--accent-strong)',
-  'accent-soft': 'var(--accent-soft)',
-  'accent-line': 'var(--accent-line)',
-  'accent-ink': 'var(--accent-ink)',
-  ok: 'var(--ok)',
-  'ok-soft': 'var(--ok-soft)',
-  warn: 'var(--warn)',
-  'warn-soft': 'var(--warn-soft)',
-  danger: 'var(--danger)',
-  'danger-soft': 'var(--danger-soft)',
-  info: 'var(--info)',
-  'info-soft': 'var(--info-soft)',
-  'rama-castores': 'var(--rama-castores)',
-  'rama-lobatos': 'var(--rama-lobatos)',
-  'rama-scouts': 'var(--rama-scouts)',
-  'rama-raiders': 'var(--rama-raiders)',
-  'rama-rovers': 'var(--rama-rovers)',
-  'rama-adultos': 'var(--rama-adultos)',
-}
+const colors = Object.fromEntries(
+  Object.keys(variablesDe(':root')).map((variable) => [variable.slice(2), `var(${variable})`]),
+)
 
 const fontSize = {
   xs: ['12px', '1.4'],

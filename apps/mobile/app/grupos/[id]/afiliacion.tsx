@@ -1,13 +1,14 @@
 import { useDeclaraciones, useDeclararAfiliacion } from '@gps/api'
 import { nombreDelTipo } from '@gps/personas/dominio'
 import { useLocalSearchParams } from 'expo-router'
-import { ScrollView, Text, View } from 'react-native'
+import { Text, View } from 'react-native'
 import {
   BotonSecundario,
   Cargando,
   Chip,
   Falla,
   FILA,
+  Marco,
   Titulo,
   Vacio,
   Volver,
@@ -44,7 +45,7 @@ export default function Pantalla() {
   const declarar = useDeclararAfiliacion()
 
   return (
-    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-10">
+    <Marco>
       <Volver href={`/grupos/${id}`}>Grupo</Volver>
       <Titulo>Declaraciones de afiliación</Titulo>
 
@@ -81,6 +82,6 @@ export default function Pantalla() {
       </View>
 
       {declarar.error && <Falla>{declarar.error.message}</Falla>}
-    </ScrollView>
+    </Marco>
   )
 }

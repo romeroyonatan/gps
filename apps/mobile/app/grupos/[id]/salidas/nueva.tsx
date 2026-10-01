@@ -3,8 +3,8 @@ import { aFechaDeCalendario } from '@gps/core/fechas'
 import { avisoDeAnticipacion, puedeAdministrarPermisosDelGrupo } from '@gps/salidas/dominio'
 import { router, useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
-import { ScrollView, TextInput, View } from 'react-native'
-import { Aviso, Boton, CAMPO, Campo, Falla, Nota, Titulo, Volver } from '../../../../src/ui'
+import { TextInput, View } from 'react-native'
+import { Aviso, Boton, CAMPO, Campo, Falla, Marco, Nota, Titulo, Volver } from '../../../../src/ui'
 
 /** El alta de una salida. Pantalla propia y no un formulario al pie de la
  *  lista: cargar una salida es una tarea que termina.
@@ -34,20 +34,15 @@ export default function Pantalla() {
   // esta dirección sin poder administrar se encuentra con el motivo.
   if (actor !== null && !puedeAdministrarPermisosDelGrupo(actor, id)) {
     return (
-      <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-10">
+      <Marco>
         <Volver href={volver}>Salidas</Volver>
         <Nota>Las salidas del grupo las carga su jefatura o su Secretaría.</Nota>
-      </ScrollView>
+      </Marco>
     )
   }
 
   return (
-    <ScrollView
-      className="flex-1 bg-surface"
-      contentContainerClassName="px-4 pb-10"
-      keyboardShouldPersistTaps="handled"
-      automaticallyAdjustKeyboardInsets
-    >
+    <Marco keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
       <Volver href={volver}>Salidas</Volver>
       <Titulo acompaña="Queda como borrador: después elegís qué unidades van y quiénes.">
         Nueva salida
@@ -161,6 +156,6 @@ export default function Pantalla() {
           {crear.isPending ? 'Creando…' : 'Crear borrador'}
         </Boton>
       </View>
-    </ScrollView>
+    </Marco>
   )
 }

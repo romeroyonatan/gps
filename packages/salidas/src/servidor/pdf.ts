@@ -1,11 +1,12 @@
-import { PDFDocument, type PDFFont, type PDFPage, rgb, StandardFonts } from 'pdf-lib'
+import { documentoDeterminista, recortar, texto } from '@gps/core/pdf'
+import { PDFDocument, type PDFFont, type PDFPage, rgb } from 'pdf-lib'
 import type { Firma, ParticipanteEmitido, Permiso } from '../dominio/modelos'
 import { cuantos } from '../dominio/participantes'
 import { numeroDeExpediente } from '../dominio/permisos'
 import { deserializar } from '../dominio/trazos'
 
 /** Lo que el PDF necesita saber de una firma pendiente para dibujar su linea. */
-export interface LineaDeFirma {
+interface LineaDeFirma {
   readonly cargo: string
   readonly nombre: string
   readonly firma: Firma | null
@@ -25,15 +26,6 @@ const TENUE = rgb(0.56, 0.56, 0.56)
 const RAYA = rgb(0.93, 0.93, 0.93)
 const BORDE = rgb(0.85, 0.85, 0.85)
 const BANDA = rgb(0.953, 0.953, 0.953)
-
-/** Un instante fijo para los metadatos. pdf-lib pone la hora del sistema en
- *  CreationDate y ModDate: con eso, el mismo permiso generaria bytes distintos
- *  cada vez y el hash que ancla las firmas no serviria para nada.
- *
- *  No sale de core.reloj: no es un hecho del negocio, es un campo que hay que
- *  fijar para que el archivo sea reproducible. La fecha real del permiso esta
- *  impresa adentro. */
-const SIN_FECHA = new Date(0)
 
 const ALTO_DE_FILA = 12
 const ALTO_DE_ENCABEZADO = 14
@@ -56,24 +48,9 @@ const CELDAS = [
 
 /** aaaa-mm-dd a dd/mm/aaaa, que es como se escribe una fecha en un papel. Parte
  *  el texto en vez de parsear: el dominio ya garantiza que es una fecha real. */
-export function enDiaMesAnio(fecha: string): string {
+function enDiaMesAnio(fecha: string): string {
   const [anio, mes, dia] = fecha.split('-')
   return dia ? `${dia}/${mes}/${anio}` : fecha
-}
-
-/** El texto que entra en `ancho`, con puntos suspensivos si no entra entero. */
-export function recortar(
-  contenido: string,
-  ancho: number,
-  fuente: PDFFont,
-  tamano: number,
-): string {
-  if (fuente.widthOfTextAtSize(contenido, tamano) <= ancho) return contenido
-  let recortado = contenido
-  while (recortado.length > 1 && fuente.widthOfTextAtSize(`${recortado}…`, tamano) > ancho) {
-    recortado = recortado.slice(0, -1)
-  }
-  return `${recortado}…`
 }
 
 /** El mismo texto cortado en renglones que entran en `ancho`. Corta por
@@ -140,18 +117,6 @@ export function composicion(
   return [...porUnidad].map(([unidad, cuantos]) => ({ unidad, cuantos }))
 }
 
-function texto(
-  pagina: PDFPage,
-  contenido: string,
-  x: number,
-  y: number,
-  fuente: PDFFont,
-  tamano = 10,
-  color = NEGRO,
-) {
-  pagina.drawText(contenido, { x, y, size: tamano, font: fuente, color })
-}
-
 /** Lo mismo pero terminando en `x`: los numeros y las fechas del margen
  *  derecho se alinean por ahi. */
 function aLaDerecha(
@@ -207,14 +172,7 @@ export async function armarPdf(datos: {
   firmas: readonly LineaDeFirma[]
   escaneos: readonly { cargo: string; contenido: Uint8Array; tipo: string }[]
 }): Promise<Uint8Array> {
-  const documento = await PDFDocument.create()
-  documento.setCreationDate(SIN_FECHA)
-  documento.setModificationDate(SIN_FECHA)
-  documento.setProducer('GPS')
-  documento.setCreator('GPS')
-
-  const normal = await documento.embedFont(StandardFonts.Helvetica)
-  const negrita = await documento.embedFont(StandardFonts.HelveticaBold)
+  const { documento, normal, negrita } = await documentoDeterminista()
 
   const { permiso } = datos
   const elGrupo = `Grupo Nº${datos.grupo.numero} — ${datos.grupo.nombre}`

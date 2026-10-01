@@ -2,7 +2,7 @@ import { useGenerarDeudasPendientes, useTesoreria } from '@gps/api'
 import { enPesos } from '@gps/tesoreria/dominio'
 import { Link } from 'expo-router'
 import { useState } from 'react'
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { Pressable, Text, TextInput, View } from 'react-native'
 import {
   Aviso,
   Boton,
@@ -11,6 +11,8 @@ import {
   Chip,
   Falla,
   Filtros,
+  Marco,
+  PIE_DE_TABLA,
   Titulo,
   Vacio,
   Volver,
@@ -100,7 +102,7 @@ export default function Pantalla() {
   const configura = consulta.data?.periodosConfigurablesDeAfiliacion != null
 
   return (
-    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-10">
+    <Marco>
       <Volver href="/">Directorio</Volver>
       <Titulo>Tesorería</Titulo>
 
@@ -168,7 +170,7 @@ export default function Pantalla() {
       )}
 
       {cuentas.length > 0 && (
-        <View className="mt-4 flex-row justify-between gap-3 rounded-lg bg-surface-3 p-3">
+        <View className={PIE_DE_TABLA}>
           <Text className="text-sm text-ink-muted">
             {cuentas.length} {cuentas.length === 1 ? 'grupo' : 'grupos'}
           </Text>
@@ -177,6 +179,6 @@ export default function Pantalla() {
           </Text>
         </View>
       )}
-    </ScrollView>
+    </Marco>
   )
 }

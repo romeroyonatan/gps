@@ -435,41 +435,6 @@ describe('abrirUnidad', () => {
   })
 })
 
-describe('cerrarUnidad', () => {
-  const montarConUnidad = async () => {
-    const { servicio } = montarConBd()
-    const distrito = await servicio.crearDistrito({ numero: 1, zona: 'San Isidro' })
-    const grupo = await servicio.crearGrupo({ numero: 1, nombre: 'Uno', distritoId: distrito.id })
-    const unidad = await servicio.abrirUnidad({
-      grupoId: grupo.id,
-      rama: 'scouts',
-      sexo: 'mixta',
-      nombre: 'San Jorge',
-    })
-    return { servicio, grupo, unidad }
-  }
-
-  test('una unidad cerrada deja de aparecer entre las del grupo', async () => {
-    const { servicio, grupo, unidad } = await montarConUnidad()
-    await servicio.cerrarUnidad(unidad.id)
-    expect((await servicio.obtenerGrupo(grupo.id))?.unidades).toEqual([])
-  })
-
-  test('cerrar libera el nombre: se puede volver a abrir igual', async () => {
-    // Es la razon por la que el UNIQUE es parcial y no completo.
-    const { servicio, grupo, unidad } = await montarConUnidad()
-    await servicio.cerrarUnidad(unidad.id)
-    expect(
-      servicio.abrirUnidad({
-        grupoId: grupo.id,
-        rama: 'scouts',
-        sexo: 'mixta',
-        nombre: 'San Jorge',
-      }),
-    ).resolves.toMatchObject({ nombre: 'San Jorge' })
-  })
-})
-
 describe('cerrarGrupo', () => {
   test('un grupo nace activo', async () => {
     const servicio = montar()

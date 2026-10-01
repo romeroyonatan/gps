@@ -75,10 +75,7 @@ export class CambioDeAutoridadDenegado extends Error {
   }
 }
 
-/** Lo que este modulo hace, que es mas que lo que publica: ver Personas en
- *  /dominio/publico.ts. `extends` es lo que hace que la implementacion no pueda
- *  quedar corta sin que TypeScript se entere. */
-export interface DatosDeAsignacionDeCargo {
+interface DatosDeAsignacionDeCargo {
   readonly personaId: string
   readonly cargo: TipoDeCargo
   readonly ambitoId: string | null
@@ -86,6 +83,9 @@ export interface DatosDeAsignacionDeCargo {
   readonly hasta?: string | null
 }
 
+/** Lo que este modulo hace, que es mas que lo que publica: ver Personas en
+ *  /dominio/publico.ts. `extends` es lo que hace que la implementacion no pueda
+ *  quedar corta sin que TypeScript se entere. */
 export interface ServicioDePersonas extends Personas {
   crearPersona(
     alcance: Alcance,

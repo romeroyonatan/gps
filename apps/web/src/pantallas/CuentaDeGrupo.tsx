@@ -1,11 +1,10 @@
 import { useActor, useAnularPago, useCuentaDeGrupo, useTesoreria } from '@gps/api'
-import { puedeRegistrarPagos, puedeVerTesoreriaDeLaDiocesis } from '@gps/tesoreria/dominio'
+import { enPesos, puedeRegistrarPagos, puedeVerTesoreriaDeLaDiocesis } from '@gps/tesoreria/dominio'
 import {
   Accion,
   BOTON_AL_MARGEN,
   Cargando,
   Falla,
-  pesos,
   Saldo,
   Seccion,
   Titulo,
@@ -67,12 +66,12 @@ export function CuentaDeGrupo(props: { grupoId: string }) {
                     lado va el movimiento, no si el número es grande. */}
                 <strong className="shrink-0 tabular-nums">
                   {movimiento.tipo === 'pago' ? '−' : '+'}
-                  {pesos.format(movimiento.importe)}
+                  {enPesos(movimiento.importe)}
                 </strong>
               </div>
               {movimiento.cantidad && (
                 <p className="mt-0.5 text-label tabular-nums text-ink-muted">
-                  {movimiento.cantidad} × {pesos.format(movimiento.cuota ?? 0)}
+                  {movimiento.cantidad} × {enPesos(movimiento.cuota ?? 0)}
                 </p>
               )}
               {movimiento.referencia && (

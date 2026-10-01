@@ -27,20 +27,9 @@ export class ErrorDeApi extends Error {
 }
 
 /** Como se ejecuta una consulta. La implementacion HTTP es la unica que
- *  existe hoy; el modo local va a aportar otra que ejecuta en proceso, sin
- *  que las pantallas cambien. */
-export interface Transporte {
-  ejecutar<Resultado, Variables>(
-    documento: TypedDocumentNode<Resultado, Variables>,
-    variables?: Variables,
-  ): Promise<Resultado>
-
-  /** De donde cuelgan las rutas que no son GraphQL: subir y bajar archivos, y
-   *  el PDF de un permiso. Esas rutas devuelven caminos relativos -/archivos/x-
-   *  y en el navegador alcanza, pero React Native no tiene origen contra el que
-   *  resolverlos: sin esto, subir un adjunto desde el telefono falla. */
-  readonly origen: string
-}
+ *  existe hoy; cuando llegue el modo local, que ejecuta en proceso, esto vuelve
+ *  a ser una interfaz con dos implementaciones. */
+export type Transporte = ReturnType<typeof transporteHttp>
 
 /** De donde sale el secreto de la sesion en mobile. La web no la usa: su
  *  sesion viaja en una cookie HttpOnly, que el JavaScript de la pagina no
@@ -61,13 +50,21 @@ export function transporteHttp(
   hacerPedido: typeof fetch = fetch,
   secretoDeSesion?: SecretoDeSesion,
   intencionElevada?: IntencionElevada,
-): Transporte {
+) {
   return {
-    // El de la URL de GraphQL: las rutas de archivos las sirve el mismo backend.
-    // Vacio cuando la URL ya es relativa -asi la usa la web-: ahi el navegador
-    // resuelve contra la pagina y anteponerle algo la rompe.
+    /** De donde cuelgan las rutas que no son GraphQL: subir y bajar archivos, y
+     *  el PDF de un permiso. Esas rutas devuelven caminos relativos -/archivos/x-
+     *  y en el navegador alcanza, pero React Native no tiene origen contra el que
+     *  resolverlos: sin esto, subir un adjunto desde el telefono falla.
+     *
+     *  Es el de la URL de GraphQL: las rutas de archivos las sirve el mismo
+     *  backend. Vacio cuando la URL ya es relativa -asi la usa la web-: ahi el
+     *  navegador resuelve contra la pagina y anteponerle algo la rompe. */
     origen: origenDe(url),
-    async ejecutar(documento, variables) {
+    async ejecutar<Resultado, Variables>(
+      documento: TypedDocumentNode<Resultado, Variables>,
+      variables?: Variables,
+    ): Promise<Resultado> {
       const secreto = await secretoDeSesion?.()
       const esMutation = documento.definitions.some(
         (definicion) =>
@@ -111,7 +108,7 @@ export function transporteHttp(
         )
       }
 
-      return cuerpo.data as never
+      return cuerpo.data as Resultado
     },
   }
 }

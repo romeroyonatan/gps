@@ -329,8 +329,8 @@ El respaldo es el escaneo, que va como página anexa del PDF. Registrar quién l
 sigue pendiente.
 
 Tampoco hay forma de abrir o cerrar una unidad desde las pantallas: el servicio de
-`estructura` las tiene (`abrirUnidad`, `cerrarUnidad`) y el demo las usa, pero ninguna
-mutation las expone. Llega con la pantalla que las necesite. Y una unidad no se puede
+`estructura` tiene `abrirUnidad`, que usa el demo, pero ninguna mutation la expone, y
+`cerrarUnidad` no existe. Las dos llegan, auditadas, con la pantalla que las necesite. Y una unidad no se puede
 renombrar, así que los nombres por defecto que dejó la migración —"Tropa scout" a secas—
 sólo se corrigen sembrando de nuevo.
 

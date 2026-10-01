@@ -1,7 +1,7 @@
 import { usePersonasDelGrupo } from '@gps/api'
 import type { ReactNode } from 'react'
-import { Pressable, ScrollView, Text, View } from 'react-native'
-import { Cargando, Falla, Vacio, Volver } from '../src/ui'
+import { Pressable, Text, View } from 'react-native'
+import { Cargando, Falla, FILA, Marco, Vacio, Volver } from '../src/ui'
 
 export type Persona = NonNullable<
   ReturnType<typeof usePersonasDelGrupo>['data']
@@ -31,12 +31,7 @@ export function PantallaDePersona(props: {
   const { persona, isPending, error } = usePersona(props.grupoId, props.personaId)
 
   return (
-    <ScrollView
-      className="flex-1 bg-surface"
-      contentContainerClassName="px-4 pb-10"
-      keyboardShouldPersistTaps="handled"
-      automaticallyAdjustKeyboardInsets
-    >
+    <Marco keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
       <Volver href={props.volverA}>{props.volverTexto}</Volver>
       {isPending && <Cargando>Consultando la nómina…</Cargando>}
       {error && <Falla>No se pudo consultar la nómina: {error.message}</Falla>}
@@ -44,7 +39,7 @@ export function PantallaDePersona(props: {
         <Vacio>No hay ninguna persona de este grupo con esa dirección.</Vacio>
       )}
       {persona && props.children(persona)}
-    </ScrollView>
+    </Marco>
   )
 }
 
@@ -61,7 +56,7 @@ export function Dato(props: { nombre: string; children: ReactNode; onPress?: () 
     </Text>
   )
   return (
-    <View className="min-h-14 flex-row items-center justify-between gap-3 border-b border-line py-2">
+    <View className={`${FILA} justify-between`}>
       <Text className="text-sm text-ink-muted">{props.nombre}</Text>
       {/* Con `onPress` el valor se toca —el teléfono llama—, y sigue siendo la
           misma fila que en la web, no una acción aparte. */}

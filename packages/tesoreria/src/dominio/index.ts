@@ -15,14 +15,7 @@ export {
   puedeRegistrarPagos,
   puedeVerTesoreriaDeLaDiocesis,
 } from './politicas'
-export {
-  enPesos,
-  fechaValida,
-  type ImputacionDelPago,
-  importeEnPesosValido,
-  imputacionDelPago,
-  saldoDe,
-} from './reglas'
+export { enPesos, importeEnPesosValido, imputacionDelPago } from './reglas'
 export type {
   CobranzaDelDistrito,
   DatosDelReporte,

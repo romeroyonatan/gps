@@ -1,12 +1,13 @@
 import { useActor, useAnularPago, useCuentaDeGrupo, useTesoreria } from '@gps/api'
 import { enPesos, puedeRegistrarPagos, puedeVerTesoreriaDeLaDiocesis } from '@gps/tesoreria/dominio'
 import { useLocalSearchParams } from 'expo-router'
-import { ScrollView, Text, View } from 'react-native'
+import { Text, View } from 'react-native'
 import {
   Accion,
   AccionAlMargen,
   Cargando,
   Falla,
+  Marco,
   Saldo,
   Seccion,
   Titulo,
@@ -38,7 +39,7 @@ export default function Pantalla() {
   const desdeLaDiocesis = actor !== null && puedeVerTesoreriaDeLaDiocesis(actor)
 
   return (
-    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-10">
+    <Marco>
       {desdeLaDiocesis ? (
         <Volver href="/tesoreria">Tesorería</Volver>
       ) : (
@@ -109,6 +110,6 @@ export default function Pantalla() {
         )}
         {anular.error && <Falla>{anular.error.message}</Falla>}
       </Seccion>
-    </ScrollView>
+    </Marco>
   )
 }

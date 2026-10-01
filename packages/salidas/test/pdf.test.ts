@@ -1,8 +1,9 @@
 import { beforeAll, describe, expect, test } from 'bun:test'
+import { recortar } from '@gps/core/pdf'
 import { PDFDocument, type PDFFont, StandardFonts } from 'pdf-lib'
 import type { Firma, ParticipanteEmitido, Permiso } from '../src/dominio/modelos'
 import { serializar } from '../src/dominio/trazos'
-import { armarPdf, recortar, seccionesDeParticipantes } from '../src/servidor/pdf'
+import { armarPdf, seccionesDeParticipantes } from '../src/servidor/pdf'
 
 const HORA = new Date('1970-01-01T00:00:00Z')
 

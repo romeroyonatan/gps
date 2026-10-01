@@ -13,6 +13,6 @@ describe('urlDeIngreso', () => {
     expect(urlDeIngreso('http://gps.test', 'demo', 'ios', 'tesoreria')).toBe(
       'http://gps.test/auth/demo/iniciar?plataforma=ios&perfil=tesoreria',
     )
-    expect(urlDeIngreso('http://gps.test', 'demo', 'ios', 'a b&c')).toContain('perfil=a%20b%26c')
+    expect(urlDeIngreso('http://gps.test', 'demo', 'ios', 'a b&c')).toContain('perfil=a+b%26c')
   })
 })

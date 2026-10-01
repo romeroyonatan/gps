@@ -41,11 +41,6 @@ export class SinAutorizador extends Error {
  *  pide y manda los bytes. */
 const VENCIMIENTO_MS = 15 * 60 * 1000
 
-/** Lo que cada modulo dueño tiene que contestar para que sus archivos se puedan
- *  descargar. `archivos` no conoce ninguna regla de permisos: pregunta.
- *
- *  Recibe `actor` aunque hoy sea siempre null: cuando exista auth, la firma no
- *  cambia y cada dueño decide con quien esta preguntando. */
 /** Lo que el modulo dueño de un recurso contesta antes de que se entreguen sus
  *  bytes. Recibe el alcance del pedido -null si no hay sesion- porque la
  *  descarga tiene que filtrar igual que la consulta GraphQL: una URL no

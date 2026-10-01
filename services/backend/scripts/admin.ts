@@ -4,12 +4,8 @@
 //
 //     bun run admin asignar --persona <id>
 
-import { crearAlmacenamientoEnDisco, crearAlmacenamientoEnMemoria } from '../src/almacenamiento'
-import { crearBd } from '../src/bd'
 import { componer } from '../src/composicion'
-import { crearConversorDeImagenes } from '../src/conversor'
-import { leerClavesDeSello, leerConfig, leerDirectorioDeArchivos, leerRutaDeBd } from '../src/index'
-import { crearSellador } from '../src/sellador'
+import { leerConfig, piezasDelEntorno } from '../src/index'
 
 async function main(argv: readonly string[]): Promise<void> {
   const [comando, ...resto] = argv
@@ -25,26 +21,7 @@ async function main(argv: readonly string[]): Promise<void> {
   }
 
   const config = leerConfig()
-  const bd = crearBd(leerRutaDeBd(config.entorno, process.env.BD))
-  const claves = leerClavesDeSello(
-    config.entorno,
-    process.env.CLAVES_DE_SELLO,
-    process.env.CLAVE_DE_SELLO_ACTIVA,
-  )
-  const almacenamiento =
-    config.entorno === 'demo'
-      ? crearAlmacenamientoEnMemoria()
-      : crearAlmacenamientoEnDisco(
-          leerDirectorioDeArchivos(config.entorno, process.env.DIRECTORIO_DE_ARCHIVOS),
-        )
-
-  const { contexto } = await componer(
-    config,
-    bd,
-    crearSellador(claves.claves, claves.activa),
-    almacenamiento,
-    crearConversorDeImagenes(),
-  )
+  const { contexto } = await componer(config, ...piezasDelEntorno(config))
 
   try {
     await contexto.auth.asignarAdministrador(personaId)

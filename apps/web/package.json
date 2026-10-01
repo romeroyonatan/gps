@@ -27,7 +27,6 @@
     "@types/bun": "latest",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
-    "bun-plugin-tailwind": "^0.1.2",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.7.0"
   }

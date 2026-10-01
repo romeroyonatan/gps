@@ -1,8 +1,8 @@
 import { useDefinirCuotaDeAfiliacion, useTesoreria } from '@gps/api'
 import { router } from 'expo-router'
 import { useState } from 'react'
-import { ScrollView, TextInput, View } from 'react-native'
-import { Boton, CAMPO, Campo, Falla, Filtros, Titulo, Volver } from '../../../src/ui'
+import { TextInput, View } from 'react-native'
+import { Boton, CAMPO, Campo, Falla, Filtros, Marco, Titulo, Volver } from '../../../src/ui'
 
 /** Definir la cuota de un período. Pantalla propia y no un formulario colgado
  *  del historial: es una tarea que termina, y al terminar vuelve a la lista,
@@ -19,12 +19,7 @@ export default function Pantalla() {
   const periodo = periodoElegido ?? (periodos[0] === undefined ? null : String(periodos[0]))
 
   return (
-    <ScrollView
-      className="flex-1 bg-surface"
-      contentContainerClassName="px-4 pb-10"
-      keyboardShouldPersistTaps="handled"
-      automaticallyAdjustKeyboardInsets
-    >
+    <Marco keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
       <Volver href="/tesoreria/configuracion">Cuotas</Volver>
       <Titulo acompaña="Se aplica a las declaraciones del período. Lo ya cobrado conserva su importe.">
         Definir una cuota
@@ -67,6 +62,6 @@ export default function Pantalla() {
           {definir.isPending ? 'Guardando…' : 'Guardar cuota'}
         </Boton>
       </View>
-    </ScrollView>
+    </Marco>
   )
 }

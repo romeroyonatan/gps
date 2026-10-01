@@ -24,7 +24,7 @@
  *  `director` es el sacerdote a cargo del grupo. No se valida contra la
  *  categoria: en la practica es adherente y el jefe de grupo es activo, pero
  *  eso es un hecho del mundo, no una regla que el sistema imponga. */
-export const AMBITOS_DE_CARGO = ['grupo', 'distrito', 'diocesis'] as const
+const AMBITOS_DE_CARGO = ['grupo', 'distrito', 'diocesis'] as const
 
 export type AmbitoDeCargo = (typeof AMBITOS_DE_CARGO)[number]
 

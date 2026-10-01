@@ -1,22 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import {
   AsignarCargoDocument,
-  type AsignarCargoMutationVariables,
   CambiarDeUnidadDocument,
-  type CambiarDeUnidadMutationVariables,
   CrearPersonaDocument,
-  type CrearPersonaMutationVariables,
   EditarPersonaDocument,
-  type EditarPersonaMutationVariables,
   IntegrarEquipoDocument,
-  type IntegrarEquipoMutationVariables,
   JefesDeGruposDocument,
   PersonasDocument,
   RevocarCargoDocument,
   RevocarIntegranteDeEquipoDocument,
 } from './generated/graphql'
-import { useTransporte } from './proveedor'
-import type { Transporte } from './transporte'
+import { useMutacion, useTransporte } from './proveedor'
 
 /** Las personas de un grupo. No hay lista global: a una persona se llega por su
  *  grupo, que es como esta pensada la pantalla. */
@@ -46,74 +40,19 @@ export function useJefesDeGrupos(grupoIds: readonly string[], fecha: string) {
 /** Al alta exitosa invalida ['personas'] entero -no solo el grupo- porque una
  *  persona nueva puede cambiar lo que se ve en mas de una pantalla el dia que
  *  exista el cambio de grupo. Es lo unico que la pantalla no tiene que
- *  acordarse de hacer. */
-export function useCrearPersona() {
-  const transporte = useTransporte()
-  const clienteDeQueries = useQueryClient()
-  return useMutation({
-    mutationFn: (variables: CrearPersonaMutationVariables) =>
-      transporte.ejecutar(CrearPersonaDocument, variables),
-    onSuccess: () => clienteDeQueries.invalidateQueries({ queryKey: ['personas'] }),
-  })
-}
-
-/** Corregir los datos y pasar de unidad invalidan lo mismo que el alta: la
- *  nomina del grupo es de donde salen las dos pantallas que los muestran. */
-export function useEditarPersona() {
-  const transporte = useTransporte()
-  const clienteDeQueries = useQueryClient()
-  return useMutation({
-    mutationFn: (variables: EditarPersonaMutationVariables) =>
-      transporte.ejecutar(EditarPersonaDocument, variables),
-    onSuccess: () => clienteDeQueries.invalidateQueries({ queryKey: ['personas'] }),
-  })
-}
-
-export function useCambiarDeUnidad() {
-  const transporte = useTransporte()
-  const clienteDeQueries = useQueryClient()
-  return useMutation({
-    mutationFn: (variables: CambiarDeUnidadMutationVariables) =>
-      transporte.ejecutar(CambiarDeUnidadDocument, variables),
-    onSuccess: () => clienteDeQueries.invalidateQueries({ queryKey: ['personas'] }),
-  })
-}
+ *  acordarse de hacer. Corregir los datos y pasar de unidad invalidan lo mismo:
+ *  la nomina del grupo es de donde salen las dos pantallas que los muestran. */
+const PERSONAS = ['personas']
+export const useCrearPersona = () => useMutacion(CrearPersonaDocument, PERSONAS)
+export const useEditarPersona = () => useMutacion(EditarPersonaDocument, PERSONAS)
+export const useCambiarDeUnidad = () => useMutacion(CambiarDeUnidadDocument, PERSONAS)
 
 /** Las cuatro operaciones de plantel. Todas invalidan `personas` y
  *  `personaActual`: cambiar un cargo cambia lo que esa persona puede hacer, y
  *  si se lo cambió a sí misma tiene que verlo ya. */
-function useCambioDePlantel<V>(correr: (transporte: Transporte, variables: V) => Promise<unknown>) {
-  const transporte = useTransporte()
-  const clienteDeQueries = useQueryClient()
-  return useMutation({
-    mutationFn: (variables: V) => correr(transporte, variables),
-    onSuccess: async () => {
-      await clienteDeQueries.invalidateQueries({ queryKey: ['personas'] })
-      await clienteDeQueries.invalidateQueries({ queryKey: ['personaActual'] })
-    },
-  })
-}
-
-export function useAsignarCargo() {
-  return useCambioDePlantel<AsignarCargoMutationVariables>((transporte, variables) =>
-    transporte.ejecutar(AsignarCargoDocument, variables),
-  )
-}
-
-export function useRevocarCargo() {
-  return useCambioDePlantel<{ cargoId: string }>((transporte, variables) =>
-    transporte.ejecutar(RevocarCargoDocument, variables),
-  )
-}
-
-export function useIntegrarEquipo() {
-  return useCambioDePlantel<IntegrarEquipoMutationVariables>((transporte, variables) =>
-    transporte.ejecutar(IntegrarEquipoDocument, variables),
-  )
-}
-
-export function useRevocarIntegranteDeEquipo() {
-  return useCambioDePlantel<{ integranteId: string }>((transporte, variables) =>
-    transporte.ejecutar(RevocarIntegranteDeEquipoDocument, variables),
-  )
-}
+const PLANTEL = [PERSONAS, ['personaActual']]
+export const useAsignarCargo = () => useMutacion(AsignarCargoDocument, ...PLANTEL)
+export const useRevocarCargo = () => useMutacion(RevocarCargoDocument, ...PLANTEL)
+export const useIntegrarEquipo = () => useMutacion(IntegrarEquipoDocument, ...PLANTEL)
+export const useRevocarIntegranteDeEquipo = () =>
+  useMutacion(RevocarIntegranteDeEquipoDocument, ...PLANTEL)

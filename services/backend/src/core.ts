@@ -10,11 +10,7 @@ import {
 } from '@gps/core'
 
 function nuevoSecreto(bytes = 32): string {
-  if (!Number.isInteger(bytes) || bytes < 1)
-    throw new RangeError('bytes tiene que ser un entero positivo')
-  return Array.from(crypto.getRandomValues(new Uint8Array(bytes)), (byte) =>
-    byte.toString(16).padStart(2, '0'),
-  ).join('')
+  return Buffer.from(crypto.getRandomValues(new Uint8Array(bytes))).toString('hex')
 }
 
 export function crearCore(

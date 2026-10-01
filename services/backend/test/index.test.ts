@@ -2,7 +2,6 @@ import { describe, expect, test } from 'bun:test'
 import {
   leerClavesDeSello,
   leerConfigDeAuth,
-  leerDirectorioDeArchivos,
   leerEntorno,
   leerPuerto,
   leerRutaDeBd,
@@ -149,16 +148,5 @@ describe('leerClavesDeSello', () => {
   test('un par sin `=` o sin clave es un error', () => {
     expect(() => leerClavesDeSello('produccion', 'suelta', undefined)).toThrow()
     expect(() => leerClavesDeSello('produccion', 'a=', undefined)).toThrow()
-  })
-})
-
-describe('leerDirectorioDeArchivos', () => {
-  test('en demo no se puede configurar: no escribe sobre archivos de verdad', () => {
-    expect(leerDirectorioDeArchivos('demo', '/datos/reales')).toBe('')
-  })
-
-  test('fuera de demo, el del entorno o el default', () => {
-    expect(leerDirectorioDeArchivos('produccion', '/datos/archivos')).toBe('/datos/archivos')
-    expect(leerDirectorioDeArchivos('desarrollo', undefined)).toBe('./archivos')
   })
 })

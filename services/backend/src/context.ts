@@ -7,13 +7,7 @@ export function secretoDelPedido(pedido: Request): string | null {
     const bearer = /^Bearer\s+(.+)$/i.exec(autorizacion)
     return bearer?.[1] ?? null
   }
-  const cookie = pedido.headers.get('cookie')
-  if (!cookie) return null
-  for (const parte of cookie.split(';')) {
-    const [nombre, ...valor] = parte.trim().split('=')
-    if (nombre === 'gps_session') return valor.join('=') || null
-  }
-  return null
+  return new Bun.CookieMap(pedido.headers.get('cookie') ?? '').get('gps_session') || null
 }
 
 /** Resuelve identidad, funciones y alcance exactamente una vez por request. */

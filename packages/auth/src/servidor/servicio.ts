@@ -20,13 +20,6 @@ const DURACION_DE_TRANSACCION = 10 * 60 * 1000
 const DURACION_DE_INVITACION = 7 * 24 * 60 * 60 * 1000
 const DURACION_DE_ELEVACION = 10 * 60 * 1000
 
-export class IdentidadInvalida extends Error {
-  constructor() {
-    super('La identidad no existe o está desactivada.')
-    this.name = 'IdentidadInvalida'
-  }
-}
-
 /** El proveedor validó al usuario, pero nadie vinculó todavía ese `subject` a
  *  una persona: hace falta una invitación de activación (ver tareas 4.x), no
  *  un login espontáneo. */
@@ -102,7 +95,6 @@ export interface ServicioDeAuth extends Auth {
    *  módulo. */
   nombreDe(personaId: string): Promise<{ nombres: string; apellidos: string } | null>
 
-  crearSesionParaIdentidad(identidadId: string): Promise<{ secreto: string; sesionId: string }>
   revocarSesion(sesionId: string): Promise<void>
 
   /** Arranca un login con Google o Apple. La transacción sellada viaja y
@@ -128,15 +120,6 @@ export interface ServicioDeAuth extends Auth {
    *  y rechaza un `subject` que ya esté vinculado, activo, a otra persona. */
   vincularProveedor(
     personaId: string,
-    datos: { transaccion: string; stateRecibido: string; code: string },
-  ): Promise<void>
-
-  /** Reemplaza autónomamente un proveedor ya vinculado por otro, usando la
-   *  sesión con la que se autenticó el segundo: no hace falta invitación y no
-   *  toca cargos, equipos ni historial -viven en `personas`, no acá-. */
-  reemplazarProveedorPropio(
-    personaId: string,
-    proveedorAReemplazar: ProveedorDeIdentidad,
     datos: { transaccion: string; stateRecibido: string; code: string },
   ): Promise<void>
 
@@ -392,52 +375,6 @@ export function crearServicioDeAuth(
         })
         .run()
       registrarEvento('identidad.vincular', personaId, personaId, { proveedor })
-    },
-
-    async reemplazarProveedorPropio(personaId, proveedorAReemplazar, datos) {
-      const { proveedor, subject } = await resolverSubject(datos)
-      if (proveedor !== proveedorAReemplazar) {
-        throw new TransaccionDeLoginInvalida('el proveedor no coincide con el que se reemplaza')
-      }
-      const enUso = core.bd
-        .select({ id: identidadesExternas.id })
-        .from(identidadesExternas)
-        .where(
-          and(
-            eq(identidadesExternas.proveedor, proveedor),
-            eq(identidadesExternas.subject, subject),
-            isNull(identidadesExternas.desactivadaEn),
-            ne(identidadesExternas.personaId, personaId),
-          ),
-        )
-        .get()
-      if (enUso) throw new ProveedorYaVinculado()
-
-      const ahora = core.reloj.ahora()
-      core.bd.transaction((tx) => {
-        tx.update(identidadesExternas)
-          .set({ desactivadaEn: ahora, actualizadoEn: ahora })
-          .where(
-            and(
-              eq(identidadesExternas.personaId, personaId),
-              eq(identidadesExternas.proveedor, proveedorAReemplazar),
-              isNull(identidadesExternas.desactivadaEn),
-            ),
-          )
-          .run()
-        tx.insert(identidadesExternas)
-          .values({
-            id: core.nuevoId('identidad'),
-            personaId,
-            proveedor,
-            subject,
-            desactivadaEn: null,
-            creadoEn: ahora,
-            actualizadoEn: ahora,
-          })
-          .run()
-      })
-      registrarEvento('identidad.reemplazar', personaId, personaId, { proveedor })
     },
 
     async emitirInvitacion(actor, datos) {
@@ -885,20 +822,6 @@ export function crearServicioDeAuth(
           tx,
         )
       })
-    },
-
-    async crearSesionParaIdentidad(identidadId) {
-      const identidad = core.bd
-        .select({ personaId: identidadesExternas.personaId })
-        .from(identidadesExternas)
-        .where(
-          and(eq(identidadesExternas.id, identidadId), isNull(identidadesExternas.desactivadaEn)),
-        )
-        .get()
-      if (!identidad || !(await personas.personaExiste(identidad.personaId))) {
-        throw new IdentidadInvalida()
-      }
-      return crearSesion(identidadId, identidad.personaId)
     },
 
     async resolverSesion(secreto) {

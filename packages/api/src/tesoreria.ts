@@ -1,15 +1,14 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import {
   AnularPagoDocument,
   CuentaDeGrupoDocument,
   DefinirCuotaDeAfiliacionDocument,
   GenerarDeudasPendientesDocument,
-  type MedioDePago,
   RegistrarPagoDocument,
   ReporteDeCobranzaDocument,
   TesoreriaDocument,
 } from './generated/graphql'
-import { useTransporte } from './proveedor'
+import { useMutacion, useTransporte } from './proveedor'
 
 export function useTesoreria() {
   const transporte = useTransporte()
@@ -38,55 +37,11 @@ export function useCuentaDeGrupo(grupoId: string) {
   })
 }
 
-const invalidarTesoreria = (cliente: ReturnType<typeof useQueryClient>, grupoId?: string) => {
-  cliente.invalidateQueries({ queryKey: ['tesoreria'] })
-  if (grupoId) cliente.invalidateQueries({ queryKey: ['cuentaDeGrupo', grupoId] })
-}
-
-export function useDefinirCuotaDeAfiliacion() {
-  const transporte = useTransporte()
-  const cliente = useQueryClient()
-  return useMutation({
-    mutationFn: (variables: { periodo: number; importe: number }) =>
-      transporte.ejecutar(DefinirCuotaDeAfiliacionDocument, variables),
-    onSuccess: () => invalidarTesoreria(cliente),
-  })
-}
-
-export function useRegistrarPago() {
-  const transporte = useTransporte()
-  const cliente = useQueryClient()
-  return useMutation({
-    mutationFn: (variables: {
-      grupoId: string
-      fecha: string
-      importe: number
-      medioDePago: MedioDePago
-      referencia?: string
-      observacion?: string
-    }) => transporte.ejecutar(RegistrarPagoDocument, variables),
-    onSuccess: (_datos, variables) => invalidarTesoreria(cliente, variables.grupoId),
-  })
-}
-
-export function useAnularPago(grupoId: string) {
-  const transporte = useTransporte()
-  const cliente = useQueryClient()
-  return useMutation({
-    mutationFn: (variables: { pagoId: string }) =>
-      transporte.ejecutar(AnularPagoDocument, variables),
-    onSuccess: () => invalidarTesoreria(cliente, grupoId),
-  })
-}
-
-export function useGenerarDeudasPendientes() {
-  const transporte = useTransporte()
-  const cliente = useQueryClient()
-  return useMutation({
-    mutationFn: () => transporte.ejecutar(GenerarDeudasPendientesDocument),
-    onSuccess: () => {
-      cliente.invalidateQueries({ queryKey: ['tesoreria'] })
-      cliente.invalidateQueries({ queryKey: ['cuentaDeGrupo'] })
-    },
-  })
-}
+export const useDefinirCuotaDeAfiliacion = () =>
+  useMutacion(DefinirCuotaDeAfiliacionDocument, ['tesoreria'])
+export const useRegistrarPago = () =>
+  useMutacion(RegistrarPagoDocument, ['tesoreria'], ['cuentaDeGrupo'])
+export const useAnularPago = (grupoId: string) =>
+  useMutacion(AnularPagoDocument, ['tesoreria'], ['cuentaDeGrupo', grupoId])
+export const useGenerarDeudasPendientes = () =>
+  useMutacion(GenerarDeudasPendientesDocument, ['tesoreria'], ['cuentaDeGrupo'])

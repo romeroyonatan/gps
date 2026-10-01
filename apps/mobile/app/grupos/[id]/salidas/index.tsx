@@ -11,8 +11,8 @@ import {
 } from '@gps/salidas/dominio'
 import { Link, useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
-import { Pressable, ScrollView, Text, View } from 'react-native'
-import { Accion, Cargando, Chip, Falla, Filtros, Titulo, Vacio } from '../../../../src/ui'
+import { Pressable, Text, View } from 'react-native'
+import { Accion, Cargando, Chip, Falla, Filtros, Marco, Titulo, Vacio } from '../../../../src/ui'
 import { estadoDelPermiso, miFirmaPendiente } from './[permisoId]'
 
 type Permiso = PermisosQuery['permisos'][number]
@@ -77,7 +77,7 @@ export default function Pantalla() {
   const visibles = permisos.filter((permiso) => categoriaDeSalida(permiso, hoy) === filtro)
 
   return (
-    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-10">
+    <Marco>
       <Titulo>Permisos de salida</Titulo>
 
       {actor && puedeAdministrarPermisosDelGrupo(actor, id) && (
@@ -108,6 +108,6 @@ export default function Pantalla() {
       </View>
 
       {visibles.length === 0 && !consulta.isPending && <Vacio>{VACIO[filtro]}</Vacio>}
-    </ScrollView>
+    </Marco>
   )
 }

@@ -21,12 +21,8 @@ linker = "isolated"
 # biome.json).
 publicHoistPattern = ["*babel*"]
 
-# Bun lee bunfig.toml solo desde el cwd del proceso: no busca hacia arriba ni
-# fusiona con otros bunfig.toml. Este archivo cubre la invocación directa
-# "bun services/backend/src/index.ts" desde la raíz del repo (cwd = raíz);
-# services/backend/bunfig.toml cubre "bun run dev" (cwd = services/backend,
-# por el filtro de workspace). Si editás el bloque [serve.static] acá, editá
-# también el otro archivo.
+# Bun lee bunfig.toml solo desde el cwd del proceso, así que el backend se
+# arranca siempre desde la raíz ("bun run dev", "bun run demo", el Dockerfile).
 [serve.static]
 plugins = ["bun-plugin-tailwind"]
 

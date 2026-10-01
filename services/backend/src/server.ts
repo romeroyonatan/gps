@@ -71,6 +71,7 @@ export async function crearServidor(
 
   // Devuelve tambien el contexto porque quien arranca el proceso necesita
   // alcanzar a los servicios sin un request encima: el barrido de afiliacion
-  // corre al arrancar, no atras de una consulta.
-  return { servidor, contexto }
+  // corre al arrancar, no atras de una consulta. El logger, para que el
+  // barrido loguee igual que el resto.
+  return { servidor, contexto, logger }
 }

@@ -26,6 +26,8 @@ de propósito general.
 | Pieza | Qué es |
 | --- | --- |
 | `CAMPO` | Clases del input: borde, alto de 48px, deshabilitado. Va en el `className` de un `TextInput`. |
+| `Marco` | El marco de toda pantalla: el `ScrollView` con fondo y `px-4 pb-10`. Lo demás pasa derecho al `ScrollView`. No es `Pantalla` porque así se llama el `default export` de cada ruta. |
+| `PIE_DE_TABLA` | El pie de una lista con total: cuántos son a la izquierda, la plata a la derecha. Mismo nombre que en web. |
 | `FILA` | Fila de lista de 56px. Las de 72px, con dos líneas de dato, las escribe cada pantalla. |
 | `Icono` | El único dibujo de la guía: trazos de 1.7 sobre `viewBox` de 24, hereda el color por `className`. Los `d` están en `src/iconos.ts`. |
 | `Trazo` | El `<Path>` de `react-native-svg` ya enseñado a leer `className`. Importalo de acá —y nunca un color escrito a mano—: es lo que hace que el dibujo dé vuelta con el tema. |

@@ -10,8 +10,8 @@ import {
   nombreDelTipo,
 } from '@gps/personas/dominio'
 import { Link, useLocalSearchParams } from 'expo-router'
-import { Pressable, ScrollView, Text, View } from 'react-native'
-import { Accion, Cargando, Chevron, Chip, Falla, Titulo, Vacio } from '../../../src/ui'
+import { Pressable, Text, View } from 'react-native'
+import { Accion, Cargando, Chevron, Chip, Falla, Marco, Titulo, Vacio } from '../../../src/ui'
 
 type Persona = NonNullable<ReturnType<typeof usePersonasDelGrupo>['data']>['personas'][number]
 
@@ -114,7 +114,7 @@ export default function Pantalla() {
   const { grupo } = arbol
 
   return (
-    <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-6">
+    <Marco contentContainerClassName="px-4 pb-6">
       <Titulo>Nómina</Titulo>
 
       {(arbol.isPending || lista.isPending) && <Cargando>Consultando el grupo…</Cargando>}
@@ -168,6 +168,6 @@ export default function Pantalla() {
           />
         </>
       )}
-    </ScrollView>
+    </Marco>
   )
 }

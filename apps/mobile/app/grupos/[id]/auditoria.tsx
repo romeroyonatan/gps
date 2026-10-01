@@ -10,7 +10,7 @@ import {
 } from '@gps/auditoria/dominio'
 import { useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { Pressable, Text, TextInput, View } from 'react-native'
 import {
   BotonSecundario,
   CAMPO,
@@ -20,6 +20,7 @@ import {
   Chip,
   Falla,
   Filtros,
+  Marco,
   Nota,
   Titulo,
   Vacio,
@@ -118,14 +119,14 @@ export default function Pantalla() {
 
   if (permitidos !== null && !permitidos.includes(id)) {
     return (
-      <ScrollView className="flex-1 bg-surface" contentContainerClassName="px-4 pb-10">
+      <Marco>
         <Volver href={`/grupos/${id}/mas`}>Más</Volver>
         <Titulo>Auditoría</Titulo>
         <Nota>
           La auditoría de un grupo la ven su Jefatura y su Secretaría, y la diócesis entera sólo con
           elevación.
         </Nota>
-      </ScrollView>
+      </Marco>
     )
   }
 
@@ -165,12 +166,7 @@ export default function Pantalla() {
   )
 
   return (
-    <ScrollView
-      className="flex-1 bg-surface"
-      contentContainerClassName="px-4 pb-10"
-      automaticallyAdjustKeyboardInsets
-      keyboardShouldPersistTaps="handled"
-    >
+    <Marco automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
       <Volver href={`/grupos/${id}/mas`}>Más</Volver>
       <Titulo acompaña="Quién cambió qué y cuándo, del más reciente al más antiguo.">
         Auditoría
@@ -269,6 +265,6 @@ export default function Pantalla() {
           </BotonSecundario>
         </View>
       )}
-    </ScrollView>
+    </Marco>
   )
 }
