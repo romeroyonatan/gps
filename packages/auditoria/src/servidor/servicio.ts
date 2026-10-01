@@ -1,4 +1,5 @@
 import type { Alcance, Core } from '@gps/core'
+import { ErrorDeNegocio } from '@gps/core/errores'
 import type { Estructura } from '@gps/estructura/dominio'
 import type { Personas } from '@gps/personas/dominio'
 import { and, desc, eq, gte, inArray, lt, lte, or, type SQL } from 'drizzle-orm'
@@ -10,8 +11,10 @@ import {
 } from '../dominio'
 import { eventosDeAuditoria } from './tablas'
 
-export class AuditoriaDenegada extends Error {
-  override name = 'AuditoriaDenegada'
+export class AuditoriaDenegada extends ErrorDeNegocio {
+  constructor(mensaje: string) {
+    super(mensaje, 'SIN_PERMISO')
+  }
 }
 
 type Fila = typeof eventosDeAuditoria.$inferSelect

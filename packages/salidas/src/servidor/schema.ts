@@ -1,39 +1,9 @@
 import { alcanceDe, type Context } from '@gps/core'
 import { type Builder, enumCompartido } from '@gps/core/graphql'
 import { TIPOS_DE_CARGO, type TipoDeCargo } from '@gps/personas/dominio'
-import { GraphQLError } from 'graphql'
 import { type Adjunto, ESTADOS, type Estado, type Permiso } from '../dominio/modelos'
 import { numeroDeExpediente } from '../dominio/permisos'
-import { PermisoInvalido, PermisoNoEditable } from './borradores'
-import { type EstadoDeFirma, FirmaInvalida } from './firmas'
-
-/** Yoga enmascara todo lo que no sea un GraphQLError: sin esta traduccion, la
- *  pantalla recibe "Unexpected error." en vez de "tiene que ir al menos un
- *  dirigente", que es justo lo que hay que corregir.
- *
- *  Traducir en el resolver y no en el servicio es lo que mantiene al servicio
- *  sin conocer el framework, igual que en personas. */
-async function traduciendoErrores<T>(correr: () => Promise<T>): Promise<T> {
-  try {
-    return await correr()
-  } catch (error) {
-    if (
-      error instanceof PermisoInvalido ||
-      error instanceof PermisoNoEditable ||
-      error instanceof FirmaInvalida
-    ) {
-      throw new GraphQLError(error.message, {
-        extensions: {
-          code: error.name,
-          // Por campo, para que el formulario marque el input que falla y no
-          // un cartel generico arriba.
-          problemas: error instanceof PermisoInvalido ? error.problemas : undefined,
-        },
-      })
-    }
-    throw error
-  }
-}
+import type { EstadoDeFirma } from './firmas'
 
 export function registrarSchema(builder: Builder): void {
   const EstadoRef = builder.enumType('EstadoDePermiso', {
@@ -210,9 +180,7 @@ export function registrarSchema(builder: Builder): void {
       nullable: true,
       args: { id: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) =>
-        await traduciendoErrores(() =>
-          contexto.salidas.obtenerPermiso(alcanceDe(contexto), String(args.id)),
-        ),
+        await contexto.salidas.obtenerPermiso(alcanceDe(contexto), String(args.id)),
     }),
   )
 
@@ -231,18 +199,16 @@ export function registrarSchema(builder: Builder): void {
         comoSeViaja: t.arg.string(),
       },
       resolve: async (_padre, args, contexto) =>
-        await traduciendoErrores(() =>
-          contexto.salidas.crearPermiso(alcanceDe(contexto), String(args.grupoId), {
-            lugar: args.lugar,
-            direccion: args.direccion,
-            localidad: args.localidad,
-            provincia: args.provincia,
-            telefono: args.telefono,
-            desde: args.desde,
-            hasta: args.hasta,
-            comoSeViaja: args.comoSeViaja ?? null,
-          }),
-        ),
+        await contexto.salidas.crearPermiso(alcanceDe(contexto), String(args.grupoId), {
+          lugar: args.lugar,
+          direccion: args.direccion,
+          localidad: args.localidad,
+          provincia: args.provincia,
+          telefono: args.telefono,
+          desde: args.desde,
+          hasta: args.hasta,
+          comoSeViaja: args.comoSeViaja ?? null,
+        }),
     }),
   )
 
@@ -255,12 +221,10 @@ export function registrarSchema(builder: Builder): void {
       },
       resolve: async (_padre, args, contexto) => {
         const permisoId = String(args.permisoId)
-        await traduciendoErrores(() =>
-          contexto.salidas.elegirResponsable(
-            alcanceDe(contexto),
-            permisoId,
-            String(args.personaId),
-          ),
+        await contexto.salidas.elegirResponsable(
+          alcanceDe(contexto),
+          permisoId,
+          String(args.personaId),
         )
         return await exigirPermiso(contexto, permisoId)
       },
@@ -276,12 +240,10 @@ export function registrarSchema(builder: Builder): void {
       },
       resolve: async (_padre, args, contexto) => {
         const permisoId = String(args.permisoId)
-        await traduciendoErrores(() =>
-          contexto.salidas.elegirUnidades(
-            alcanceDe(contexto),
-            permisoId,
-            args.unidadIds.map(String),
-          ),
+        await contexto.salidas.elegirUnidades(
+          alcanceDe(contexto),
+          permisoId,
+          args.unidadIds.map(String),
         )
         return await exigirPermiso(contexto, permisoId)
       },
@@ -297,12 +259,10 @@ export function registrarSchema(builder: Builder): void {
       },
       resolve: async (_padre, args, contexto) => {
         const permisoId = String(args.permisoId)
-        await traduciendoErrores(() =>
-          contexto.salidas.agregarParticipante(
-            alcanceDe(contexto),
-            permisoId,
-            String(args.personaId),
-          ),
+        await contexto.salidas.agregarParticipante(
+          alcanceDe(contexto),
+          permisoId,
+          String(args.personaId),
         )
         return await exigirPermiso(contexto, permisoId)
       },
@@ -318,12 +278,10 @@ export function registrarSchema(builder: Builder): void {
       },
       resolve: async (_padre, args, contexto) => {
         const permisoId = String(args.permisoId)
-        await traduciendoErrores(() =>
-          contexto.salidas.quitarParticipante(
-            alcanceDe(contexto),
-            permisoId,
-            String(args.personaId),
-          ),
+        await contexto.salidas.quitarParticipante(
+          alcanceDe(contexto),
+          permisoId,
+          String(args.personaId),
         )
         return await exigirPermiso(contexto, permisoId)
       },
@@ -335,9 +293,7 @@ export function registrarSchema(builder: Builder): void {
       type: EmisionRef,
       args: { permisoId: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) =>
-        await traduciendoErrores(() =>
-          contexto.salidas.emitir(alcanceDe(contexto), String(args.permisoId)),
-        ),
+        await contexto.salidas.emitir(alcanceDe(contexto), String(args.permisoId)),
     }),
   )
 
@@ -352,10 +308,13 @@ export function registrarSchema(builder: Builder): void {
       },
       resolve: async (_padre, args, contexto) => {
         const permisoId = String(args.permisoId)
-        await traduciendoErrores(() =>
-          contexto.salidas.firmarEnApp(alcanceDe(contexto), permisoId, args.cargo as TipoDeCargo, {
+        await contexto.salidas.firmarEnApp(
+          alcanceDe(contexto),
+          permisoId,
+          args.cargo as TipoDeCargo,
+          {
             trazos: JSON.parse(args.trazos),
-          }),
+          },
         )
         return await exigirPermiso(contexto, permisoId)
       },
@@ -373,13 +332,11 @@ export function registrarSchema(builder: Builder): void {
       },
       resolve: async (_padre, args, contexto) => {
         const permisoId = String(args.permisoId)
-        await traduciendoErrores(() =>
-          contexto.salidas.firmarEnPapel(
-            alcanceDe(contexto),
-            permisoId,
-            args.cargos as TipoDeCargo[],
-            String(args.escaneoId),
-          ),
+        await contexto.salidas.firmarEnPapel(
+          alcanceDe(contexto),
+          permisoId,
+          args.cargos as TipoDeCargo[],
+          String(args.escaneoId),
         )
         return await exigirPermiso(contexto, permisoId)
       },
@@ -391,9 +348,7 @@ export function registrarSchema(builder: Builder): void {
       type: PermisoRef,
       args: { permisoId: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) =>
-        await traduciendoErrores(() =>
-          contexto.salidas.anular(alcanceDe(contexto), String(args.permisoId)),
-        ),
+        await contexto.salidas.anular(alcanceDe(contexto), String(args.permisoId)),
     }),
   )
 
@@ -403,9 +358,7 @@ export function registrarSchema(builder: Builder): void {
       description: 'Crea un borrador nuevo con los datos de un permiso anulado.',
       args: { permisoId: t.arg.id({ required: true }) },
       resolve: async (_padre, args, contexto) =>
-        await traduciendoErrores(() =>
-          contexto.salidas.reEmitir(alcanceDe(contexto), String(args.permisoId)),
-        ),
+        await contexto.salidas.reEmitir(alcanceDe(contexto), String(args.permisoId)),
     }),
   )
 
@@ -419,9 +372,7 @@ export function registrarSchema(builder: Builder): void {
       },
       resolve: async (_padre, args, contexto) => {
         const permisoId = String(args.permisoId)
-        await traduciendoErrores(() =>
-          contexto.salidas.quitarAdjunto(alcanceDe(contexto), permisoId, String(args.adjuntoId)),
-        )
+        await contexto.salidas.quitarAdjunto(alcanceDe(contexto), permisoId, String(args.adjuntoId))
         return await exigirPermiso(contexto, permisoId)
       },
     }),
@@ -436,9 +387,7 @@ export function registrarSchema(builder: Builder): void {
       },
       resolve: async (_padre, args, contexto) => {
         const permisoId = String(args.permisoId)
-        await traduciendoErrores(() =>
-          contexto.salidas.adjuntar(alcanceDe(contexto), permisoId, String(args.archivoId)),
-        )
+        await contexto.salidas.adjuntar(alcanceDe(contexto), permisoId, String(args.archivoId))
         return await exigirPermiso(contexto, permisoId)
       },
     }),

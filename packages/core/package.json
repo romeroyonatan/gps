@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./graphql": "./src/builder.ts",
+    "./errores": "./src/errores.ts",
     "./fechas": "./src/fechas.ts",
     "./roles": "./src/roles.ts",
     "./pdf": "./src/pdf.ts"

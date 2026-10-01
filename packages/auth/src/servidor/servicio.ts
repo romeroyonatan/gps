@@ -1,4 +1,5 @@
 import type { Actor, Core, EjecutorDeAuditoria } from '@gps/core'
+import { ErrorDeNegocio } from '@gps/core/errores'
 import { aFechaDeCalendario } from '@gps/core/fechas'
 import type { Estructura } from '@gps/estructura/dominio'
 import {
@@ -46,17 +47,15 @@ export class ProveedorYaVinculado extends Error {
   }
 }
 
-export class AutoridadInsuficiente extends Error {
+export class AutoridadInsuficiente extends ErrorDeNegocio {
   constructor() {
     super('No podés invitar ni recuperar a esa persona.')
-    this.name = 'AutoridadInsuficiente'
   }
 }
 
-export class InvitacionInvalida extends Error {
+export class InvitacionInvalida extends ErrorDeNegocio {
   constructor(motivo: string) {
     super(`La invitación no es válida: ${motivo}.`)
-    this.name = 'InvitacionInvalida'
   }
 }
 

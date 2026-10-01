@@ -1,4 +1,5 @@
 import type { Alcance, Core } from '@gps/core'
+import { ErrorDeNegocio } from '@gps/core/errores'
 import { and, eq } from 'drizzle-orm'
 import {
   esTipoAdmitido,
@@ -12,20 +13,10 @@ import { archivos } from './tablas'
 
 /** Lo que se pidio subir no se puede aceptar: el tipo no esta admitido, el
  *  tamaño se pasa, o falta el dueño. */
-export class SubidaInvalida extends Error {
-  constructor(motivo: string) {
-    super(motivo)
-    this.name = 'SubidaInvalida'
-  }
-}
+export class SubidaInvalida extends ErrorDeNegocio {}
 
 /** El token de subida no sirve: no corresponde a ese archivo, o vencio. */
-export class SubidaNoAutorizada extends Error {
-  constructor(motivo: string) {
-    super(motivo)
-    this.name = 'SubidaNoAutorizada'
-  }
-}
+export class SubidaNoAutorizada extends ErrorDeNegocio {}
 
 /** Nadie puede decir si esta descarga esta permitida: el modulo dueño del
  *  archivo no registro un autorizador. Es deliberadamente un error y no un

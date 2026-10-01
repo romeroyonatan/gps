@@ -1,6 +1,5 @@
 import { alcanceDe } from '@gps/core'
 import { type Builder, enumCompartido } from '@gps/core/graphql'
-import { GraphQLError } from 'graphql'
 import { TIPOS_DE_CARGO, type TipoDeCargo } from '../dominio/cargos'
 import { CATEGORIAS, type Categoria } from '../dominio/categorias'
 import { TIPOS_DE_DOCUMENTO } from '../dominio/documentos'
@@ -14,39 +13,6 @@ import type {
   PersonaConVinculos,
   Pertenencia,
 } from '../dominio/vinculos'
-import {
-  CambioDeAutoridadDenegado,
-  DatosInvalidos,
-  DocumentoDuplicado,
-  GrupoInexistente,
-} from './servicio'
-
-/** Los errores de negocio del servicio, dichos como los puede mostrar una
- *  pantalla. Yoga enmascara todo lo que no sea un GraphQLError: sin esta
- *  traduccion, el formulario recibe "Unexpected error." en vez del motivo.
- *  Traducir en el resolver y no en el servicio es lo que mantiene al servicio
- *  sin conocer el framework. */
-async function traduciendo<T>(correr: () => Promise<T>): Promise<T> {
-  try {
-    return await correr()
-  } catch (error) {
-    if (error instanceof CambioDeAutoridadDenegado) {
-      throw new GraphQLError(error.message, { extensions: { code: error.name } })
-    }
-    if (error instanceof DatosInvalidos) {
-      throw new GraphQLError(error.message, {
-        extensions: { code: 'DATOS_INVALIDOS', problemas: error.problemas },
-      })
-    }
-    if (error instanceof DocumentoDuplicado) {
-      throw new GraphQLError(error.message, { extensions: { code: 'DOCUMENTO_DUPLICADO' } })
-    }
-    if (error instanceof GrupoInexistente) {
-      throw new GraphQLError(error.message, { extensions: { code: 'GRUPO_INEXISTENTE' } })
-    }
-    throw error
-  }
-}
 
 export function registrarSchema(builder: Builder): void {
   // Los valores son los ids del dominio, en minuscula y no gritados como manda
@@ -224,23 +190,22 @@ export function registrarSchema(builder: Builder): void {
         datos: t.arg({ type: DatosDePersonaRef, required: true }),
         ingreso: t.arg({ type: DatosDeIngresoRef, required: true }),
       },
-      resolve: async (_padre, args, contexto) =>
-        await traduciendo(async () => {
-          // Pothos entrega los campos de lista de un input como array simple,
-          // sin el `readonly` que pide DatosDeIngreso: se arma campo por campo
-          // en vez de castear el argumento entero.
-          const ingreso: DatosDeIngreso = {
-            grupoId: String(args.ingreso.grupoId),
-            categoria: args.ingreso.categoria,
-            unidadId: args.ingreso.unidadId === undefined ? null : String(args.ingreso.unidadId),
-            desde: args.ingreso.desde,
-            cargos: args.ingreso.cargos.map((cargo) => ({
-              cargo: cargo.cargo,
-              hasta: cargo.hasta ?? null,
-            })),
-          }
-          return await contexto.personas.crearPersona(alcanceDe(contexto), args.datos, ingreso)
-        }),
+      resolve: async (_padre, args, contexto) => {
+        // Pothos entrega los campos de lista de un input como array simple,
+        // sin el `readonly` que pide DatosDeIngreso: se arma campo por campo
+        // en vez de castear el argumento entero.
+        const ingreso: DatosDeIngreso = {
+          grupoId: String(args.ingreso.grupoId),
+          categoria: args.ingreso.categoria,
+          unidadId: args.ingreso.unidadId === undefined ? null : String(args.ingreso.unidadId),
+          desde: args.ingreso.desde,
+          cargos: args.ingreso.cargos.map((cargo) => ({
+            cargo: cargo.cargo,
+            hasta: cargo.hasta ?? null,
+          })),
+        }
+        return await contexto.personas.crearPersona(alcanceDe(contexto), args.datos, ingreso)
+      },
     }),
   )
 
@@ -253,15 +218,14 @@ export function registrarSchema(builder: Builder): void {
         personaId: t.arg.id({ required: true }),
         datos: t.arg({ type: DatosDePersonaRef, required: true }),
       },
-      resolve: async (_padre, args, contexto) =>
-        await traduciendo(async () => {
-          await contexto.personas.editarPersona(
-            alcanceDe(contexto),
-            String(args.personaId),
-            args.datos,
-          )
-          return true
-        }),
+      resolve: async (_padre, args, contexto) => {
+        await contexto.personas.editarPersona(
+          alcanceDe(contexto),
+          String(args.personaId),
+          args.datos,
+        )
+        return true
+      },
     }),
   )
 
@@ -274,16 +238,15 @@ export function registrarSchema(builder: Builder): void {
         unidadId: t.arg.id({ required: true }),
         desde: t.arg.string({ required: true }),
       },
-      resolve: async (_padre, args, contexto) =>
-        await traduciendo(async () => {
-          await contexto.personas.cambiarDeUnidad(
-            alcanceDe(contexto),
-            String(args.personaId),
-            String(args.unidadId),
-            args.desde,
-          )
-          return true
-        }),
+      resolve: async (_padre, args, contexto) => {
+        await contexto.personas.cambiarDeUnidad(
+          alcanceDe(contexto),
+          String(args.personaId),
+          String(args.unidadId),
+          args.desde,
+        )
+        return true
+      },
     }),
   )
 
@@ -336,15 +299,13 @@ export function registrarSchema(builder: Builder): void {
         hasta: t.arg.string(),
       },
       resolve: async (_padre, args, contexto) =>
-        await traduciendo(() =>
-          contexto.personas.asignarCargoComo(alcanceDe(contexto).actor, {
-            personaId: String(args.personaId),
-            cargo: args.cargo as TipoDeCargo,
-            ambitoId: args.ambitoId === undefined ? null : String(args.ambitoId),
-            desde: args.desde,
-            hasta: args.hasta ?? null,
-          }),
-        ),
+        await contexto.personas.asignarCargoComo(alcanceDe(contexto).actor, {
+          personaId: String(args.personaId),
+          cargo: args.cargo as TipoDeCargo,
+          ambitoId: args.ambitoId === undefined ? null : String(args.ambitoId),
+          desde: args.desde,
+          hasta: args.hasta ?? null,
+        }),
     }),
   )
 
@@ -352,11 +313,10 @@ export function registrarSchema(builder: Builder): void {
     t.boolean({
       description: 'Saca a alguien de un cargo. El acceso se pierde en el pedido siguiente.',
       args: { cargoId: t.arg.id({ required: true }) },
-      resolve: async (_padre, args, contexto) =>
-        await traduciendo(async () => {
-          await contexto.personas.revocarCargo(alcanceDe(contexto).actor, String(args.cargoId))
-          return true
-        }),
+      resolve: async (_padre, args, contexto) => {
+        await contexto.personas.revocarCargo(alcanceDe(contexto).actor, String(args.cargoId))
+        return true
+      },
     }),
   )
 
@@ -370,22 +330,21 @@ export function registrarSchema(builder: Builder): void {
         ambitoId: t.arg.id(),
         desde: t.arg.string({ required: true }),
       },
-      resolve: async (_padre, args, contexto) =>
-        await traduciendo(async () => {
-          const tipo = args.tipo as TipoDeEquipo
-          const integrante = await contexto.personas.integrarEquipo(alcanceDe(contexto).actor, {
-            personaId: String(args.personaId),
-            tipo,
-            // Secretaría es del grupo; los otros dos son de la diócesis, que
-            // no apunta a ninguna entidad. Lo valida el servicio igual.
-            ambitoTipo: tipo === 'secretaria' ? 'grupo' : 'diocesis',
-            ambitoId: args.ambitoId === undefined ? null : String(args.ambitoId),
-            desde: args.desde,
-          })
-          // El tipo es el que vino en el argumento: el servicio devuelve el
-          // integrante, y el equipo al que entró es justamente éste.
-          return { ...integrante, tipo }
-        }),
+      resolve: async (_padre, args, contexto) => {
+        const tipo = args.tipo as TipoDeEquipo
+        const integrante = await contexto.personas.integrarEquipo(alcanceDe(contexto).actor, {
+          personaId: String(args.personaId),
+          tipo,
+          // Secretaría es del grupo; los otros dos son de la diócesis, que
+          // no apunta a ninguna entidad. Lo valida el servicio igual.
+          ambitoTipo: tipo === 'secretaria' ? 'grupo' : 'diocesis',
+          ambitoId: args.ambitoId === undefined ? null : String(args.ambitoId),
+          desde: args.desde,
+        })
+        // El tipo es el que vino en el argumento: el servicio devuelve el
+        // integrante, y el equipo al que entró es justamente éste.
+        return { ...integrante, tipo }
+      },
     }),
   )
 
@@ -393,14 +352,13 @@ export function registrarSchema(builder: Builder): void {
     t.boolean({
       description: 'Saca a alguien de un equipo. El acceso se pierde en el pedido siguiente.',
       args: { integranteId: t.arg.id({ required: true }) },
-      resolve: async (_padre, args, contexto) =>
-        await traduciendo(async () => {
-          await contexto.personas.revocarIntegranteDeEquipo(
-            alcanceDe(contexto).actor,
-            String(args.integranteId),
-          )
-          return true
-        }),
+      resolve: async (_padre, args, contexto) => {
+        await contexto.personas.revocarIntegranteDeEquipo(
+          alcanceDe(contexto).actor,
+          String(args.integranteId),
+        )
+        return true
+      },
     }),
   )
 }

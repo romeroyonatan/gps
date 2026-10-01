@@ -1,11 +1,21 @@
 import type { Almacenamiento, Bd, Config, ConversorDeImagenes, Sellador } from '@gps/core'
-import { createYoga } from 'graphql-yoga'
+import { ErrorDeNegocio } from '@gps/core/errores'
+import { GraphQLError } from 'graphql'
+import { createYoga, maskError } from 'graphql-yoga'
 import inicio from '../../../apps/web/index.html'
 import { crearInterceptorDeIntentosElevados } from './auditoria'
 import { componer } from './composicion'
 import { crearContexto } from './context'
 import { rutaDeArchivos, rutaDeLaNominaDeUnGrupo, rutaDelPdfDeUnPermiso } from './rutas-de-archivos'
 import { rutaDeCallbackDeLogin, rutaDeInicioDeLogin } from './rutas-de-auth'
+
+/** Un ErrorDeNegocio llega envuelto por graphql-js, que ya le copio el mensaje
+ *  y las extensions (code, problemas): pasa tal cual. Lo demas se enmascara
+ *  como siempre. */
+export const enmascararSalvoNegocio: typeof maskError = (error, mensaje, isDev) =>
+  error instanceof GraphQLError && error.originalError instanceof ErrorDeNegocio
+    ? error
+    : maskError(error, mensaje, isDev)
 
 export async function crearServidor(
   config: Config,
@@ -28,6 +38,7 @@ export async function crearServidor(
     context: contextoPorPedido,
     graphqlEndpoint: '/graphql',
     landingPage: false,
+    maskedErrors: { maskError: enmascararSalvoNegocio },
     plugins: [crearInterceptorDeIntentosElevados()],
   })
 

@@ -1,9 +1,7 @@
 import type { CambioDeAuditoria, ValorDeAuditoria } from '@gps/core'
 import { alcanceDe } from '@gps/core'
 import type { Builder } from '@gps/core/graphql'
-import { GraphQLError } from 'graphql'
 import type { EventoDeAuditoria, PaginaDeAuditoria } from '../dominio'
-import { AuditoriaDenegada } from './servicio'
 
 interface Detalle {
   clave: string
@@ -73,23 +71,17 @@ export function registrarSchema(builder: Builder): void {
         limite: t.arg.int(),
       },
       resolve: async (_padre, args, contexto) => {
-        try {
-          return await contexto.auditoria.listar(alcanceDe(contexto), {
-            desde: args.desde ? new Date(args.desde) : undefined,
-            hasta: args.hasta ? new Date(args.hasta) : undefined,
-            grupoId: args.grupoId === undefined ? undefined : String(args.grupoId),
-            actorPersonaId:
-              args.actorPersonaId === undefined ? undefined : String(args.actorPersonaId),
-            modulo: args.modulo ?? undefined,
-            accion: args.accion ?? undefined,
-            cursor: args.cursor ?? undefined,
-            limite: args.limite ?? undefined,
-          })
-        } catch (error) {
-          if (error instanceof AuditoriaDenegada)
-            throw new GraphQLError(error.message, { extensions: { code: 'SIN_PERMISO' } })
-          throw error
-        }
+        return await contexto.auditoria.listar(alcanceDe(contexto), {
+          desde: args.desde ? new Date(args.desde) : undefined,
+          hasta: args.hasta ? new Date(args.hasta) : undefined,
+          grupoId: args.grupoId === undefined ? undefined : String(args.grupoId),
+          actorPersonaId:
+            args.actorPersonaId === undefined ? undefined : String(args.actorPersonaId),
+          modulo: args.modulo ?? undefined,
+          accion: args.accion ?? undefined,
+          cursor: args.cursor ?? undefined,
+          limite: args.limite ?? undefined,
+        })
       },
     }),
   )
