@@ -1,470 +1,216 @@
 # Arquitectura de GPS
 
-Mapa de las piezas y de cómo se comunican. Complementa la spec de diseño en
-`docs/superpowers/specs/2026-08-24-arquitectura-y-walking-skeleton-design.md`, que
-explica **por qué** cada decisión es como es. Este documento explica **qué hay**.
-
-Las piezas marcadas con `(futuro)` están diseñadas pero no implementadas.
+Mapa de las piezas actuales y de sus fronteras. La [spec de diseño](superpowers/specs/2026-08-24-arquitectura-y-walking-skeleton-design.md) explica las decisiones originales. Los [cambios archivados](../openspec/changes/archive/) registran las decisiones posteriores. Este documento distingue lo existente de lo futuro.
 
 ## 1. Vista general
 
-                +---------------------+     +---------------------+
-                |      apps/web       |     |    apps/mobile      |
-                |  React, bundleado   |     |  Expo + React Native|
-                |  por Bun + Tailwind |     |  NativeWind         |
-                +----------+----------+     +----------+----------+
-                           |                           |
-                           +-------------+-------------+
-                                         |
-                              +----------v-----------+
-                              |    packages/api      |
-                              |  TanStack Query      |
-                              |  hooks del codegen   |
-                              +----------+-----------+
-                                         |
-                                 Transporte (interfaz)
-                                         |
-                    +--------------------+--------------------+
-                    |                                         |
-             transporteHttp                          transporteLocal
-                    |                                    (futuro)
-                    v                                         v
-        +-----------------------+               +-------------------------+
-        |   services/backend    |               |     packages/local      |
-        |   Bun.serve + Yoga    |               |  compone en proceso     |
-        +-----------+-----------+               +------------+------------+
-                    |                                        |
-                    +-------------------+--------------------+
-                                        |
-                          +-------------v----------------------+
-                          |    packages/<modulo>               |
-                          | sistema, estructura, personas,     |
-                          | afiliacion, tesoreria, ...          |
-                          +-------------+----------------------+
-                                        |
-                          +-------------v--------------+
-                          |      packages/core         |
-                          |  contrato, registro, Core  |
-                          +----------------------------+
+```mermaid
+flowchart TB
+    web["apps/web · React y Tailwind"] --> api["packages/api · hooks, TanStack Query y transporte HTTP"]
+    mobile["apps/mobile · Expo y NativeWind"] --> api
+    api -->|POST /graphql| backend["services/backend · Bun.serve y GraphQL Yoga"]
+    backend --> modulos["packages/* · módulos de negocio"]
+    modulos --> core["packages/core · contratos y capacidades de plataforma"]
+    futuro["Futuro: packages/local · composición en el teléfono"] -.-> modulos
+```
 
-Lo importante del dibujo: **las dos ramas del transporte llegan a los mismos módulos**.
-Un módulo no sabe si lo está ejecutando el servidor o el teléfono.
+Web y mobile comparten las reglas puras de `/dominio` y los documentos de API, no los componentes de interfaz. Hoy `packages/api` sólo implementa `transporteHttp`. No existe `packages/local`, transporte local ni base en el teléfono.
 
 ## 2. Adentro del backend
 
-    +----------------------------------------------------------------+
-    |  services/backend                                              |
-    |                                                                |
-    |  index.ts                                                      |
-    |     |                                                          |
-    |     v                                                          |
-    |  server.ts   (Bun.serve, un solo puerto)                       |
-    |     |                                                          |
-    |     +-- /graphql --> GraphQL Yoga                              |
-    |     |                   |                                      |
-    |     |                   +-- auditoria.ts                      |
-    |     |                   |     intentos elevados rechazados     |
-    |     |                   +-- envelop.ts            (futuro)     |
-    |     |                         rate limiting                    |
-    |     |                         cache de respuestas              |
-    |     |                                                          |
-    |     +-- /auth/:proveedor/iniciar   --> arranca el login             |
-    |     +-- /auth/:proveedor/callback  --> cookie web / deep link mobile |
-    |     |                                                          |
-    |     +-- /health  --> chequeo                                   |
-    |     |                                                          |
-    |     +-- /*       --> estaticos de apps/web                     |
-    +----------------------------------------------------------------+
+```mermaid
+flowchart LR
+    inicio["index.ts · entorno y recursos"] --> servidor["server.ts · Bun.serve"]
+    servidor --> graphql["/graphql · Yoga y Pothos"]
+    servidor --> auth["/auth/:proveedor/iniciar y /callback"]
+    servidor --> archivos["/archivos/:id · bytes"]
+    servidor --> pdf["/permisos/:id/pdf · /grupos/:id/nomina.pdf y .xlsx"]
+    servidor --> exportacion["/auditoria.xlsx"]
+    servidor --> health["/health"]
+    servidor --> web["/* · web estática"]
+    graphql --> contexto["context.ts · identidad y alcance por pedido"]
+    graphql --> interceptor["auditoria.ts · intentos elevados rechazados"]
+```
 
-Un contenedor, un proceso, un puerto. En desarrollo y en producción es el mismo
-`Bun.serve` el que sirve las tres rutas, con recarga en caliente.
+Un proceso sirve web y API en un puerto, también en desarrollo. Los archivos y las exportaciones viajan por HTTP, no por GraphQL. El interceptor no registra las escrituras exitosas. Cada caso de uso registra su propio evento en la transacción. No hay rate limiting ni caché de respuestas en envelop.
 
 ## 3. Arranque: la raíz de composición
 
-    index.ts
-       |
-       | 1. lee y valida la configuracion del entorno
-       v
-    core.ts ------------- construye ------------> Core { config, logger, reloj, bd,
-                                                        eventos, nuevoId, hash, sellador,
-                                                        almacenamiento,
-                                                        conversorDeImagenes }
-       |
-       | 2. toma la lista de modulos
-       v
-    modules.ts  ->  [ sistema, estructura, personas, ... ]
-       |
-       | 3. ordena por dependencies y detecta ciclos
-       v
-    aplicarMigraciones(core, modulos)   corre las migraciones pendientes de cada uno
-       |
-       v
-    para cada modulo, en orden:
-       |
-       +--> servicios = modulo.createServices(core, dependencias)
-       |         las dependencias son los servicios de modulo.dependencies,
-       |         ya construidos, tipados contra su /dominio/publico.ts
-       |         y se monta en el contexto bajo modulo.name
-       |
-       +--> modulo.registerSchema(builder)
-       |
-       v
-    esquema compuesto  --genera-->  schema.gql   (versionado, CI lo verifica)
-       |
-       v
-    server.ts escucha
+```mermaid
+flowchart TD
+    entorno["index.ts · valida entorno, abre SQLite, prepara sello y almacenamiento"] --> composicion["composicion.ts · componer"]
+    lista["modules.ts · lista de módulos"] --> orden["ordenarModulos · dependencias y ciclos"]
+    orden --> core["crearCore · reloj, base, eventos, auditoría, ids, secretos, hash, sello, archivos, conversor"]
+    composicion --> core
+    core --> migraciones["aplicarMigraciones · antes de crear servicios"]
+    migraciones --> servicios["crearServicios · createServices(core, dependencias)"]
+    servicios --> esquema["componerEsquema · registerSchema y accesoAlModulo"]
+    esquema --> servidor["server.ts · escuchar"]
+    servicios --> contexto["context.ts · actor y alcance por pedido"]
+```
 
-Si a un módulo le falta algo que necesita, **no compila**. No hay resolución por
-strings ni contenedor de inyección que falle en runtime.
+Las dependencias de `Module<S, D>` se tipan contra las claves de `D` y llegan como servicios ya construidos. El registro comprueba dependencias y ciclos al arrancar. `schema.gql` se genera con `bun run schema` y se verifica en CI. No se escribe durante cada arranque. La composición registra en Archivos los autorizadores de los módulos dueños de recursos.
+
+`@gps/core` tiene tres puertas: el índice para plomería del servidor, `@gps/core/graphql` para Pothos y `@gps/core/fechas` para código isomorfo. Un import de valor desde el índice arrastraría dependencias de servidor al bundle mobile.
 
 ## 4. Anatomía de un módulo
 
-Cada módulo es un paquete con tres entradas, y quién puede importar cada una está
-impuesto por el linter, no por convención.
+```mermaid
+flowchart LR
+    dominio["packages/personas/src/dominio · modelos, reglas, políticas y publico.ts"] --> apps["apps/web y apps/mobile"]
+    dominio --> otros["otros módulos"]
+    dominio --> servidor["packages/personas/src/servidor · servicios, GraphQL y migraciones"]
+    servidor --> backend["services/backend · composición"]
+    servidor --> demo["packages/demo · siembra"]
+```
 
-    packages/personas/
-      |
-      +-- /dominio     modelos, validaciones, reglas puras, publico.ts,
-      |                politicas.ts
-      |                    ^              ^                  ^               ^
-      |                    |              |                  |               |
-      |                 apps/web      apps/mobile    services/backend  otros modulos
-      |
-      +-- /servidor    esquema, resolvers, repositorios, migraciones
-      |                    ^              ^              ^
-      |                    |              |              |
-      |             services/backend  packages/local  packages/demo
-      |                                                (y NADIE mas)
-      |
-      +-- /ui          componentes compartibles (opcional)
-                           ^          ^
-                           |          |
-                        apps/web  apps/mobile
+`/dominio` es puro e isomorfo. Una decisión que sólo necesita datos recibidos por parámetro vive allí, aunque hoy la invoque sólo el servidor. `publico.ts` expone a otros módulos una interfaz menor que el servicio completo. `/servidor` organiza efectos, persistencia y esquema. `servicio.ts` declara el contrato y compone los casos de uso.
 
-Prohibido y verificado en CI, por `noRestrictedImports` en `biome.json`:
+Estructura y Archivos mantienen operaciones cortas en `servicio.ts`. Afiliación y Salidas separan casos de uso cohesivos. No hay una capa de repositorio obligatoria ni un archivo por método. Los enums compartidos de GraphQL usan `enumCompartido` en `@gps/core/graphql`. Así Estructura y Personas registran `Rama` una vez sin mover su catálogo a Core.
 
-    apps/**            ---X--->  packages/*/servidor
-    packages/<a>/src   ---X--->  @gps/<b>/servidor
-    packages/<a>/src   ------->  @gps/<b>/dominio     (la interfaz publica)
+El linter prohíbe importar `*/servidor` desde las apps y desde otro módulo. `packages/demo` está exceptuado para la siembra. `@gps/core` no es un módulo de negocio. Los módulos reciben servicios ajenos por `createServices` o por el contexto de los resolvers.
 
-Dos excepciones a la primera regla. `@gps/core` sí se puede importar: es la plomería, no
-un módulo. Y `packages/demo` está exceptuado del todo, porque sembrar los módulos a
-través de sus servicios públicos exige conocerlos — es su razón de ser.
+Todo `src/` de un módulo evita `bun:*`, `node:*` y lecturas de archivos. En `/servidor`, el reloj y los ids provienen de `Core`, nunca de la plataforma. Las migraciones importan SQL como texto con una extensión de Bun. Esa carga necesita adaptación para Metro antes de ejecutar módulos en el teléfono. Para crear un módulo, ver [crear un módulo](crear-un-modulo.md).
 
-`/servidor` es privado — tiene estado y es la implementación — y se llega a él por el
-contexto (`ctx.personas`, `ctx.estructura`) o por las dependencias que `createServices`
-recibe ya construidas. `/dominio`, en cambio, sí se importa entre módulos: es puro,
-isomorfo y sin estado. Lo que un módulo le ofrece a los demás se declara en
-`src/dominio/publico.ts`, deliberadamente más chico que su servicio —
-`packages/estructura/src/dominio/publico.ts` publica `interface Estructura` con un solo
-método, `obtenerGrupo`, mientras `ServicioDeEstructura` (en `/servidor`) tiene cinco más
-que siguen siendo privados.
+## 5. Recorrido de una consulta
 
-La frontera también ordena la lógica dentro de un módulo:
+```mermaid
+sequenceDiagram
+    participant P as Pantalla
+    participant A as packages/api
+    participant Y as Yoga
+    participant C as context.ts
+    participant R as Resolver Pothos
+    participant S as Servicio del módulo
+    participant B as SQLite
+    P->>A: hook de consulta
+    A->>Y: transporteHttp · POST /graphql
+    Y->>C: construir contexto del pedido
+    C-->>Y: actor, alcance y servicios
+    Y->>R: resolver con acceso al módulo
+    R->>S: operación con alcance
+    S->>B: consulta filtrada, si corresponde
+    B-->>S: filas
+    S-->>P: respuesta por GraphQL y TanStack Query
+```
 
-    /dominio     decisiones puras y vocabulario del negocio
-    /servidor    orquestación de efectos, consultas y persistencia
-    servicio.ts  contrato y composición del servicio
+`packages/api` usa documentos tipados y TanStack Query. Su caché persistida se particiona por persona. Web usa IndexedDB y mobile usa AsyncStorage para los datos. La sesión mobile se guarda aparte en `expo-secure-store`. La consulta pública de versión de Sistema no necesita base ni sesión. No todas las consultas pasan por un repositorio.
 
-Una regla que puede decidir con datos recibidos por parámetro vive en `/dominio`, aunque
-su único consumidor actual sea el servidor. Por ejemplo, Afiliación arma allí las
-nóminas declarables a partir de miembros activos, grupos abiertos y grupos que ya
-declararon. El caso de uso de `/servidor` obtiene esos datos, consulta el reloj mediante
-`Core`, asigna ids y persiste declaración y nómina en una transacción.
+## 6. Autenticación, alcance y reglas de negocio
 
-Esto no obliga a un archivo por método ni a capas de `repository`, puertos o handlers.
-Las operaciones cortas sin una decisión separable pueden seguir en `servicio.ts`, como
-las altas simples de Estructura. Cuando un módulo crece, los casos de uso cohesivos y las
-consultas se separan en archivos con nombres del negocio; `servicio.ts` queda como mapa
-del contrato y punto de composición, no como destino automático de toda regla nueva.
+```mermaid
+flowchart TD
+    pedido["Pedido · cookie web o bearer mobile"] --> sesion["auth · sesión opaca por hash"]
+    sesion --> funciones["personas · cargos y equipos vigentes"]
+    funciones --> expandir["estructura.expandirAlcance · grupos y distritos"]
+    expandir --> alcance["Alcance · actor y grupos visibles"]
+    alcance --> politica["políticas de operación y campo"]
+    alcance --> consulta["servicio · filtro de filas"]
+    politica --> resultado["permitir o denegar"]
+    consulta --> resultado
+```
 
-Compartir un tipo de dominio entre módulos tiene una arista aparte cuando ese tipo es un
-enum de GraphQL: Pothos 4.13 no tiene un `enumRef` diferido, así que un enum sólo se crea
-con `builder.enumType(...)`, y crearlo dos veces con el mismo nombre aborta el esquema al
-componerlo. `Rama` la necesitan tanto `estructura` (que la define, en su `/dominio`) como
-`personas` (que la usa para modelar la pertenencia), y los dos módulos registran su
-esquema por separado. `enumCompartido` (`packages/core/src/builder.ts`) es la plomería
-que resuelve eso: el primer módulo que lo llama con un nombre lo crea, el segundo recibe
-la misma referencia si los valores coinciden, y tira si no. El catálogo de valores de
-`Rama` no subió a `core` —sigue siendo `estructura` quien lo declara en su `/dominio`—,
-sólo el registro que evita crearlo dos veces, que es plomería y por eso vive en `core`.
+Google y Apple usan Authorization Code con PKCE, `state`, `nonce` y validación JOSE. Demo ofrece un proveedor interno sólo en ese entorno. La identidad interna es una `Persona`, sin tabla de usuarios ni correlación por correo. Las sesiones duran 30 días, son revocables y no contienen roles. Cada pedido reconstruye las funciones vigentes.
 
-## 5. El recorrido de una consulta
+La cookie web es `HttpOnly`. Mobile manda un bearer desde almacenamiento seguro. Invitaciones y recuperaciones usan enlaces de un solo uso, con vencimiento de siete días. Recuperar reemplaza la identidad perdida y revoca las sesiones.
 
-Ésta es la cadena que el walking skeleton prueba de punta a punta.
+Hay una persona administradora designada. Su sesión ordinaria no tiene alcance global. Debe reautenticarse con una identidad vinculada para elevarse durante diez minutos. La CLI permite reasignarla si pierde sus identidades. No existe mutation equivalente.
 
-    pantalla
-       |
-       v
-    useVersionQuery()            hook generado por codegen desde schema.gql
-       |
-       v
-    TanStack Query               si hay copia en disco, responde sin red
-       |
-       v
-    Transporte.ejecutar()
-       |
-       v
-    POST /graphql
-       |
-       v
-    GraphQL Yoga
-       |
-       v
-    plugins de envelop           intentos elevados rechazados
-       |
-       v
-    context.ts                   arma { actor, sistema, personas, ... }
-       |
-       v
-    resolver de Pothos           ctx.sistema.obtenerVersion()
-       |
-       v
-    servicio del modulo
-       |
-       v
-    repositorio  ->  base        (estructura llega hasta aca; sistema no tiene tablas)
-       |
-       v
-    respuesta
+La autorización tiene tres capas. `accesoAlModulo` es obligatorio y cerrado por omisión en cada campo raíz. `Alcance` es el primer parámetro de operaciones iniciadas por usuarios. Las políticas puras deciden por operación o campo. La pantalla puede usarlas para ocultar acciones, pero el servidor siempre las aplica. Las operaciones internas como el barrido de Afiliación no reciben un alcance falso.
 
-## 6. Autenticación y autorización
+Un campo GraphQL que devuelve `null` al denegarse debe ser nullable. Las escrituras denegadas lanzan error. El directorio de distritos y grupos es visible para cualquier persona con sesión, pero sus datos internos requieren autorización. Un comisionado alcanza los permisos que firma en su distrito sin acceder al padrón ni a la cuenta corriente de cada grupo.
 
-    request
-       |
-       v
-    auth        quien sos      -->  Actor { personaId, roles[] }
-       |
-       v
-    estructura  que alcanzas   -->  Alcance { actor, gruposVisibles, distritosVisibles }
-       |
-       +----------------------------+
-       |                            |
-       v                            v
-    repositorio(alcance, ...)    politicas.puedeVer...(alcance, x)
-       |                            |
-       |                            +--> tambien lo usa la pantalla,
-       |                                 para decidir que boton mostrar
-       v
-    filas que el actor puede ver
+Personas guarda pertenencias, cargos y equipos con vigencia y revocación. Estructura expande sus ámbitos. Una persona pertenece a una unidad concreta, cuya rama deriva del catálogo. Un grupo puede tener varias unidades de una misma rama. `Persona` no guarda sexo.
 
-Dos garantías salen de este dibujo. La primera: `alcance` es el **primer parámetro
-obligatorio** de todo camino iniciado por un usuario, así que una consulta que se olvide
-de filtrar no compila. La segunda: las políticas son las **mismas funciones** en el
-servidor y en la pantalla, así que la interfaz no puede ofrecer algo que el servidor
-vaya a rechazar.
-
-`Alcance` lleva adentro al `Actor` porque las dos preguntas viajan siempre juntas: qué
-filas se ven —`gruposVisibles`— y qué puede hacer quien pregunta, que es lo que deciden
-las políticas. Separarlas obligaría a dos parámetros en cada firma, y a que alguna se
-olvidara.
-
-Arriba de las dos hay una tercera capa, que es la primera que corre: cada `Module`
-declara `accesoAlModulo`, y `componerEsquema` se lo cuelga a cada campo raíz que ese
-módulo registra. Es obligatorio en la interfaz —un módulo nuevo no compila sin
-decidirlo— y un campo raíz sin módulo dueño aborta el arranque, en vez de quedar
-publicado abierto.
-
-Un grupo se subdivide en **unidades**: la Manada, las dos Tropas, el Clan. La rama sigue
-siendo el catálogo —el tramo de edad, y cómo se llama el tipo de unidad que le
-corresponde—, y la unidad es la instancia concreta que ese grupo abrió, con su sexo
-(masculina, femenina o mixta) y su nombre propio. Es la misma separación que hay entre los
-cargos, que los nombra el código, y los equipos, que los crea alguien. Por eso un grupo
-puede tener dos tropas scout, que es lo que la tabla `ramas_del_grupo` —clave
-`(grupo, rama)`— no podía representar. Las ramas abiertas de un grupo se derivan de sus
-unidades, sin repetir.
-
-Las cuatro capacidades que `Core` sumó con `salidas` son todas plataforma que un módulo no
-puede tocar: `hash` es sha256 y dice si unos bytes cambiaron; `sellador` es HMAC con una
-clave secreta y dice además que los escribimos nosotros —sin secreto, quien alcanza la base
-recalcula el hash y el sello no prueba nada—; `almacenamiento` mueve los bytes de los
-archivos, que no van a SQLite; y `conversorDeImagenes` pasa a JPEG las fotos HEIC de los
-iPhone, que `pdf-lib` no sabe leer.
-
-Las claves de sello **no** están en `Config`: las lee el backend del entorno y se las pasa a
-`crearCore`, igual que la ruta de la base. Ningún módulo las lee —usan el `sellador` ya
-construido— así que meterlas en `Config` sólo las expondría a todos. Cada firma guarda con
-qué clave se selló, que es lo que permite rotar sin invalidar lo ya firmado.
-
-La persona pertenece a una unidad y no a una rama: la rama sale de la unidad. A quién se
-pone en cuál lo deciden los dirigentes; el sistema no lo valida ni lo sugiere, y `Persona`
-no guarda sexo.
-
-Quien ocupa cada cargo lo dice `personas`, no `estructura` — ver §7. La cadena de
-dependencias es `auth` → `personas` → `estructura`; `auth` también depende de
-`estructura` directo, para poder nombrar el grupo de un enlace de invitación.
+El detalle de persona lee `personas(grupoId)` y permite corregir datos, incluido el documento. También permite cambiar a un dirigente de unidad con historial. Los pases de beneficiarios se hacen por lote. No existe una consulta global `persona(id)`.
 
 ## 7. Dependencias entre módulos
 
-`Actor` y `Alcance` son tipos de `core`; `estructura` aporta `expandirAlcance`, que
-expande los roles de un actor en un alcance concreto. Eso es ortogonal a la dependencia
-de módulo: `personas` depende de `estructura`.
+Las flechas indican «depende de». `core` aporta contratos y capacidades a todos, pero no es un módulo de negocio.
 
-    core                        plomeria; todos dependen de el
+```mermaid
+flowchart LR
+    personas --> estructura
+    auth --> personas
+    auth --> estructura
+    afiliacion --> personas
+    afiliacion --> estructura
+    tesoreria --> afiliacion
+    tesoreria --> estructura
+    salidas --> personas
+    salidas --> estructura
+    salidas --> archivos
+    auditoria --> personas
+    auditoria --> estructura
+    auditoria --> auth
+    sistema["sistema · sin dependencias"]
+```
 
-    estructura      archivos    no dependen de ningun otro modulo
-       ^  ^             ^
-       |  |             |
-    personas  +---------+
-       ^  ^  |
-       |  |  |
-       |  +--+-- salidas    depende de las tres: personas, estructura y archivos
-       |
-       +-- salud
-       |
-       +-- auth        depende de personas y de estructura
-       |
-    afiliacion      depende tambien de estructura, directo y no solo via personas
-       ^
-       |
-    tesoreria
+Estructura, Archivos y Sistema no dependen de otros módulos. La pertenencia y los cargos viven en Personas. Por eso Personas depende de Estructura y no al revés. Afiliación consulta grupos abiertos y miembros activos para conservar fotografías de las declaraciones. Tesorería consume las declaraciones y lista también grupos cerrados. Cerrar un grupo no elimina su deuda.
 
-La spec base suponía que `estructura` iba a depender de `personas`, porque modela cargos
-y autoridades (jefe de grupo, comisionado de distrito, auxiliares, Edifor): todos apuntan
-a una persona. Al conectar los dos módulos la relación resultó invertida: la pertenencia
-y los cargos viven en `personas`, en dos tablas con historial (`pertenencias` y `cargos`),
-así que es `personas` quien depende de `estructura` (`dependencies: ['estructura']`) —
-para saber a qué grupo pertenece cada quien — y no al revés. `estructura` no depende de
-ningún otro módulo (`dependencies: []`), y quién ocupa cada cargo lo dice `personas`.
+Salidas usa Personas para participantes y firmantes, Estructura para unidades y distrito, y Archivos para PDF, escaneos y adjuntos. Archivos no importa Salidas. La raíz de composición registra el autorizador del recurso. Si no hay dueño registrado, no entrega el archivo.
 
-`afiliacion` depende de `personas` **y** de `estructura` (`dependencies: ['personas',
-'estructura']`), las dos por lectura: no escribe ni una persona ni un grupo. Necesita
-`estructura.gruposAbiertosEn` para saber qué grupos existían un día dado, y
-`personas.miembrosActivos` para la nómina de ese día — ninguna de las dos alcanza sola,
-porque un grupo cerrado no debe declarar aunque su gente siga viva en las tablas de
-`personas` (ver §"Qué NO existe todavía" en `AGENT.md` sobre esa deuda). No depende de
-`salidas`: esa flecha era un error de una versión anterior de este diagrama, de cuando
-`afiliacion` era todavía especulativa.
+Auditoría lee nombres desde Personas y Estructura. Depende de Auth para migrar el historial de seguridad. Las escrituras de los otros módulos usan `core.auditoria`, no una dependencia hacia el módulo Auditoría.
 
-`tesoreria` depende de las interfaces públicas de `afiliacion` y `estructura`. De la
-primera obtiene las fotos cobrables y de la segunda todos los grupos, incluidos los
-cerrados: cerrar un grupo no borra su deuda.
+## 8. Demo, persistencia y portabilidad
 
-`salidas` —el permiso de salida, que en el diagrama viejo se llamaba `permisos`— depende de
-las tres: de `personas` por los participantes y por quién ocupa cada cargo el día que
-firma, de `estructura` por el grupo y su distrito, y de `archivos` por el PDF, los escaneos
-de lo firmado en papel y los adjuntos. Se renombró porque "permisos" choca de frente con la
-autorización: `puedeVerPermiso` no se puede leer.
+```mermaid
+flowchart LR
+    normal["Backend · SQLite por Drizzle, WAL y archivos en disco"] --> core["Core · base, reloj, almacenamiento y capacidades"]
+    demo["Demo · SQLite y archivos en memoria"] --> core
+    core --> modulos["Los mismos módulos"]
+    local["Futuro · expo-sqlite y archivos locales"] -.-> core
+```
 
-`archivos` no depende de nadie y, sobre todo, **no conoce ninguna regla de permisos**: para
-autorizar una descarga le pregunta al módulo dueño, que se registra en la raíz de
-composición. Depender de sus dueños sería un ciclo, y un archivo cuyo módulo no esté en ese
-registro no se entrega.
+`bun run demo` siembra datos sintéticos por los servicios y ofrece perfiles de acceso. El backend abre SQLite en `bd.ts` y espera hasta cinco segundos ante un lock. El bus, el reloj, los ids, los secretos, el hash, el sellador HMAC, el almacenamiento y la conversión HEIC a JPEG entran por `Core`.
 
-El registro resuelve el orden efectivo a partir de esas dependencias.
+Ni las claves de sello ni la ruta de la base ni el directorio de archivos se exponen como configuración de los módulos. Fuera de demo, los archivos van a disco. En demo, van a memoria. El runner de migraciones recibe SQL y usa `core.bd`.
 
-## 8. Modo demo y offline
+Los imports `with { type: 'text' }` de los módulos dependen de Bun. Requieren una solución para Metro cuando exista `packages/local`. No hay base offline ni sincronización. La caché mobile no equivale a ejecutar los módulos localmente.
 
-Los mismos módulos, otro `Core`.
+## 9. Eventos entre módulos y cuentas corrientes
 
-    +---------------------------+        +---------------------------+
-    |  services/backend         |        |  apps/mobile   (futuro)   |
-    |                           |        |                           |
-    |  Core {                   |        |  Core {                   |
-    |    bd: bun:sqlite         |        |    bd: expo-sqlite        |
-    |    notificador (futuro)   |        |    notificador: ninguno   |
-    |    almacenamiento (futuro)|        |    almacenamiento: local  |
-    |  }                        |        |  }                        |
-    +------------+--------------+        +------------+--------------+
-                 |                                    |
-                 +------------------+-----------------+
-                                    |
-                       +------------v-------------+
-                       |  packages/<modulo>       |
-                       |  identico en los dos     |
-                       +--------------------------+
+```mermaid
+flowchart LR
+    afiliacion["Afiliación · declaración confirmada"] -->|AfiliacionDeclarada| bus["Core.eventos · bus tipado, síncrono y en proceso"]
+    bus --> tesoreria["Tesorería · cargo de afiliación"]
+    pendientes["Generar deudas pendientes · reconciliación"] --> tesoreria
+```
 
-La mitad izquierda ya existe, salvo lo marcado `(futuro)`: `services/backend/src/bd.ts`
-abre SQLite real por Drizzle, con WAL y cinco segundos de espera ante un lock, y
-`bun run demo` (`ENTORNO=demo`) levanta esa misma base en memoria, sembrada por
-`packages/demo` a través de los servicios públicos de cada
-módulo — la siembra no conoce repositorios ni tablas, sólo llama a lo que cualquier
-resolver llamaría.
+Afiliación publica después del commit. Si falla el suscriptor o falta la cuota, la declaración queda guardada. La reconciliación manual crea el cargo pendiente de forma idempotente. No hay broker ni reintentos automáticos.
 
-La mitad derecha sigue siendo futuro completo: no hay `packages/local` ni base en el
-dispositivo. Cuando exista, va a componer los mismos módulos con un `Core` que abra
-`expo-sqlite` en vez de `bun:sqlite` — `bd.ts` es hoy el único archivo que conoce el
-driver, así que cambiarlo ahí es todo lo que hace falta del lado del servidor.
+Tesorería guarda cuotas por período y movimientos inmutables: cargo positivo, pago negativo y anulación de pago positiva. Un saldo positivo es deuda. Uno negativo es saldo a favor. El cargo conserva cantidad y cuota aplicadas, aunque cambien después los datos de referencia. No hay imputación de pagos a cargos ni saldo mutable.
 
-Esto sólo funciona si se respeta la regla: **el código de servidor de un módulo nunca
-toca una API de plataforma directamente.** Ni `bun:sqlite`, ni `fs`, ni `fetch`, ni la
-hora del sistema. Todo pasa por `Core`.
+## 10. Salidas, archivos y auditoría
 
-Con una deuda conocida, que conviene tener escrita y no escondida. El runner
-`aplicarMigraciones` sí es portable: recibe `sql: string` y habla por `core.bd`, sin
-tocar el sistema de archivos ni el driver. Lo que **no** es portable es cómo cada
-módulo consigue ese texto, que es un detalle de plataforma: hoy `estructura` lo importa
-con `with { type: 'text' }`, una extensión de Bun que Metro no soporta (del atributo de
-import sólo `json` es estándar). El día que exista `packages/local` va a haber que
-resolverlo ahí — un transformer de Metro, o pasarle las migraciones al módulo de otra
-forma —, pero es un cambio en los módulos, no en el runner.
+```mermaid
+stateDiagram-v2
+    [*] --> borrador
+    borrador --> emitido: emitir y congelar participantes
+    emitido --> firmado: completar tres firmas
+    emitido --> anulado: anular
+    firmado --> anulado: anular
+    anulado --> borradorNuevo: reemitir como nuevo permiso
+```
 
-## 9. Eventos entre módulos
+Emitir guarda una fotografía de participantes y un PDF inicial en Archivos. El permiso guarda `hashDelPdf`, que ancla las firmas, y `hashDelContenido`, que identifica el texto canónico impreso en cada hoja. El expediente tiene numeración diocesana consecutiva por año y unicidad en la base. Una falla al generar el PDF puede dejar un hueco, pero no duplica un número.
 
-Los módulos no se llaman entre sí para reaccionar a cosas.
+Editar un permiso emitido exige anular y reemitir. El PDF descargable compone las firmas de la app y agrega los escaneos como anexos. Las tres firmas requeridas corresponden a jefe de grupo, director y comisionado de distrito. La app exige que firme la persona que ocupa el cargo en ese ámbito, incluso si hay elevación administrativa.
 
-    afiliacion
-       |
-       | despues de guardar, emite AfiliacionDeclarada
-       v
-    bus de eventos (core, en proceso, sincronico, tipado)
-       |
-       +--> tesoreria      genera el cargo
-       |
-       +--> mensajeria     (futuro)
-       +--> notificaciones (futuro)
+Los trazos se sellan con HMAC y la clave identificada en la firma. `hashDelPdf` solo no probaría autoría. La firma en papel guarda el escaneo y la declaración de cargos, pero no verifica el papel. No hay firma con certificado ni re-sellado para retirar claves.
 
-Afiliación no sabe quién escucha. Ése es el punto: la deuda la genera Tesorería sin que
-Afiliación la conozca. El bus sólo tiene `suscribir` y `publicar`; no hay broker, cola ni
-serialización.
+Archivos guarda metadatos en SQLite y bytes fuera de la base. La subida solicita y confirma por GraphQL y transfiere bytes por HTTP. La descarga consulta el autorizador del módulo dueño. Salidas genera PDF en `/servidor`, para no introducir `pdf-lib` en el bundle de mobile.
 
-El evento se llama `AfiliacionDeclarada` y no `AfiliacionAprobada`: lo que hace
-`afiliacion.declarar` es una declaración —una fotografía de quién está en cada grupo un
-día dado—, no una aprobación.
+```mermaid
+flowchart LR
+    caso["Caso de uso · escritura"] --> tx["Transacción SQLite"]
+    tx --> datos["Cambio de datos"]
+    tx --> evento["core.auditoria.registrar(datos, tx)"]
+    evento --> tabla["eventos_de_auditoria · sólo agregado"]
+```
 
-La declaración es el hecho principal y no se revierte si un suscriptor falla. Tesorería
-compara las declaraciones cobrables con los cargos existentes y ofrece **Generar deudas
-pendientes** únicamente cuando falta alguno. Esa reconciliación idempotente recupera un
-evento perdido o una declaración emitida antes de configurar su cuota.
+Cada escritura registra un evento en la misma transacción. Una edición guarda `cambios` anterior/nuevo. Altas, firmas y anulaciones guardan un resumen reducido. No se guardan secretos, URLs privadas, bytes ni trazos. Las reacciones internas indican `origenInterno`. Los intentos sensibles rechazados se registran aparte para sobrevivir al rechazo.
 
-## 10. Auditoría
+El interceptor GraphQL sólo observa la intención elevada rechazada, sin conceder permisos. `ACCIONES_AUDITADAS` en `services/backend/src/auditoria.ts` inventaría las mutations. Su test exige clasificar las nuevas.
 
-Toda escritura iniciada por una persona deja un evento en `eventos_de_auditoria`, una
-tabla de sólo agregado del módulo `auditoria`. No hay mutation para editarla ni borrarla,
-ni siquiera con elevación.
-
-    caso de uso de un modulo
-       |
-       | core.bd.transaction((tx) => {
-       |   ...cambio de datos...
-       |   core.auditoria.registrar({ actorPersonaId, modulo, accion, ... }, tx)
-       | })
-       v
-    eventos_de_auditoria        mismo commit: o quedan los dos o ninguno
-
-El registrador es plomería de `Core` (`core.auditoria`), no un servicio que los módulos
-importen: así `auditoria` puede depender de `personas` y `estructura` para mostrar
-nombres sin volver circular la dependencia. La raíz de composición lo conecta con la
-tabla, y el registrador toma instante e id de `Core.reloj` y `Core.nuevoId`.
-
-Qué se guarda lo decide cada caso de uso, nunca una copia de los argumentos GraphQL:
-
-- una edición guarda `cambios`, la lista de `{ campo, anterior, nuevo }`;
-- un alta, anulación, emisión o firma guarda un `resumen` con lo que la identifica;
-- se guardan referencias (`permisoId`, `archivoId`, `sesionId`), y nunca secretos,
-  tokens, URLs privadas, bytes de archivos ni trazos o sellos de firma.
-
-Una reacción interna —la deuda que Tesorería genera por una declaración, el barrido de
-Afiliación— lleva `origenInterno` en vez de una persona. Los errores ordinarios no dejan
-evento; sí lo dejan, como `rechazado`, los intentos sensibles: elevación, recuperación,
-reasignación administrativa y la escritura marcada con `x-gps-intencion-elevada` cuya
-elevación venció en el viaje. Esa cabecera no concede nada: sólo permite reconocer la
-carrera, y el plugin de `services/backend/src/auditoria.ts` la registra cuando la
-respuesta es `SIN_PERMISO`. `ACCIONES_AUDITADAS` en ese archivo es el inventario de
-mutations: una nueva que no se clasifique rompe su test.
-
-La consulta `auditoria(...)` pagina por cursor, del más reciente al más antiguo, con
-filtros combinables de fechas, grupo, actor, módulo y acción. Jefatura y Secretaría ven
-sólo sus grupos; la diócesis entera, y los eventos sin grupo, sólo el administrador
-elevado. Los eventos de `eventos_de_autoridad` y `eventos_de_seguridad` se copiaron al
-registro central al migrar; esas tablas quedan por rollback y ya nadie escribe en ellas.
+La consulta de Auditoría pagina por cursor y combina filtros de fechas, grupo, actor, módulo y acción. Jefatura y Secretaría leen eventos de sus grupos. Sólo la persona administradora elevada lee toda la diócesis y eventos sin grupo. `/auditoria.xlsx` exporta con la misma autorización. El historial anterior de autoridad y seguridad se migró al registro central. Sus tablas originales permanecen para rollback, sin escritores nuevos.
